@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+/*
+ * GitHub Primer design tokens mapped to Tailwind v4 theme variables.
+ * Light mode values mirror github.com's CSS custom properties.
+ */
+@theme {
+  /* ── Colour scale (canvas / page) ─────────────────────────── */
+  --color-canvas-default:          #ffffff;
+  --color-canvas-overlay:          #ffffff;
+  --color-canvas-inset:            #f6f8fa;
+  --color-canvas-subtle:           #f6f8fa;
+
+  /* ── Foreground ───────────────────────────────────────────── */
+  --color-fg-default:              #1f2328;
+  --color-fg-muted:                #636c76;
+  --color-fg-subtle:               #6e7781;
+  --color-fg-on-emphasis:          #ffffff;
+
+  /* ── Border ───────────────────────────────────────────────── */
+  --color-border-default:          #d0d7de;
+  --color-border-muted:            #d8dee4;
+  --color-border-subtle:           rgba(31,35,40,0.15);
+
+  /* ── Accent (blue) ────────────────────────────────────────── */
+  --color-accent-fg:               #0969da;
+  --color-accent-emphasis:         #0969da;
+  --color-accent-muted:            rgba(84,174,255,0.4);
+  --color-accent-subtle:           #ddf4ff;
+
+  /* ── Success (green) ──────────────────────────────────────── */
+  --color-success-fg:              #1a7f37;
+  --color-success-emphasis:        #2da44e;
+  --color-success-muted:           rgba(74,194,107,0.4);
+  --color-success-subtle:          #dafbe1;
+
+  /* ── Danger (red) ─────────────────────────────────────────── */
+  --color-danger-fg:               #d1242f;
+  --color-danger-emphasis:         #cf222e;
+  --color-danger-muted:            rgba(255,129,130,0.4);
+  --color-danger-subtle:           #ffebe9;
+
+  /* ── Attention (yellow) ───────────────────────────────────── */
+  --color-attention-fg:            #9a6700;
+  --color-attention-emphasis:      #bf8700;
+  --color-attention-muted:         rgba(212,167,44,0.4);
+  --color-attention-subtle:        #fff8c5;
+
+  /* ── Neutral ──────────────────────────────────────────────── */
+  --color-neutral-emphasis-plus:   #24292f;
+  --color-neutral-emphasis:        #6e7781;
+  --color-neutral-muted:           rgba(175,184,193,0.2);
+  --color-neutral-subtle:          rgba(234,238,242,0.5);
+
+  /* ── Typography ───────────────────────────────────────────── */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
+               Helvetica, Arial, sans-serif, "Apple Color Emoji",
+               "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas,
+               "Liberation Mono", monospace;
+
+  --font-size-xs:   12px;
+  --font-size-sm:   14px;
+  --font-size-base: 16px;
+  --font-size-lg:   20px;
+  --font-size-xl:   24px;
+  --font-size-2xl:  28px;
+  --font-size-3xl:  32px;
+
+  /* ── Radius ───────────────────────────────────────────────── */
+  --radius-sm:  3px;
+  --radius-md:  6px;
+  --radius-lg:  12px;
+  --radius-full: 9999px;
+
+  /* ── Shadow ───────────────────────────────────────────────── */
+  --shadow-sm:   0 1px 0 rgba(31,35,40,0.04);
+  --shadow-md:   0 3px 6px rgba(140,149,159,0.15);
+  --shadow-lg:   0 8px 24px rgba(140,149,159,0.2);
+  --shadow-extra-large: 0 12px 28px rgba(140,149,159,0.3);
+}
+
+/* ── Dark mode overrides ──────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas-default:     #0d1117;
+    --color-canvas-overlay:     #161b22;
+    --color-canvas-inset:       #010409;
+    --color-canvas-subtle:      #161b22;
+
+    --color-fg-default:         #e6edf3;
+    --color-fg-muted:           #8d96a0;
+    --color-fg-subtle:          #6e7681;
+
+    --color-border-default:     #30363d;
+    --color-border-muted:       #21262d;
+    --color-border-subtle:      rgba(240,246,252,0.1);
+
+    --color-accent-fg:          #58a6ff;
+    --color-accent-emphasis:    #1f6feb;
+    --color-accent-muted:       rgba(56,139,253,0.4);
+    --color-accent-subtle:      rgba(56,139,253,0.15);
+
+    --color-success-fg:         #3fb950;
+    --color-success-emphasis:   #238636;
+    --color-success-muted:      rgba(46,160,67,0.4);
+    --color-success-subtle:     rgba(46,160,67,0.15);
+
+    --color-danger-fg:          #f85149;
+    --color-danger-emphasis:    #da3633;
+    --color-danger-muted:       rgba(248,81,73,0.4);
+    --color-danger-subtle:      rgba(248,81,73,0.15);
+
+    --color-attention-fg:       #d29922;
+    --color-attention-emphasis: #9e6a03;
+    --color-attention-muted:    rgba(187,128,9,0.4);
+    --color-attention-subtle:   rgba(187,128,9,0.15);
+
+    --color-neutral-emphasis-plus: #cdd9e5;
+    --color-neutral-emphasis:      #768390;
+    --color-neutral-muted:         rgba(110,118,129,0.4);
+    --color-neutral-subtle:        rgba(110,118,129,0.1);
+
+    --shadow-sm:          0 0 transparent;
+    --shadow-md:          0 3px 6px #010409;
+    --shadow-lg:          0 8px 24px #010409;
+    --shadow-extra-large: 0 12px 28px #010409;
+  }
+}
+
+/* ── Base reset ───────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  color: var(--color-fg-default);
+  background-color: var(--color-canvas-default);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
