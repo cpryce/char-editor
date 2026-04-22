@@ -6,6 +6,7 @@ import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import mongoose from 'mongoose';
 import { User } from './models/User';
+import { Character } from './models/Character';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -94,6 +95,74 @@ app.post('/auth/logout', (req, res, next) => {
     if (err) return next(err);
     res.json({ ok: true });
   });
+});
+
+// ── Character routes ────────────────────────────────────────────
+app.get('/api/characters', async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const characters = await Character.find(
+    { owner: u._id },
+    { name: 1, classes: 1, updatedAt: 1 },
+  ).sort({ updatedAt: -1 });
+  res.json(characters);
+});
+
+app.post('/api/characters', async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  try {
+    const character = await Character.create({ ...req.body, owner: u._id });
+    res.status(201).json(character);
+  } catch (err: unknown) {
+    if (err instanceof mongoose.Error.ValidationError) {
+      res.status(400).json({ error: err.message });
+    } else {
+      throw err;
+    }
+  }
+});
+
+app.get('/api/characters/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const character = await Character.findOne({ _id: req.params.id, owner: u._id });
+  if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json(character);
+});
+
+app.put('/api/characters/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  try {
+    const character = await Character.findOneAndUpdate(
+      { _id: req.params.id, owner: u._id },
+      { $set: req.body },
+      { new: true, runValidators: true },
+    );
+    if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+    res.json(character);
+  } catch (err: unknown) {
+    if (err instanceof mongoose.Error.ValidationError) {
+      res.status(400).json({ error: err.message });
+    } else {
+      throw err;
+    }
+  }
+});
+
+app.delete('/api/characters/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const character = await Character.findOneAndDelete({ _id: req.params.id, owner: u._id });
+  if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+  res.status(204).end();
 });
 
 // ── Database & boot ─────────────────────────────────────────────

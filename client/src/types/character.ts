@@ -1,0 +1,91 @@
+// ── Enumerations (mirror server coreMechanics constants) ────────────────────
+
+export const RACES = ['Human', 'Elf', 'Dwarf', 'Gnome', 'Halfling', 'Half-Elf', 'Half-Orc'] as const;
+export type Race = (typeof RACES)[number];
+
+export const ALIGNMENTS = [
+  'Lawful Good', 'Neutral Good', 'Chaotic Good',
+  'Lawful Neutral', 'True Neutral', 'Chaotic Neutral',
+  'Lawful Evil', 'Neutral Evil', 'Chaotic Evil',
+] as const;
+export type Alignment = (typeof ALIGNMENTS)[number];
+
+export const GENDERS = ['male', 'female', 'other'] as const;
+export type Gender = (typeof GENDERS)[number];
+
+export const SIZES = ['Fine','Diminutive','Tiny','Small','Medium','Large','Huge','Gargantuan','Colossal'] as const;
+export type Size = (typeof SIZES)[number];
+
+export const CLASSES = [
+  'Barbarian', 'Bard', 'Cleric', 'Druid', 'Fighter',
+  'Monk', 'Paladin', 'Ranger', 'Rogue', 'Sorcerer', 'Wizard',
+] as const;
+export type ClassName = (typeof CLASSES)[number];
+
+export const HIT_DIE_BY_CLASS: Record<string, number> = {
+  Barbarian: 12, Fighter: 10, Paladin: 10, Ranger: 8, Bard: 6,
+  Cleric: 8, Druid: 8, Monk: 8, Rogue: 6, Sorcerer: 4, Wizard: 4,
+};
+
+// ── Sub-types ────────────────────────────────────────────────────────────────
+
+export interface AbilityScore {
+  base: number;
+  racial: number;
+  enhancement: number;
+  misc: number;
+  temp: number;
+}
+
+export interface Skill {
+  name: string;
+  keyAbility: string | null;
+  trainedOnly: boolean;
+  armorCheckPenalty: boolean;
+  ranks: number;
+  classSkill: boolean;
+  miscBonus: number;
+  bonus: number;
+}
+
+export interface ClassEntry {
+  name: string;
+  level: number;
+  hitDieType: number;
+  hpRolled: number[];
+}
+
+// ── Full character form state ─────────────────────────────────────────────────
+
+export interface CharacterDraft {
+  name: string;
+  gender: Gender;
+  race: Race;
+  alignment: Alignment;
+  size: Size;
+  deity: string;
+  age: string;
+  height: string;
+  weight: string;
+  eyes: string;
+  hair: string;
+  skin: string;
+  languages: string;
+  description: string;
+  backstory: string;
+
+  classes: ClassEntry[];
+
+  abilityScores: {
+    strength:     AbilityScore;
+    dexterity:    AbilityScore;
+    constitution: AbilityScore;
+    intelligence: AbilityScore;
+    wisdom:       AbilityScore;
+    charisma:     AbilityScore;
+  };
+
+  hitPoints: { max: number; current: number; nonlethal: number };
+
+  skills: Skill[];
+}

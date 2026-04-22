@@ -369,6 +369,34 @@ export const HUMAN_RACIAL_TRAITS = Object.freeze({
   description: 'Humans gain 1 bonus feat at 1st level and 1 extra skill point per level (×4 at 1st).',
 });
 
+// ── Racial Ability Score Adjustments ─────────────────────────────────────────
+// SRD: Each race lists adjustments applied to ability scores.
+// All values are deltas (+/-); 0 = no adjustment.
+
+export interface RacialAbilityAdjustments {
+  readonly strength:     number;
+  readonly dexterity:    number;
+  readonly constitution: number;
+  readonly intelligence: number;
+  readonly wisdom:       number;
+  readonly charisma:     number;
+}
+
+const ZERO_ADJ: RacialAbilityAdjustments = {
+  strength: 0, dexterity: 0, constitution: 0,
+  intelligence: 0, wisdom: 0, charisma: 0,
+};
+
+export const RACIAL_ABILITY_ADJUSTMENTS: Readonly<Record<string, RacialAbilityAdjustments>> = Object.freeze({
+  Human:    { ...ZERO_ADJ },
+  Elf:      { ...ZERO_ADJ, dexterity: +2, constitution: -2 },
+  Dwarf:    { ...ZERO_ADJ, constitution: +2, charisma: -2 },
+  Gnome:    { ...ZERO_ADJ, constitution: +2, strength: -2 },
+  Halfling: { ...ZERO_ADJ, dexterity: +2, strength: -2 },
+  'Half-Elf': { ...ZERO_ADJ },
+  'Half-Orc': { ...ZERO_ADJ, strength: +2, intelligence: -2, charisma: -2 },
+});
+
 // ── Experience Points Thresholds (levels 1–20) ───────────────────────────────
 
 export const XP_THRESHOLDS: Readonly<number[]> = Object.freeze([
