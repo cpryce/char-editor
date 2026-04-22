@@ -25,6 +25,22 @@ export const RACIAL_SIZES: Readonly<Record<Race, Size>> = {
   'Half-Orc': 'Medium',
 };
 
+export const ABILITY_POINT_BUY_BUDGET = 28;
+
+export const ABILITY_POINT_BUY_COSTS: Readonly<Record<number, number>> = {
+  8: 0,
+  9: 1,
+  10: 2,
+  11: 3,
+  12: 4,
+  13: 5,
+  14: 6,
+  15: 8,
+  16: 10,
+  17: 13,
+  18: 16,
+};
+
 // Mirrors server SKILL_LIST — keyAbility null = Speak Language
 const SKILL_DEFS: { name: string; keyAbility: string | null; trainedOnly: boolean; armorCheckPenalty: boolean }[] = [
   { name: 'Appraise',                              keyAbility: 'intelligence', trainedOnly: false, armorCheckPenalty: false },
@@ -74,7 +90,37 @@ const SKILL_DEFS: { name: string; keyAbility: string | null; trainedOnly: boolea
   { name: 'Use Rope',                              keyAbility: 'dexterity',   trainedOnly: false, armorCheckPenalty: false },
 ];
 
-const BLANK_SCORE: AbilityScore = { base: 10, racial: 0, enhancement: 0, misc: 0, temp: 0 };
+const BLANK_SCORE: AbilityScore = { base: 8, racial: 0, enhancement: 0, misc: 0, temp: 0 };
+
+export function clampAbilityBaseScore(score: number) {
+  if (Number.isNaN(score)) return 8;
+  return Math.min(18, Math.max(8, Math.trunc(score)));
+}
+
+export function abilityPointBuyCost(score: number) {
+  return ABILITY_POINT_BUY_COSTS[clampAbilityBaseScore(score)] ?? 0;
+}
+
+export function abilityPointBuyTotal(scores: CharacterDraft['abilityScores']) {
+  return Object.values(scores).reduce((sum, abilityScore) => sum + abilityPointBuyCost(abilityScore.base), 0);
+}
+
+export function affordableAbilityBaseScore(
+  scores: CharacterDraft['abilityScores'],
+  key: keyof CharacterDraft['abilityScores'],
+  requestedScore: number,
+) {
+  const clampedRequestedScore = clampAbilityBaseScore(requestedScore);
+  const availablePoints = ABILITY_POINT_BUY_BUDGET - abilityPointBuyTotal(scores) + abilityPointBuyCost(scores[key].base);
+
+  for (let score = clampedRequestedScore; score >= 8; score -= 1) {
+    if (abilityPointBuyCost(score) <= availablePoints) {
+      return score;
+    }
+  }
+
+  return 8;
+}
 
 export function abilityModifier(score: number) {
   return Math.floor((score - 10) / 2);

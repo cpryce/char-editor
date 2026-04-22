@@ -13,6 +13,12 @@ async function selectClass(page: Page, className: string) {
   await page.locator('select').filter({ hasText: '— Select class —' }).selectOption(className);
 }
 
+function abilityRow(page: Page, label: string) {
+  return page.locator('div.flex.items-center.gap-3').filter({
+    has: page.locator('span.w-8', { hasText: label }),
+  });
+}
+
 test.describe('Character Editor', () => {
   test.describe('Layout', () => {
     test('shows the New Character heading', async ({ page }) => {
@@ -34,6 +40,14 @@ test.describe('Character Editor', () => {
       await expect(page.getByRole('heading', { name: /class/i, level: 3 })).toBeVisible();
     });
 
+    test('shows a derived hit points field under the class selector instead of a hit points section', async ({ page }) => {
+      await openEditor(page);
+
+      await expect(page.getByRole('heading', { name: /^Hit Points$/i, level: 3 })).toHaveCount(0);
+      await expect(page.getByRole('textbox', { name: 'Hit Points' })).toBeVisible();
+      await expect(page.getByRole('textbox', { name: 'Hit Points' })).toHaveValue('');
+    });
+
     test('shows Ability Score rows (STR, DEX, CON, INT, WIS, CHA)', async ({ page }) => {
       await openEditor(page);
 
@@ -45,6 +59,16 @@ test.describe('Character Editor', () => {
       for (const label of ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']) {
         await expect(page.locator('span.w-8', { hasText: label })).toBeVisible();
       }
+    });
+
+    test('starts all base ability scores at 8 and shows full 28-point budget remaining', async ({ page }) => {
+      await openEditor(page);
+
+      for (const label of ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']) {
+        await expect(abilityRow(page, label).locator('input[type="number"]')).toHaveValue('8');
+      }
+
+      await expect(page.getByText('0 / 28 points spent · 28 remaining')).toBeVisible();
     });
 
     test('shows the Skills section with a table', async ({ page }) => {
@@ -165,6 +189,35 @@ test.describe('Character Editor', () => {
       });
     });
 
+    test('submitted body contains calculated first-level hit points', async ({ page }) => {
+      let postedBody: Record<string, unknown> | null = null;
+
+      await mockAuth(page);
+      await page.route('**/api/characters', async (route) => {
+        if (route.request().method() === 'POST') {
+          postedBody = await route.request().postDataJSON() as Record<string, unknown>;
+          await route.fulfill({
+            status: 201,
+            contentType: 'application/json',
+            body: JSON.stringify({ _id: 'new-id', name: 'Borin', classes: [{ name: 'Fighter', level: 1 }], updatedAt: new Date().toISOString() }),
+          });
+        } else {
+          await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+        }
+      });
+
+      await page.goto('/');
+      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByPlaceholder('Character name').fill('Borin');
+      await selectClass(page, 'Fighter');
+      await abilityRow(page, 'CON').locator('input[type="number"]').fill('14');
+      await page.getByRole('button', { name: 'Save Character' }).click();
+
+      expect(postedBody).toMatchObject({
+        hitPoints: { max: 12, current: 12, nonlethal: 0 },
+      });
+    });
+
     test('Save button shows "Saving…" while the request is in flight', async ({ page }) => {
       await mockAuth(page);
 
@@ -243,6 +296,37 @@ test.describe('Character Editor', () => {
 
       // No errors should be visible
       await expect(page.getByText(/failed|error/i)).not.toBeVisible();
+    });
+
+    test('ability scores cannot go below 8 or exceed the remaining point-buy budget', async ({ page }) => {
+      await openEditor(page);
+
+      const strengthInput = abilityRow(page, 'STR').locator('input[type="number"]');
+      await strengthInput.fill('18');
+      await expect(strengthInput).toHaveValue('18');
+      await expect(page.getByText('16 / 28 points spent · 12 remaining')).toBeVisible();
+
+      const dexterityInput = abilityRow(page, 'DEX').locator('input[type="number"]');
+      await dexterityInput.fill('18');
+      await expect(dexterityInput).toHaveValue('16');
+      await expect(page.getByText('26 / 28 points spent · 2 remaining')).toBeVisible();
+
+      await strengthInput.fill('6');
+      await expect(strengthInput).toHaveValue('8');
+    });
+
+    test('hit points update when class or constitution changes', async ({ page }) => {
+      await openEditor(page);
+
+      const hitPointsInput = page.getByRole('textbox', { name: 'Hit Points' });
+      await selectClass(page, 'Fighter');
+      await expect(hitPointsInput).toHaveValue('9');
+
+      await abilityRow(page, 'CON').locator('input[type="number"]').fill('14');
+      await expect(hitPointsInput).toHaveValue('12');
+
+      await selectClass(page, 'Wizard');
+      await expect(hitPointsInput).toHaveValue('6');
     });
   });
 });

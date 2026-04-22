@@ -1,7 +1,17 @@
 import { useState, useCallback } from 'react';
 import type { CharacterDraft, AbilityScore } from '../types/character';
 import { RACES, ALIGNMENTS, GENDERS, CLASSES, HIT_DIE_BY_CLASS } from '../types/character';
-import { newCharacterDraft, abilityModifier, totalScore, computeSkillBonus, RACIAL_ABILITY_ADJUSTMENTS, RACIAL_SIZES } from '../utils/characterHelpers';
+import {
+  newCharacterDraft,
+  abilityModifier,
+  totalScore,
+  computeSkillBonus,
+  RACIAL_ABILITY_ADJUSTMENTS,
+  RACIAL_SIZES,
+  ABILITY_POINT_BUY_BUDGET,
+  abilityPointBuyTotal,
+  affordableAbilityBaseScore,
+} from '../utils/characterHelpers';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -101,8 +111,8 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
 };
 
 function AbilityScoreRow({
-  label, score, onChange,
-}: { label: string; score: AbilityScore; onChange: (s: AbilityScore) => void }) {
+  label, score, onBaseChange,
+}: { label: string; score: AbilityScore; onBaseChange: (base: number) => void }) {
   const total = totalScore(score);
   const mod = abilityModifier(total);
   const modStr = mod >= 0 ? `+${mod}` : `${mod}`;
@@ -119,8 +129,9 @@ function AbilityScoreRow({
         <input
           type="number"
           value={score.base}
-          min={1}
-          onChange={(e) => onChange({ ...score, base: Number(e.target.value) })}
+          min={8}
+          max={18}
+          onChange={(e) => onBaseChange(e.target.valueAsNumber)}
           style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px' }}
         />
       </div>
@@ -166,10 +177,11 @@ function AbilityScoreRow({
 // ── Classes section ───────────────────────────────────────────────────────────
 
 function ClassesSection({
-  classes, onChange, isCreate = false,
+  classes, onChange, calculatedHitPoints, isCreate = false,
 }: {
   classes: CharacterDraft['classes'];
   onChange: (c: CharacterDraft['classes']) => void;
+  calculatedHitPoints: number | null;
   isCreate?: boolean;
 }) {
   const classSelectWidth = `${Math.max('— Select class —'.length, ...CLASSES.map((className) => className.length)) + 2}ch`;
@@ -182,20 +194,35 @@ function ClassesSection({
       onChange([{ name, level: 1, hitDieType: HIT_DIE_BY_CLASS[name] ?? 8, hpRolled: [] }]);
     }
     return (
-      <div className="flex items-center gap-3">
-        <select
-          value={selectedName}
-          onChange={(e) => handleClassChange(e.target.value)}
-          style={{ ...inputStyle, width: classSelectWidth }}
-        >
-          <option value="">— Select class —</option>
-          {CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        {selectedName && (
-          <span className="text-sm" style={{ color: 'var(--color-fg-default)' }}>
-            Level 1 &nbsp;·&nbsp; d{HIT_DIE_BY_CLASS[selectedName]} hit die
-          </span>
-        )}
+      <div className="flex flex-col items-start gap-3">
+        <div className="flex items-center gap-3">
+          <select
+            value={selectedName}
+            onChange={(e) => handleClassChange(e.target.value)}
+            style={{ ...inputStyle, width: classSelectWidth }}
+          >
+            <option value="">— Select class —</option>
+            {CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          {selectedName && (
+            <span className="text-sm" style={{ color: 'var(--color-fg-default)' }}>
+              Level 1 &nbsp;·&nbsp; d{HIT_DIE_BY_CLASS[selectedName]} hit die
+            </span>
+          )}
+        </div>
+        <Field label="Hit Points">
+          <input
+            type="text"
+            value={calculatedHitPoints ?? ''}
+            readOnly
+            style={{
+              ...inputStyle,
+              width: 96,
+              color: 'var(--color-fg-default)',
+              cursor: 'default',
+            }}
+          />
+        </Field>
       </div>
     );
   }
@@ -348,14 +375,24 @@ export function CharacterEditor({ onSaved, onCancel }: CharacterEditorProps) {
   const [draft, setDraft] = useState<CharacterDraft>(newCharacterDraft);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const spentAbilityPoints = abilityPointBuyTotal(draft.abilityScores);
+  const remainingAbilityPoints = ABILITY_POINT_BUY_BUDGET - spentAbilityPoints;
+  const selectedClass = draft.classes[0];
+  const calculatedHitPoints = selectedClass
+    ? Math.max(1, selectedClass.hitDieType + abilityModifier(totalScore(draft.abilityScores.constitution)))
+    : null;
 
   function setField<K extends keyof CharacterDraft>(key: K, value: CharacterDraft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
   }
 
-  const setAbility = useCallback((key: AbilityKey, score: AbilityScore) => {
+  const setAbilityBase = useCallback((key: AbilityKey, requestedBase: number) => {
     setDraft((d) => {
-      const newScores = { ...d.abilityScores, [key]: score };
+      const nextBase = affordableAbilityBaseScore(d.abilityScores, key, requestedBase);
+      const newScores = {
+        ...d.abilityScores,
+        [key]: { ...d.abilityScores[key], base: nextBase },
+      };
       const skills = d.skills.map((sk) => ({
         ...sk,
         bonus: computeSkillBonus(sk, newScores),
@@ -394,8 +431,8 @@ export function CharacterEditor({ onSaved, onCancel }: CharacterEditorProps) {
         age: draft.age ? Number(draft.age) : undefined,
         languages: draft.languages ? draft.languages.split(',').map((s) => s.trim()).filter(Boolean) : [],
         hitPoints: {
-          max: draft.hitPoints.max || 1,
-          current: draft.hitPoints.current || 1,
+          max: calculatedHitPoints ?? 1,
+          current: calculatedHitPoints ?? 1,
           nonlethal: 0,
         },
         combat: {
@@ -510,30 +547,27 @@ export function CharacterEditor({ onSaved, onCancel }: CharacterEditorProps) {
 
         {/* ── Classes ── */}
         <SectionHeader>Class &amp; Level <span style={{ color: 'var(--color-danger-fg)', fontSize: '0.75rem' }}>*</span></SectionHeader>
-        <ClassesSection classes={draft.classes} onChange={(c) => setField('classes', c)} isCreate />
+        <ClassesSection
+          classes={draft.classes}
+          onChange={(c) => setField('classes', c)}
+          calculatedHitPoints={calculatedHitPoints}
+          isCreate
+        />
 
         {/* ── Ability Scores ── */}
         <SectionHeader>Ability Scores</SectionHeader>
+        <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+          {spentAbilityPoints} / {ABILITY_POINT_BUY_BUDGET} points spent · {remainingAbilityPoints} remaining
+        </p>
         <div className="flex flex-col gap-2">
           {ABILITY_KEYS.map((key) => (
             <AbilityScoreRow
               key={key}
               label={ABILITY_LABELS[key]}
               score={draft.abilityScores[key]}
-              onChange={(s) => setAbility(key, s)}
+              onBaseChange={(base) => setAbilityBase(key, base)}
             />
           ))}
-        </div>
-
-        {/* ── Hit Points ── */}
-        <SectionHeader>Hit Points</SectionHeader>
-        <div className="flex gap-6">
-          <Field label="Max HP">
-            <NumberInput value={draft.hitPoints.max} onChange={(v) => setField('hitPoints', { ...draft.hitPoints, max: v })} />
-          </Field>
-          <Field label="Current HP">
-            <NumberInput value={draft.hitPoints.current} onChange={(v) => setField('hitPoints', { ...draft.hitPoints, current: v })} />
-          </Field>
         </div>
 
         {/* ── Skills ── */}
