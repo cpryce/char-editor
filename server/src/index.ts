@@ -1,19 +1,99 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import session from 'express-session';
+import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import mongoose from 'mongoose';
+import { User } from './models/User';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
 const MONGO_URI = process.env.MONGO_URI ?? '';
 
 // ── Middleware ──────────────────────────────────────────────────
-app.use(cors({ origin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173' }));
+app.use(cors({ origin: process.env.CLIENT_URL ?? 'http://localhost:5173', credentials: true }));
 app.use(express.json());
+app.use(session({
+  secret: process.env.SESSION_SECRET ?? 'fallback_secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 },
+}));
+
+// ── Passport ────────────────────────────────────────────────────
+passport.use(new GoogleStrategy(
+  {
+    clientID: process.env.GOOGLE_CLIENT_ID ?? '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+    callbackURL: process.env.CALLBACK_URI ?? 'http://localhost:3001/auth/google/callback',
+  },
+  async (_accessToken, _refreshToken, profile, done) => {
+    try {
+      let user = await User.findOne({ googleId: profile.id });
+      if (!user) {
+        user = await User.create({
+          googleId: profile.id,
+          email: profile.emails?.[0]?.value ?? '',
+          name: profile.displayName,
+          avatar: profile.photos?.[0]?.value,
+        });
+      }
+      done(null, user);
+    } catch (err) {
+      done(err as Error);
+    }
+  },
+));
+
+passport.serializeUser((user, done) => {
+  const u = user as { _id: mongoose.Types.ObjectId };
+  done(null, u._id.toString());
+});
+
+passport.deserializeUser(async (id: string, done) => {
+  try {
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (err) {
+    done(err as Error);
+  }
+});
+
+app.use(passport.initialize());
+app.use(passport.session());
 
 // ── Routes ──────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
+});
+
+app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+app.get(
+  '/auth/google/callback',
+  passport.authenticate('google', {
+    failureRedirect: `${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=auth_failed`,
+  }),
+  (_req, res) => {
+    res.redirect(process.env.CLIENT_URL ?? 'http://localhost:5173');
+  },
+);
+
+app.get('/auth/me', (req, res) => {
+  if (req.isAuthenticated()) {
+    const u = req.user as { _id: mongoose.Types.ObjectId; name?: string; email: string; avatar?: string };
+    res.json({ id: u._id, name: u.name, email: u.email, avatar: u.avatar });
+  } else {
+    res.status(401).json({ error: 'Not authenticated' });
+  }
+});
+
+app.post('/auth/logout', (req, res, next) => {
+  req.logout((err) => {
+    if (err) return next(err);
+    res.json({ ok: true });
+  });
 });
 
 // ── Database & boot ─────────────────────────────────────────────
