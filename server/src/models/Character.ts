@@ -1,5 +1,5 @@
 import mongoose, { Schema, type Document, type Types } from 'mongoose';
-import { ALIGNMENTS, RACES, SIZE_CATEGORIES } from '../rules/coreMechanics';
+import { ALIGNMENTS, FEAT_TYPES, FEAT_SOURCES, RACES, SIZE_CATEGORIES } from '../rules/coreMechanics';
 
 // ── Sub-schemas ──────────────────────────────────────────────────────────────
 
@@ -38,11 +38,22 @@ const classLevelSchema = new Schema(
 
 const skillSchema = new Schema(
   {
-    name:       { type: String, required: true },
-    keyAbility: { type: String, required: true },
-    ranks:      { type: Number, default: 0, min: 0 },
-    classSkill: { type: Boolean, default: false },
-    miscBonus:  { type: Number, default: 0 },
+    name:              { type: String, required: true },
+    /** Governing ability score key; omitted for Speak Language (no ability mod). */
+    keyAbility:        { type: String },
+    /** True if the skill requires at least 1 rank to use untrained. */
+    trainedOnly:       { type: Boolean, default: false },
+    /** True if armor check penalty applies to this skill. */
+    armorCheckPenalty: { type: Boolean, default: false },
+    ranks:             { type: Number, default: 0, min: 0 },
+    classSkill:        { type: Boolean, default: false },
+    miscBonus:         { type: Number, default: 0 },
+    /**
+     * Pre-computed total modifier for the skill check:
+     *   ranks + abilityModifier(keyAbility score) + miscBonus
+     * Recompute whenever ranks, ability scores, or miscBonus change.
+     */
+    bonus:             { type: Number, default: 0 },
   },
   { _id: false },
 );
@@ -50,7 +61,22 @@ const skillSchema = new Schema(
 const featSchema = new Schema(
   {
     name:   { type: String, required: true },
-    source: { type: String },  // e.g. "Human Bonus", "Fighter Bonus", "Level 1"
+    /**
+     * type — the SRD feat type bracket (Types of Feats, d20srd.org/srd/feats.htm):
+     *   General          : most feats; no special group rules
+     *   Fighter Bonus Feat : can be selected as a fighter's bonus feat
+     *   Item Creation    : lets spellcasters create magic items
+     *   Metamagic        : lets spellcasters modify spells
+     *   Special          : unique acquisition rules (e.g. Spell Mastery)
+     */
+    type:   { type: String, enum: FEAT_TYPES, required: true, default: 'General' },
+    /**
+     * source — how this feat was obtained by the character:
+     *   Class Feat     : granted automatically by class (proficiencies, bonus feats)
+     *   Character Feat : freely chosen (level feats, racial bonus feats)
+     *   Special        : DM prerogative or exceptional circumstance
+     */
+    source: { type: String, enum: FEAT_SOURCES, required: true, default: 'Character Feat' },
     notes:  { type: String },
   },
   { _id: false },
@@ -133,7 +159,7 @@ export interface ICharacter extends Document {
 
   // Skills, Feats, Equipment, Currency
   skills: { name: string; keyAbility: string; ranks: number; classSkill: boolean; miscBonus: number }[];
-  feats:  { name: string; source?: string; notes?: string }[];
+  feats:  { name: string; category: string; source?: string; notes?: string }[];
   equipment: { name: string; type?: string; weight: number; equipped: boolean; notes?: string }[];
   currency: { pp: number; gp: number; sp: number; cp: number };
 }
