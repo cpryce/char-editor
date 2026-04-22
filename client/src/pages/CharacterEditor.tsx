@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { CharacterDraft, AbilityScore } from '../types/character';
-import { RACES, ALIGNMENTS, GENDERS, SIZES, CLASSES, HIT_DIE_BY_CLASS } from '../types/character';
-import { newCharacterDraft, abilityModifier, totalScore, computeSkillBonus, RACIAL_ABILITY_ADJUSTMENTS } from '../utils/characterHelpers';
+import { RACES, ALIGNMENTS, GENDERS, CLASSES, HIT_DIE_BY_CLASS } from '../types/character';
+import { newCharacterDraft, abilityModifier, totalScore, computeSkillBonus, RACIAL_ABILITY_ADJUSTMENTS, RACIAL_SIZES } from '../utils/characterHelpers';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -172,6 +172,8 @@ function ClassesSection({
   onChange: (c: CharacterDraft['classes']) => void;
   isCreate?: boolean;
 }) {
+  const classSelectWidth = `${Math.max('— Select class —'.length, ...CLASSES.map((className) => className.length)) + 2}ch`;
+
   // ── Create mode: single class dropdown, level always 1 ──
   if (isCreate) {
     const selectedName = classes[0]?.name ?? '';
@@ -184,13 +186,13 @@ function ClassesSection({
         <select
           value={selectedName}
           onChange={(e) => handleClassChange(e.target.value)}
-          style={inputStyle}
+          style={{ ...inputStyle, width: classSelectWidth }}
         >
           <option value="">— Select class —</option>
           {CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         {selectedName && (
-          <span className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
+          <span className="text-sm" style={{ color: 'var(--color-fg-default)' }}>
             Level 1 &nbsp;·&nbsp; d{HIT_DIE_BY_CLASS[selectedName]} hit die
           </span>
         )}
@@ -213,7 +215,7 @@ function ClassesSection({
         const name = value as string;
         return { ...c, name, hitDieType: HIT_DIE_BY_CLASS[name] ?? 8 };
       }
-      return { ...c, [field]: value };
+      return { ...c, level: value as number };
     });
     onChange(updated);
   }
@@ -378,7 +380,7 @@ export function CharacterEditor({ onSaved, onCancel }: CharacterEditorProps) {
         ...sk,
         bonus: computeSkillBonus(sk, newScores),
       }));
-      return { ...d, race, abilityScores: newScores, skills };
+      return { ...d, race, size: RACIAL_SIZES[race], abilityScores: newScores, skills };
     });
   }, []);
 
@@ -469,7 +471,16 @@ export function CharacterEditor({ onSaved, onCancel }: CharacterEditorProps) {
             <Select value={draft.alignment} onChange={(v) => setField('alignment', v)} options={ALIGNMENTS} />
           </Field>
           <Field label="Size">
-            <Select value={draft.size} onChange={(v) => setField('size', v)} options={SIZES} />
+            <input
+              type="text"
+              value={draft.size}
+              readOnly
+              style={{
+                ...inputStyle,
+                color: 'var(--color-fg-muted)',
+                cursor: 'default',
+              }}
+            />
           </Field>
           <Field label="Deity">
             <TextInput value={draft.deity} onChange={(v) => setField('deity', v)} />

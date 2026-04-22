@@ -1,4 +1,4 @@
-import type { CharacterDraft, AbilityScore, Skill } from '../types/character';
+import type { CharacterDraft, AbilityScore, Skill, Race, Size } from '../types/character';
 
 // ── Racial ability adjustments (mirrors server coreMechanics) ────────────────
 
@@ -13,6 +13,16 @@ export const RACIAL_ABILITY_ADJUSTMENTS: Readonly<Record<string, AbilityAdj>> = 
   Halfling:   { ...ZERO, dexterity: +2, strength: -2 },
   'Half-Elf': { ...ZERO },
   'Half-Orc': { ...ZERO, strength: +2, intelligence: -2, charisma: -2 },
+};
+
+export const RACIAL_SIZES: Readonly<Record<Race, Size>> = {
+  Human: 'Medium',
+  Elf: 'Medium',
+  Dwarf: 'Medium',
+  Gnome: 'Small',
+  Halfling: 'Small',
+  'Half-Elf': 'Medium',
+  'Half-Orc': 'Medium',
 };
 
 // Mirrors server SKILL_LIST — keyAbility null = Speak Language
@@ -89,7 +99,7 @@ export function newCharacterDraft(): CharacterDraft {
     gender: 'male',
     race: 'Human',
     alignment: 'True Neutral',
-    size: 'Medium',
+    size: RACIAL_SIZES.Human,
     deity: '',
     age: '',
     height: '',
