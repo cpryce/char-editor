@@ -55,6 +55,15 @@ export interface ClassEntry {
   hpRolled: number[];
 }
 
+// ── Selectable feat slot (stored in CharacterDraft.feats) ──────────────────────
+
+export interface FeatSlot {
+  name: string;        // blank while not yet selected
+  type: 'General' | 'Fighter Bonus Feat';
+  source: 'Character Feat' | 'Bonus Feat' | 'Fighter Bonus Feat' | 'Special';
+  sourceLabel: string; // display label, e.g. "Character Level 1", "Fighter Level 1"
+}
+
 // ── Full character form state ─────────────────────────────────────────────────
 
 export interface CharacterDraft {
@@ -101,4 +110,5 @@ export interface CharacterDraft {
   };
 
   skills: Skill[];
+  feats: FeatSlot[];
 }

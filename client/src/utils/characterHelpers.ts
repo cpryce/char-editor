@@ -1,4 +1,4 @@
-import type { CharacterDraft, AbilityScore, Skill, Race, Size, ClassName } from '../types/character';
+import type { CharacterDraft, AbilityScore, Skill, Race, Size, ClassName, FeatSlot } from '../types/character';
 
 // ── Racial ability adjustments (mirrors server coreMechanics) ────────────────
 
@@ -99,6 +99,171 @@ export function baseSaveBonusFromClasses(classes: CharacterDraft['classes'], sav
     const level = Math.max(0, Math.trunc(entry.level || 0));
     return sum + saveByProgression(level, progression);
   }, 0);
+}
+
+export type ClassFeatEntry = {
+  name: string;
+  type: 'General' | 'Fighter Bonus Feat';
+  source: 'Class Feat' | 'Fighter Bonus Feat';
+  sourceLabel: string;
+  shortDescription: string;
+};
+
+const CLASS_PROFICIENCY_FEATS: Readonly<Record<ClassName, ReadonlyArray<ClassFeatEntry>>> = {
+  Barbarian: [
+    { name: 'Simple Weapon Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with all simple weapons.' },
+    { name: 'Martial Weapon Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with all martial weapons.' },
+    { name: 'Armor Proficiency (Light)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with light armor.' },
+    { name: 'Armor Proficiency (Medium)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with medium armor.' },
+    { name: 'Shield Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with shields (except tower shields).' },
+  ],
+  Bard: [
+    { name: 'Weapon Proficiency (Bard)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with simple weapons plus hand crossbow, longsword, rapier, sap, short sword, shortbow, and whip.' },
+    { name: 'Armor Proficiency (Light)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with light armor.' },
+    { name: 'Shield Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with shields (except tower shields).' },
+  ],
+  Cleric: [
+    { name: 'Simple Weapon Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with all simple weapons.' },
+    { name: 'Armor Proficiency (Light)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with light armor.' },
+    { name: 'Armor Proficiency (Medium)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with medium armor.' },
+    { name: 'Armor Proficiency (Heavy)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with heavy armor.' },
+    { name: 'Shield Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with shields (except tower shields).' },
+  ],
+  Druid: [
+    { name: 'Weapon Proficiency (Druid)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with club, dagger, dart, quarterstaff, scimitar, sickle, sling, and spear.' },
+    { name: 'Armor Proficiency (Light)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with light armor (nonmetal only).' },
+    { name: 'Armor Proficiency (Medium)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with medium armor (nonmetal only).' },
+    { name: 'Shield Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with shields (except tower shields, nonmetal only).' },
+  ],
+  Fighter: [
+    { name: 'Simple Weapon Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with all simple weapons.' },
+    { name: 'Martial Weapon Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with all martial weapons.' },
+    { name: 'Armor Proficiency (Light)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with light armor.' },
+    { name: 'Armor Proficiency (Medium)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with medium armor.' },
+    { name: 'Armor Proficiency (Heavy)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with heavy armor.' },
+    { name: 'Shield Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with shields.' },
+    { name: 'Tower Shield Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with tower shields.' },
+  ],
+  Monk: [
+    { name: 'Weapon Proficiency (Monk)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with club, crossbow (light/heavy), dagger, handaxe, javelin, kama, nunchaku, quarterstaff, sai, shuriken, siangham, and sling.' },
+  ],
+  Paladin: [
+    { name: 'Simple Weapon Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with all simple weapons.' },
+    { name: 'Martial Weapon Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with all martial weapons.' },
+    { name: 'Armor Proficiency (Light)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with light armor.' },
+    { name: 'Armor Proficiency (Medium)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with medium armor.' },
+    { name: 'Armor Proficiency (Heavy)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with heavy armor.' },
+    { name: 'Shield Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with shields (except tower shields).' },
+  ],
+  Ranger: [
+    { name: 'Simple Weapon Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with all simple weapons.' },
+    { name: 'Martial Weapon Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with all martial weapons.' },
+    { name: 'Armor Proficiency (Light)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with light armor.' },
+    { name: 'Shield Proficiency', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with shields (except tower shields).' },
+  ],
+  Rogue: [
+    { name: 'Weapon Proficiency (Rogue)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with simple weapons plus hand crossbow, rapier, sap, shortbow, and short sword.' },
+    { name: 'Armor Proficiency (Light)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with light armor.' },
+  ],
+  Sorcerer: [
+    { name: 'Weapon Proficiency (Sorcerer)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with club, dagger, heavy crossbow, light crossbow, and quarterstaff.' },
+  ],
+  Wizard: [
+    { name: 'Weapon Proficiency (Wizard)', type: 'General', source: 'Class Feat', sourceLabel: 'Class Feature', shortDescription: 'Proficient with club, dagger, heavy crossbow, light crossbow, and quarterstaff.' },
+  ],
+};
+
+const FIGHTER_BONUS_FEAT_LEVELS_LIST = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20] as const;
+
+const STANDARD_FEAT_LEVELS: readonly number[] = [1, 3, 6, 9, 12, 15, 18];
+
+/** Returns only auto-granted proficiency feats (read-only, not user-selectable). */
+export function deriveAutoFeats(classes: CharacterDraft['classes']): ClassFeatEntry[] {
+  const classFeatMap = new Map<string, ClassFeatEntry>();
+
+  classes.forEach((entry) => {
+    const className = entry.name as ClassName;
+    const level = Math.max(0, Math.trunc(entry.level || 0));
+    if (!className || level <= 0) return;
+
+    const proficiencies = CLASS_PROFICIENCY_FEATS[className] ?? [];
+    proficiencies.forEach((feat) => {
+      if (!classFeatMap.has(feat.name)) classFeatMap.set(feat.name, feat);
+    });
+  });
+
+  return Array.from(classFeatMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Returns user-selectable feat slots derived from class levels and race:
+ *   1. Standard character level feats (every character at 1, 3, 6, 9 …)
+ *   2. Racial bonus feat (Human only, at level 1)
+ *   3. Fighter bonus feat slots (Fighter at 1, 2, 4, 6, 8 …)
+ */
+export function deriveSelectableFeats(
+  classes: CharacterDraft['classes'],
+  race: CharacterDraft['race'],
+): FeatSlot[] {
+  const charLevel = totalCharacterLevel(classes);
+  if (charLevel === 0 && classes.length === 0) return [];
+
+  const slots: FeatSlot[] = [];
+
+  // 1. Standard character feats
+  STANDARD_FEAT_LEVELS.filter((l) => l <= Math.max(1, charLevel)).forEach((l) => {
+    slots.push({ name: '', type: 'General', source: 'Character Feat', sourceLabel: `Character Level ${l}` });
+  });
+
+  // 2. Human racial bonus feat (level 1)
+  if (race === 'Human') {
+    slots.push({ name: '', type: 'General', source: 'Bonus Feat', sourceLabel: 'Racial Bonus Feat (Human)' });
+  }
+
+  // 3. Fighter class bonus feats
+  classes.forEach((entry) => {
+    if (entry.name !== 'Fighter') return;
+    const level = Math.max(0, Math.trunc(entry.level || 0));
+    FIGHTER_BONUS_FEAT_LEVELS_LIST.filter((l) => l <= Math.max(1, level)).forEach((slotLevel) => {
+      slots.push({
+        name: '',
+        type: 'Fighter Bonus Feat',
+        source: 'Fighter Bonus Feat',
+        sourceLabel: `Fighter Level ${slotLevel}`,
+      });
+    });
+  });
+
+  return slots;
+}
+
+/**
+ * When classes or race change, re-derive slots while preserving the user's
+ * existing feat name selections where the sourceLabel still matches.
+ * User-added extras (source === 'Special') are always kept at the end.
+ */
+export function mergeSelectableFeats(
+  existing: FeatSlot[],
+  derived: FeatSlot[],
+): FeatSlot[] {
+  const derivedLabels = new Set(derived.map((f) => f.sourceLabel));
+
+  // Preserve existing name selections for each sourceLabel
+  const existingByLabel = new Map<string, string>();
+  existing.forEach((f) => {
+    if (derivedLabels.has(f.sourceLabel) && !existingByLabel.has(f.sourceLabel)) {
+      existingByLabel.set(f.sourceLabel, f.name);
+    }
+  });
+
+  const merged = derived.map((slot) => ({
+    ...slot,
+    name: existingByLabel.get(slot.sourceLabel) ?? '',
+  }));
+
+  // Keep user-added extras
+  const extras = existing.filter((f) => f.source === 'Special');
+  return [...merged, ...extras];
 }
 
 export const CLASS_SKILLS: Readonly<Record<ClassName, ReadonlySet<string>>> = {
@@ -361,5 +526,6 @@ export function newCharacterDraft(): CharacterDraft {
       miscBonus: 0,
       bonus: 0,
     })),
+    feats: [],
   };
 }

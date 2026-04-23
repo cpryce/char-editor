@@ -70,8 +70,7 @@ export function CharactersPage({ onNewCharacter, onEditCharacter }: CharactersPa
     <div className="p-6">
       <div className="flex items-center justify-between mb-5">
         <h2
-          className="text-xl font-semibold"
-          style={{ color: 'var(--color-fg-default)' }}
+          className="text-xl font-semibold text-[color:var(--color-fg-default)]"
         >
           Characters
         </h2>
@@ -84,33 +83,28 @@ export function CharactersPage({ onNewCharacter, onEditCharacter }: CharactersPa
       </div>
 
       {loading && (
-        <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+        <p className="text-sm text-[color:var(--color-fg-muted)]">
           Loading…
         </p>
       )}
 
       {error && (
-        <p className="text-sm" style={{ color: 'var(--color-danger-fg)' }}>
+        <p className="text-sm text-[color:var(--color-danger-fg)]">
           {error}
         </p>
       )}
 
       {!loading && !error && (
         <div
-          className="rounded overflow-hidden"
-          style={{ border: '1px solid var(--color-border-default)' }}
+          className="rounded overflow-hidden border border-[var(--color-border-default)]"
         >
           <table className="w-full text-sm border-collapse">
             <thead>
-              <tr style={{ background: 'var(--color-canvas-subtle)' }}>
+              <tr className="bg-[var(--color-canvas-subtle)]">
                 {['Name', 'Class', 'Level', 'Last Modified', ''].map((h) => (
                   <th
                     key={h}
-                    className="text-left px-4 py-2 font-medium"
-                    style={{
-                      color: 'var(--color-fg-muted)',
-                      borderBottom: '1px solid var(--color-border-default)',
-                    }}
+                    className="text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]"
                   >
                     {h}
                   </th>
@@ -122,13 +116,13 @@ export function CharactersPage({ onNewCharacter, onEditCharacter }: CharactersPa
                 <tr>
                   <td
                     colSpan={5}
-                    className="px-4 py-6 text-center text-sm"
-                    style={{ color: 'var(--color-fg-muted)' }}
+                    className="px-4 py-6 text-center text-sm text-[color:var(--color-fg-muted)]"
                   >
                     No characters yet.{' '}
                     <button
+                      type="button"
                       onClick={onNewCharacter}
-                      style={{ color: 'var(--color-accent-fg)', cursor: 'pointer', textDecoration: 'underline', background: 'none', border: 'none', padding: 0, font: 'inherit' }}
+                      className="text-[color:var(--color-accent-fg)] cursor-pointer underline bg-transparent border-0 p-0 [font:inherit]"
                     >
                       Create a new character
                     </button>{' '}
@@ -138,32 +132,21 @@ export function CharactersPage({ onNewCharacter, onEditCharacter }: CharactersPa
               ) : characters.map((char, i) => (
                 <tr
                   key={char._id}
-                  style={{
-                    background: i % 2 === 0 ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)',
-                    borderBottom: '1px solid var(--color-border-muted)',
-                    cursor: 'pointer',
-                  }}
+                  className={`border-b border-[var(--color-border-muted)] cursor-pointer hover:bg-[var(--color-accent-subtle)] ${i % 2 === 0 ? 'bg-[var(--color-canvas-default)]' : 'bg-[var(--color-canvas-subtle)]'}`}
                   onClick={() => onEditCharacter(char._id)}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = 'var(--color-accent-subtle)')
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background =
-                      i % 2 === 0 ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)')
-                  }
                 >
                   <td
                     className="px-4 py-2 font-medium"
                   >
                     {char.name}
                   </td>
-                  <td className="px-4 py-2" style={{ color: 'var(--color-fg-default)' }}>
+                  <td className="px-4 py-2 text-[color:var(--color-fg-default)]">
                     {classLabel(char.classes)}
                   </td>
-                  <td className="px-4 py-2" style={{ color: 'var(--color-fg-default)' }}>
+                  <td className="px-4 py-2 text-[color:var(--color-fg-default)]">
                     {totalLevel(char.classes)}
                   </td>
-                  <td className="px-4 py-2" style={{ color: 'var(--color-fg-muted)' }}>
+                  <td className="px-4 py-2 text-[color:var(--color-fg-muted)]">
                     {formatDate(char.updatedAt)}
                   </td>
                   <td className="px-4 py-2 text-right">
@@ -175,16 +158,7 @@ export function CharactersPage({ onNewCharacter, onEditCharacter }: CharactersPa
                       }}
                       title="Delete character"
                       aria-label={`Delete ${char.name}`}
-                      className="inline-flex items-center justify-center"
-                      style={{
-                        width: 24,
-                        height: 24,
-                        border: '1px solid var(--color-border-default)',
-                        borderRadius: 4,
-                        color: 'var(--color-danger-fg)',
-                        background: 'var(--color-canvas-default)',
-                        cursor: 'pointer',
-                      }}
+                      className="inline-flex items-center justify-center w-6 h-6 border border-[var(--color-border-default)] rounded text-[color:var(--color-danger-fg)] bg-[var(--color-canvas-default)] cursor-pointer"
                     >
                       <svg
                         width="14"

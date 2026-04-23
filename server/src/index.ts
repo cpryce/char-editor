@@ -69,7 +69,13 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+app.get(
+  '/auth/google',
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    prompt: 'select_account',
+  }),
+);
 
 app.get(
   '/auth/google/callback',
@@ -93,7 +99,11 @@ app.get('/auth/me', (req, res) => {
 app.post('/auth/logout', (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
-    res.json({ ok: true });
+    req.session.destroy((sessionErr) => {
+      if (sessionErr) return next(sessionErr);
+      res.clearCookie('connect.sid');
+      res.json({ ok: true });
+    });
   });
 });
 

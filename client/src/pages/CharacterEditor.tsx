@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import type { CharacterDraft, AbilityScore } from '../types/character';
+import type { CharacterDraft, AbilityScore, FeatSlot } from '../types/character';
 import { RACES, ALIGNMENTS, GENDERS, CLASSES, HIT_DIE_BY_CLASS } from '../types/character';
 import {
   newCharacterDraft,
@@ -19,6 +19,9 @@ import {
   totalSkillPointsAvailable,
   baseAttackBonusFromClasses,
   baseSaveBonusFromClasses,
+  deriveAutoFeats,
+  deriveSelectableFeats,
+  mergeSelectableFeats,
 } from '../utils/characterHelpers';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -837,6 +840,157 @@ function CombatSection({
   );
 }
 
+function AutoFeatsSection({ feats }: { feats: Array<{ name: string; type: string; sourceLabel: string; shortDescription: string }> }) {
+  if (feats.length === 0) {
+    return (
+      <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+        Select a class to see automatically granted proficiency feats.
+      </p>
+    );
+  }
+
+  return (
+    <div className="rounded overflow-hidden" style={{ border: '1px solid var(--color-border-default)' }}>
+      <table aria-label="Class proficiency feats" className="w-full text-xs border-collapse">
+        <thead>
+          <tr style={{ background: 'var(--color-canvas-subtle)' }}>
+            {['Feat', 'Type', 'Source', 'Description'].map((header) => (
+              <th key={header} className="px-3 py-2 text-left font-medium"
+                style={{ color: 'var(--color-fg-muted)', borderBottom: '1px solid var(--color-border-default)' }}>
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {feats.map((feat, index) => (
+            <tr key={`${feat.name}-${index}`}
+              style={{
+                background: index % 2 === 0 ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)',
+                borderBottom: '1px solid var(--color-border-muted)',
+              }}
+            >
+              <td className="px-3 py-2 font-medium" style={{ color: 'var(--color-fg-default)' }}>{feat.name}</td>
+              <td className="px-3 py-2" style={{ color: 'var(--color-fg-default)' }}>{feat.type}</td>
+              <td className="px-3 py-2" style={{ color: 'var(--color-fg-muted)' }}>{feat.sourceLabel}</td>
+              <td className="px-3 py-2" style={{ color: 'var(--color-fg-muted)' }}>{feat.shortDescription}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SelectableFeatsSection({
+  feats,
+  onChange,
+}: {
+  feats: FeatSlot[];
+  onChange: (feats: FeatSlot[]) => void;
+}) {
+  function updateName(i: number, name: string) {
+    onChange(feats.map((f, idx) => (idx === i ? { ...f, name } : f)));
+  }
+
+  function removeFeat(i: number) {
+    onChange(feats.filter((_, idx) => idx !== i));
+  }
+
+  function addFeat() {
+    onChange([...feats, { name: '', type: 'General', source: 'Special', sourceLabel: 'Additional' }]);
+  }
+
+  const TABLE_HEADERS = ['Feat', 'Type', 'Source', ''];
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="rounded overflow-hidden" style={{ border: '1px solid var(--color-border-default)' }}>
+        <table aria-label="Selectable feats" className="w-full text-xs border-collapse">
+          <thead>
+            <tr style={{ background: 'var(--color-canvas-subtle)' }}>
+              {TABLE_HEADERS.map((header) => (
+                <th key={header} className="px-3 py-2 text-left font-medium"
+                  style={{ color: 'var(--color-fg-muted)', borderBottom: '1px solid var(--color-border-default)' }}>
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {feats.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-3 py-3 text-center"
+                  style={{ color: 'var(--color-fg-subtle)' }}>
+                  No feat slots yet — select a class to populate.
+                </td>
+              </tr>
+            )}
+            {feats.map((feat, i) => (
+              <tr key={i}
+                style={{
+                  background: i % 2 === 0 ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)',
+                  borderBottom: '1px solid var(--color-border-muted)',
+                }}
+              >
+                <td className="px-3 py-1">
+                  <input
+                    type="text"
+                    aria-label={`${feat.sourceLabel} feat name`}
+                    value={feat.name}
+                    placeholder={feat.type === 'Fighter Bonus Feat' ? 'Choose fighter bonus feat…' : 'Enter feat name…'}
+                    onChange={(e) => updateName(i, e.target.value)}
+                    style={{ ...inputStyle, width: '100%', minWidth: 180 }}
+                  />
+                </td>
+                <td className="px-3 py-1" style={{ color: 'var(--color-fg-default)', whiteSpace: 'nowrap' }}>
+                  {feat.type}
+                </td>
+                <td className="px-3 py-1" style={{ color: 'var(--color-fg-muted)', whiteSpace: 'nowrap' }}>
+                  {feat.sourceLabel}
+                </td>
+                <td className="px-3 py-1 text-center">
+                  {feat.source === 'Special' && (
+                    <button
+                      type="button"
+                      aria-label={`Remove additional feat ${i + 1}`}
+                      onClick={() => removeFeat(i)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--color-fg-muted)',
+                        cursor: 'pointer',
+                        fontSize: 14,
+                        lineHeight: 1,
+                        padding: '0 4px',
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <button
+        type="button"
+        onClick={addFeat}
+        className="text-xs px-3 py-1 rounded self-start"
+        style={{
+          border: '1px solid var(--color-border-default)',
+          color: 'var(--color-fg-default)',
+          cursor: 'pointer',
+          background: 'transparent',
+        }}
+      >
+        + Add Feat
+      </button>
+    </div>
+  );
+}
+
 // ── Main editor ───────────────────────────────────────────────────────────────
 
 interface CharacterEditorProps {
@@ -854,6 +1008,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
   const saveSequenceRef = useRef(0);
   const isEdit = Boolean(characterId);
   const spentAbilityPoints = abilityPointBuyTotal(draft.abilityScores);
+  const autoFeats = deriveAutoFeats(draft.classes);
   const remainingAbilityPoints = ABILITY_POINT_BUY_BUDGET - spentAbilityPoints;
   const intelligenceMod = abilityModifier(totalScore(draft.abilityScores.intelligence));
   const totalLevel = totalCharacterLevel(draft.classes);
@@ -983,7 +1138,8 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           bonus: computeSkillBonus(skill, loaded.abilityScores),
         }));
 
-        const loadedDraft = { ...loaded, skills: adjustedSkills };
+        const derivedFeats = deriveSelectableFeats(loaded.classes, loaded.race);
+        const loadedDraft = { ...loaded, skills: adjustedSkills, feats: derivedFeats };
         setDraft(loadedDraft);
         setAutoSaveCharacterId(characterId);
         setInitialDraftFingerprint(JSON.stringify(loadedDraft));
@@ -1039,7 +1195,9 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
         ...sk,
         bonus: computeSkillBonus(sk, newScores),
       }));
-      return { ...d, race, size: RACIAL_SIZES[race], abilityScores: newScores, skills };
+      const derivedFeats = deriveSelectableFeats(d.classes, race);
+      const feats = mergeSelectableFeats(d.feats, derivedFeats);
+      return { ...d, race, size: RACIAL_SIZES[race], abilityScores: newScores, skills, feats };
     });
   }, []);
 
@@ -1050,7 +1208,9 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
         ...sk,
         bonus: computeSkillBonus(sk, d.abilityScores),
       }));
-      return { ...d, classes, skills };
+      const derivedFeats = deriveSelectableFeats(classes, d.race);
+      const feats = mergeSelectableFeats(d.feats, derivedFeats);
+      return { ...d, classes, skills, feats };
     });
   }, []);
 
@@ -1096,7 +1256,20 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
                 },
               },
             },
-            feats: [],
+            feats: [
+              ...deriveAutoFeats(draft.classes).map((feat) => ({
+                name: feat.name,
+                type: feat.type,
+                source: feat.source,
+                notes: feat.shortDescription,
+              })),
+              ...draft.feats.map((feat) => ({
+                name: feat.name,
+                type: feat.type,
+                source: feat.source,
+                notes: feat.sourceLabel,
+              })),
+            ],
             equipment: [],
             currency: { pp: 0, gp: 0, sp: 0, cp: 0 },
             experience: { current: 0, nextLevel: 1000 },
@@ -1371,6 +1544,31 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
               />
             ))}
           </div>
+        </Accordion>
+
+        {/* ── Feats ── */}
+        <Accordion
+          title="Feats"
+          summary={`${autoFeats.length} class · ${draft.feats.length} selectable`}
+        >
+          <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-fg-muted)' }}>
+            Class Proficiency Feats
+          </p>
+          <p className="text-sm mb-2" style={{ color: 'var(--color-fg-subtle)' }}>
+            Granted automatically by class. Not selectable.
+          </p>
+          <AutoFeatsSection feats={autoFeats} />
+
+          <p className="text-xs font-semibold uppercase tracking-wider mt-4 mb-1" style={{ color: 'var(--color-fg-muted)' }}>
+            Selectable Feats
+          </p>
+          <p className="text-sm mb-2" style={{ color: 'var(--color-fg-subtle)' }}>
+            Slots granted by character level, race, and class bonus feats. Enter the chosen feat name.
+          </p>
+          <SelectableFeatsSection
+            feats={draft.feats}
+            onChange={(feats) => setField('feats', feats)}
+          />
         </Accordion>
 
         {/* ── Combat ── */}
