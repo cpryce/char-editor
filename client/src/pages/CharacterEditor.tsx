@@ -60,13 +60,14 @@ function TextInput({
 }
 
 function NumberInput({
-  value, onChange, min = 0,
-}: { value: number; onChange: (v: number) => void; min?: number }) {
+  value, onChange, min = 0, 'aria-label': ariaLabel,
+}: { value: number; onChange: (v: number) => void; min?: number; 'aria-label'?: string }) {
   return (
     <input
       type="number"
       value={value}
       min={min}
+      aria-label={ariaLabel}
       onChange={(e) => onChange(Number(e.target.value))}
       style={{ ...inputStyle, width: 72 }}
     />
@@ -111,6 +112,7 @@ function Accordion({
     <div>
       <button
         type="button"
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center gap-2 pb-1 mb-3"
         style={{
@@ -209,6 +211,7 @@ function AbilityScoreRow({
         <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>base</span>
         <input
           type="number"
+          aria-label={`${label} base score`}
           value={score.base}
           min={8}
           max={18}
@@ -277,6 +280,7 @@ function ClassesSection({
       <div className="flex flex-col items-start gap-3">
         <div className="flex items-center gap-3">
           <select
+            aria-label="Class"
             value={selectedName}
             onChange={(e) => handleClassChange(e.target.value)}
             style={{ ...inputStyle, width: classSelectWidth }}
@@ -315,6 +319,7 @@ function ClassesSection({
       {classes.map((c, i) => (
         <div key={i} className="flex items-center gap-2">
           <select
+            aria-label={i === 0 ? 'Class' : `Multiclass ${i + 1}`}
             value={c.name}
             onChange={(e) => update(i, 'name', e.target.value)}
             style={{ ...inputStyle, width: classSelectWidth }}
@@ -327,7 +332,7 @@ function ClassesSection({
             ))}
           </select>
           <span className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>Lv</span>
-          <NumberInput value={c.level} min={1} onChange={(v) => update(i, 'level', v)} />
+          <NumberInput value={c.level} min={1} aria-label={`${c.name || 'Class'} level`} onChange={(v) => update(i, 'level', v)} />
           <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>{c.name ? `d${c.hitDieType}` : ''}</span>
         </div>
       ))}
@@ -461,12 +466,13 @@ function SkillsSection({
           </svg>
         </button>
       </div>
-      <table className="w-full text-xs border-collapse">
+      <table aria-label="Skills" className="w-full text-xs border-collapse">
         <thead>
           <tr style={{ background: 'var(--color-canvas-subtle)' }}>
             {['', 'Skill', 'Key Ability', 'Class', 'Score', 'Bonus', 'Ranks', 'Misc Bonus'].map((h) => (
               <th
                 key={h}
+                aria-label={h === '' ? 'Trained only' : undefined}
                 className={`px-3 py-2 font-medium ${h === 'Score' || h === 'Bonus' ? 'text-right' : 'text-left'}`}
                 style={{ color: 'var(--color-fg-muted)', borderBottom: '1px solid var(--color-border-default)' }}
               >
@@ -503,6 +509,7 @@ function SkillsSection({
                 <td className="px-3 py-1 text-center" style={{ color: 'var(--color-fg-muted)' }}>
                   <input
                     type="checkbox"
+                    aria-label={`${sk.name} is class skill`}
                     checked={sk.classSkill}
                     readOnly
                     style={{ accentColor: 'black', width: 14, height: 14 }}
@@ -517,6 +524,7 @@ function SkillsSection({
                 <td className="px-3 py-1">
                   <input
                     type="number"
+                    aria-label={`${sk.name} ranks`}
                     value={sk.ranks}
                     min={0}
                     step={sk.classSkill ? 1 : 0.5}
@@ -534,6 +542,7 @@ function SkillsSection({
                 <td className="px-3 py-1">
                   <input
                     type="number"
+                    aria-label={`${sk.name} misc bonus`}
                     value={sk.miscBonus}
                     onChange={(e) => updateMiscBonus(i, Number(e.target.value))}
                     style={{ ...inputStyle, width: 62, padding: '2px 4px', textAlign: 'center' }}
