@@ -11,7 +11,7 @@ interface User {
 }
 
 type Section = 'characters';
-type View = 'list' | 'new';
+type View = 'list' | 'new' | 'edit';
 
 // ── User dropdown ────────────────────────────────────────────────────────────
 
@@ -122,6 +122,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState<Section>('characters');
   const [view, setView] = useState<View>('list');
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/auth/me', { credentials: 'include' })
@@ -186,12 +187,29 @@ function App() {
         <Sidebar active={section} onNavigate={(id) => { setSection(id as Section); setView('list'); }} />
         <main className="flex-1 overflow-y-auto">
           {section === 'characters' && view === 'list' && (
-            <CharactersPage onNewCharacter={() => setView('new')} />
+            <CharactersPage
+              onNewCharacter={() => {
+                setSelectedCharacterId(null);
+                setView('new');
+              }}
+              onEditCharacter={(id) => {
+                setSelectedCharacterId(id);
+                setView('edit');
+              }}
+            />
           )}
           {section === 'characters' && view === 'new' && (
             <CharacterEditor
-              onSaved={() => setView('list')}
               onCancel={() => setView('list')}
+            />
+          )}
+          {section === 'characters' && view === 'edit' && selectedCharacterId && (
+            <CharacterEditor
+              characterId={selectedCharacterId}
+              onCancel={() => {
+                setSelectedCharacterId(null);
+                setView('list');
+              }}
             />
           )}
         </main>

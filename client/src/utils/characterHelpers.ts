@@ -1,4 +1,4 @@
-import type { CharacterDraft, AbilityScore, Skill, Race, Size } from '../types/character';
+import type { CharacterDraft, AbilityScore, Skill, Race, Size, ClassName } from '../types/character';
 
 // ── Racial ability adjustments (mirrors server coreMechanics) ────────────────
 
@@ -23,6 +23,52 @@ export const RACIAL_SIZES: Readonly<Record<Race, Size>> = {
   Halfling: 'Small',
   'Half-Elf': 'Medium',
   'Half-Orc': 'Medium',
+};
+
+export const CLASS_SKILL_POINTS_PER_LEVEL: Readonly<Record<ClassName, number>> = {
+  Barbarian: 4,
+  Bard: 6,
+  Cleric: 2,
+  Druid: 4,
+  Fighter: 2,
+  Monk: 4,
+  Paladin: 2,
+  Ranger: 6,
+  Rogue: 8,
+  Sorcerer: 2,
+  Wizard: 2,
+};
+
+export const CLASS_SKILLS: Readonly<Record<ClassName, ReadonlySet<string>>> = {
+  Barbarian: new Set(['Climb', 'Craft', 'Handle Animal', 'Intimidate', 'Jump', 'Listen', 'Ride', 'Survival', 'Swim']),
+  Bard: new Set([
+    'Appraise', 'Balance', 'Bluff', 'Climb', 'Concentration', 'Craft', 'Decipher Script', 'Diplomacy',
+    'Disguise', 'Escape Artist', 'Gather Information', 'Hide', 'Jump', 'Knowledge (arcana)',
+    'Knowledge (architecture & engineering)', 'Knowledge (dungeoneering)', 'Knowledge (geography)',
+    'Knowledge (history)', 'Knowledge (local)', 'Knowledge (nature)', 'Knowledge (nobility & royalty)',
+    'Knowledge (religion)', 'Knowledge (the planes)',
+    'Listen', 'Move Silently', 'Perform', 'Profession', 'Sense Motive', 'Sleight of Hand',
+    'Speak Language', 'Spellcraft', 'Swim', 'Tumble', 'Use Magic Device', 'Use Rope',
+  ]),
+  Cleric: new Set(['Concentration', 'Craft', 'Diplomacy', 'Heal', 'Knowledge (arcana)', 'Knowledge (history)', 'Knowledge (religion)', 'Knowledge (the planes)', 'Profession', 'Spellcraft']),
+  Druid: new Set(['Concentration', 'Craft', 'Diplomacy', 'Handle Animal', 'Heal', 'Knowledge (nature)', 'Listen', 'Profession', 'Ride', 'Spellcraft', 'Spot', 'Survival', 'Swim']),
+  Fighter: new Set(['Climb', 'Craft', 'Handle Animal', 'Intimidate', 'Jump', 'Ride', 'Swim']),
+  Monk: new Set(['Balance', 'Climb', 'Concentration', 'Craft', 'Diplomacy', 'Escape Artist', 'Hide', 'Jump', 'Knowledge (arcana)', 'Knowledge (religion)', 'Listen', 'Move Silently', 'Perform', 'Profession', 'Sense Motive', 'Spot', 'Swim', 'Tumble']),
+  Paladin: new Set(['Concentration', 'Craft', 'Diplomacy', 'Handle Animal', 'Heal', 'Knowledge (nobility & royalty)', 'Knowledge (religion)', 'Profession', 'Ride', 'Sense Motive']),
+  Ranger: new Set(['Climb', 'Concentration', 'Craft', 'Handle Animal', 'Heal', 'Hide', 'Jump', 'Knowledge (dungeoneering)', 'Knowledge (geography)', 'Knowledge (nature)', 'Listen', 'Move Silently', 'Profession', 'Ride', 'Search', 'Spot', 'Survival', 'Swim', 'Use Rope']),
+  Rogue: new Set(['Appraise', 'Balance', 'Bluff', 'Climb', 'Craft', 'Decipher Script', 'Diplomacy', 'Disable Device', 'Disguise', 'Escape Artist', 'Forgery', 'Gather Information', 'Hide', 'Intimidate', 'Jump', 'Knowledge (local)', 'Listen', 'Move Silently', 'Open Lock', 'Perform', 'Profession', 'Search', 'Sense Motive', 'Sleight of Hand', 'Spot', 'Swim', 'Tumble', 'Use Magic Device', 'Use Rope']),
+  Sorcerer: new Set(['Bluff', 'Concentration', 'Craft', 'Knowledge (arcana)', 'Profession', 'Spellcraft']),
+  Wizard: new Set(['Concentration', 'Craft', 'Decipher Script', 'Knowledge (arcana)', 'Knowledge (architecture & engineering)', 'Knowledge (dungeoneering)', 'Knowledge (geography)', 'Knowledge (history)', 'Knowledge (local)', 'Knowledge (nature)', 'Knowledge (nobility & royalty)', 'Knowledge (religion)', 'Knowledge (the planes)', 'Profession', 'Spellcraft']),
+};
+
+export const RACIAL_SKILL_BONUSES: Readonly<Record<Race, Readonly<Record<string, number>>>> = {
+  Human: {},
+  Elf: { Listen: 2, Search: 2, Spot: 2 },
+  Dwarf: {},
+  Gnome: { Listen: 2 },
+  Halfling: { Climb: 2, Jump: 2, Listen: 2, 'Move Silently': 2 },
+  'Half-Elf': { Listen: 1, Search: 1, Spot: 1 },
+  'Half-Orc': {},
 };
 
 export const ABILITY_POINT_BUY_BUDGET = 28;
@@ -134,9 +180,74 @@ export function computeSkillBonus(
   skill: Skill,
   scores: CharacterDraft['abilityScores'],
 ): number {
-  if (!skill.keyAbility) return skill.ranks + skill.miscBonus;
+  if (!skill.keyAbility) return Math.floor(skill.ranks + skill.miscBonus);
   const score = totalScore(scores[skill.keyAbility as keyof CharacterDraft['abilityScores']]);
-  return skill.ranks + abilityModifier(score) + skill.miscBonus;
+  return Math.floor(skill.ranks + abilityModifier(score) + skill.miscBonus);
+}
+
+export function totalCharacterLevel(classes: CharacterDraft['classes']) {
+  return classes.reduce((sum, entry) => sum + Math.max(0, Math.trunc(entry.level || 0)), 0);
+}
+
+export function maxClassSkillRanks(totalLevel: number) {
+  return Math.max(0, totalLevel + 3);
+}
+
+export function maxCrossClassSkillRanks(totalLevel: number) {
+  return Math.max(0, (totalLevel + 3) / 2);
+}
+
+export function skillRankCost(ranks: number, classSkill: boolean) {
+  return classSkill ? ranks : ranks * 2;
+}
+
+export function spentSkillPoints(skills: CharacterDraft['skills']) {
+  return skills.reduce((sum, skill) => sum + skillRankCost(skill.ranks, skill.classSkill), 0);
+}
+
+export function totalSkillPointsAvailable(
+  classes: CharacterDraft['classes'],
+  intelligenceModifier: number,
+  race: Race,
+) {
+  const classSequence: ClassName[] = [];
+  classes.forEach((entry) => {
+    const className = entry.name as ClassName;
+    const levels = Math.max(0, Math.trunc(entry.level || 0));
+    for (let i = 0; i < levels; i += 1) {
+      classSequence.push(className);
+    }
+  });
+
+  if (classSequence.length === 0) return 0;
+
+  const racialPerLevel = race === 'Human' ? 1 : 0;
+
+  return classSequence.reduce((total, className, index) => {
+    const classBase = CLASS_SKILL_POINTS_PER_LEVEL[className] ?? 0;
+    const perLevel = Math.max(1, classBase + intelligenceModifier + racialPerLevel);
+    return total + (index === 0 ? perLevel * 4 : perLevel);
+  }, 0);
+}
+
+export function applyClassAndRacialSkillRules(
+  skills: CharacterDraft['skills'],
+  classes: CharacterDraft['classes'],
+  race: Race,
+) {
+  const classSkillNames = new Set(
+    classes.flatMap((entry) => Array.from(CLASS_SKILLS[entry.name as ClassName] ?? [])),
+  );
+  const racialBonuses = RACIAL_SKILL_BONUSES[race] ?? {};
+
+  return skills.map((skill) => {
+    const classSkill = classSkillNames.has(skill.name);
+    return {
+      ...skill,
+      classSkill,
+      miscBonus: racialBonuses[skill.name] ?? 0,
+    };
+  });
 }
 
 export function newCharacterDraft(): CharacterDraft {

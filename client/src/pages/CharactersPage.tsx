@@ -14,6 +14,7 @@ interface ClassEntry {
 
 interface CharactersPageProps {
   onNewCharacter: () => void;
+  onEditCharacter: (id: string) => void;
 }
 
 function formatDate(iso: string) {
@@ -32,10 +33,27 @@ function classLabel(classes: ClassEntry[]) {
   return classes.map((c) => c.name).join(' / ');
 }
 
-export function CharactersPage({ onNewCharacter }: CharactersPageProps) {
+export function CharactersPage({ onNewCharacter, onEditCharacter }: CharactersPageProps) {
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  async function deleteCharacter(id: string) {
+    setError(null);
+    try {
+      const res = await fetch(`/api/characters/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok && res.status !== 204) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? 'Failed to delete character');
+      }
+      setCharacters((prev) => prev.filter((char) => char._id !== id));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to delete character');
+    }
+  }
 
   useEffect(() => {
     fetch('/api/characters', { credentials: 'include' })
@@ -85,7 +103,7 @@ export function CharactersPage({ onNewCharacter }: CharactersPageProps) {
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr style={{ background: 'var(--color-canvas-subtle)' }}>
-                {['Name', 'Class', 'Level', 'Last Modified'].map((h) => (
+                {['Name', 'Class', 'Level', 'Last Modified', ''].map((h) => (
                   <th
                     key={h}
                     className="text-left px-4 py-2 font-medium"
@@ -103,7 +121,7 @@ export function CharactersPage({ onNewCharacter }: CharactersPageProps) {
               {characters.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={5}
                     className="px-4 py-6 text-center text-sm"
                     style={{ color: 'var(--color-fg-muted)' }}
                   >
@@ -125,6 +143,7 @@ export function CharactersPage({ onNewCharacter }: CharactersPageProps) {
                     borderBottom: '1px solid var(--color-border-muted)',
                     cursor: 'pointer',
                   }}
+                  onClick={() => onEditCharacter(char._id)}
                   onMouseEnter={(e) =>
                     (e.currentTarget.style.background = 'var(--color-accent-subtle)')
                   }
@@ -147,6 +166,59 @@ export function CharactersPage({ onNewCharacter }: CharactersPageProps) {
                   </td>
                   <td className="px-4 py-2" style={{ color: 'var(--color-fg-muted)' }}>
                     {formatDate(char.updatedAt)}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteCharacter(char._id);
+                      }}
+                      title="Delete character"
+                      aria-label={`Delete ${char.name}`}
+                      className="inline-flex items-center justify-center"
+                      style={{
+                        width: 24,
+                        height: 24,
+                        border: '1px solid var(--color-border-default)',
+                        borderRadius: 4,
+                        color: 'var(--color-danger-fg)',
+                        background: 'var(--color-canvas-default)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M3 6h18"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M8 6V4h8v2"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M19 6l-1 14H6L5 6"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        <path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    </button>
                   </td>
                 </tr>
               ))}
