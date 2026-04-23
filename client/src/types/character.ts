@@ -87,5 +87,18 @@ export interface CharacterDraft {
 
   hitPoints: { max: number; current: number; nonlethal: number };
 
+  combat: {
+    initiative: { miscBonus: number };
+    speed: { base: number; armorAdjust: number; fly: number; swim: number };
+    armorClass: { armor: number; shield: number; dodge: number; natural: number; deflection: number; misc: number };
+    saves: {
+      fortitude: { base: number; magic: number; misc: number; temp: number };
+      reflex: { base: number; magic: number; misc: number; temp: number };
+      will: { base: number; magic: number; misc: number; temp: number };
+    };
+    baseAttackBonus: number;
+    grappleBonus: number;
+  };
+
   skills: Skill[];
 }

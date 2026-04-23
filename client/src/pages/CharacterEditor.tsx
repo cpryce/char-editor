@@ -17,6 +17,8 @@ import {
   maxCrossClassSkillRanks,
   spentSkillPoints,
   totalSkillPointsAvailable,
+  baseAttackBonusFromClasses,
+  baseSaveBonusFromClasses,
 } from '../utils/characterHelpers';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -96,14 +98,64 @@ function Textarea({
   );
 }
 
-function SectionHeader({ children }: { children: React.ReactNode }) {
+function Accordion({
+  title, summary, defaultOpen = false, children,
+}: {
+  title: React.ReactNode;
+  summary?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <h3
-      className="text-sm font-semibold uppercase tracking-wider mt-6 mb-3 pb-1"
-      style={{ color: 'var(--color-fg-muted)', borderBottom: '1px solid var(--color-border-muted)' }}
-    >
-      {children}
-    </h3>
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-2 pb-1 mb-3"
+        style={{
+          background: 'none',
+          border: 'none',
+          borderBottom: '1px solid var(--color-border-muted)',
+          cursor: 'pointer',
+          padding: '0 0 4px 0',
+          textAlign: 'left',
+        }}
+      >
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          style={{
+            transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+            transition: 'transform 0.15s',
+            flexShrink: 0,
+            color: 'var(--color-fg-muted)',
+          }}
+          aria-hidden="true"
+        >
+          <path d="M3 1.5l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--color-fg-default)' }}>
+          {title}
+        </span>
+        {!open && summary && (
+          <span className="text-xs font-normal normal-case tracking-normal ml-2" style={{ color: 'var(--color-fg-muted)' }}>
+            {summary}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div
+          className="flex flex-col gap-4"
+          style={{ padding: '6px', paddingBottom: '24px' }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -115,6 +167,26 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
   strength: 'STR', dexterity: 'DEX', constitution: 'CON',
   intelligence: 'INT', wisdom: 'WIS', charisma: 'CHA',
 };
+
+const SIZE_MODIFIERS: Record<CharacterDraft['size'], number> = {
+  Fine: 8,
+  Diminutive: 4,
+  Tiny: 2,
+  Small: 1,
+  Medium: 0,
+  Large: -1,
+  Huge: -2,
+  Gargantuan: -4,
+  Colossal: -8,
+};
+
+function signed(value: number) {
+  return value >= 0 ? `+${value}` : `${value}`;
+}
+
+function safeCombatNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
 
 function AbilityScoreRow({
   label, score, onBaseChange,
@@ -478,6 +550,286 @@ function SkillsSection({
 
 // ── Main editor ───────────────────────────────────────────────────────────────
 
+function CombatSection({
+  combat,
+  classes,
+  abilityScores,
+  size,
+  onCombatChange,
+}: {
+  combat: CharacterDraft['combat'];
+  classes: CharacterDraft['classes'];
+  abilityScores: CharacterDraft['abilityScores'];
+  size: CharacterDraft['size'];
+  onCombatChange: (value: CharacterDraft['combat']) => void;
+}) {
+  const dexMod = abilityModifier(totalScore(abilityScores.dexterity));
+  const conMod = abilityModifier(totalScore(abilityScores.constitution));
+  const wisMod = abilityModifier(totalScore(abilityScores.wisdom));
+  const strMod = abilityModifier(totalScore(abilityScores.strength));
+  const sizeMod = SIZE_MODIFIERS[size] ?? 0;
+  const acArmor = safeCombatNumber(combat.armorClass.armor);
+  const acShield = safeCombatNumber(combat.armorClass.shield);
+  const acDodge = safeCombatNumber(combat.armorClass.dodge);
+  const acNatural = safeCombatNumber(combat.armorClass.natural);
+  const acDeflection = safeCombatNumber(combat.armorClass.deflection);
+  const acMisc = safeCombatNumber(combat.armorClass.misc);
+  const initMisc = safeCombatNumber(combat.initiative.miscBonus);
+  const speedBase = safeCombatNumber(combat.speed.base);
+  const speedArmorAdjust = safeCombatNumber(combat.speed.armorAdjust);
+  const speedFly = safeCombatNumber(combat.speed.fly);
+  const speedSwim = safeCombatNumber(combat.speed.swim);
+  const bab = baseAttackBonusFromClasses(classes);
+  const fortitudeBase = baseSaveBonusFromClasses(classes, 'fortitude');
+  const reflexBase = baseSaveBonusFromClasses(classes, 'reflex');
+  const willBase = baseSaveBonusFromClasses(classes, 'will');
+
+  const totalAC = 10
+    + acArmor
+    + acShield
+    + dexMod
+    + sizeMod
+    + acDodge
+    + acNatural
+    + acDeflection
+    + acMisc;
+  const touchAC = 10 + dexMod + sizeMod + acDodge + acDeflection + acMisc;
+  const flatFootedAC = 10
+    + acArmor
+    + acShield
+    + sizeMod
+    + acNatural
+    + acDeflection
+    + acMisc;
+
+  const initiativeTotal = dexMod + initMisc;
+  const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc) + safeCombatNumber(combat.saves.fortitude.temp);
+  const reflexTotal = reflexBase + dexMod + safeCombatNumber(combat.saves.reflex.magic) + safeCombatNumber(combat.saves.reflex.misc) + safeCombatNumber(combat.saves.reflex.temp);
+  const willTotal = willBase + wisMod + safeCombatNumber(combat.saves.will.magic) + safeCombatNumber(combat.saves.will.misc) + safeCombatNumber(combat.saves.will.temp);
+
+  const meleeAttack = bab + strMod + sizeMod;
+  const rangedAttack = bab + dexMod + sizeMod;
+  const speedFeet = Math.max(0, speedBase + speedArmorAdjust);
+
+  function updateNumeric(path: string, value: number) {
+    const safe = Number.isFinite(value) ? Math.trunc(value) : 0;
+    const parts = path.split('.');
+    onCombatChange((() => {
+      if (parts.length === 1) {
+        const [k1] = parts as [keyof CharacterDraft['combat']];
+        return {
+          ...combat,
+          [k1]: safe,
+        } as CharacterDraft['combat'];
+      }
+      if (parts.length === 2) {
+        const [k1, k2] = parts as [keyof CharacterDraft['combat'], string];
+        return {
+          ...combat,
+          [k1]: {
+            ...(combat[k1] as Record<string, unknown>),
+            [k2]: safe,
+          },
+        } as CharacterDraft['combat'];
+      }
+      const [k1, k2, k3] = parts as [keyof CharacterDraft['combat'], string, string];
+      return {
+        ...combat,
+        [k1]: {
+          ...(combat[k1] as Record<string, unknown>),
+          [k2]: {
+            ...((combat[k1] as Record<string, Record<string, number>>)[k2]),
+            [k3]: safe,
+          },
+        },
+      } as CharacterDraft['combat'];
+    })());
+  }
+
+  function statRow(label: string, total: string | number, parts: React.ReactNode) {
+    return (
+      <div className="flex items-stretch gap-3">
+        <div
+          className="shrink-0 rounded px-2 py-1 min-w-[92px]"
+          style={{ border: '1px solid var(--color-border-default)', background: 'var(--color-canvas-subtle)' }}
+        >
+          <div className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>{label}</div>
+          <div className="text-lg font-semibold leading-none mt-0.5" style={{ color: 'var(--color-fg-default)' }}>{total}</div>
+        </div>
+        <div className="flex items-end gap-2 flex-wrap">
+          {parts}
+        </div>
+      </div>
+    );
+  }
+
+  function modInput(label: string, value: number, onChange?: (v: number) => void, min = -20) {
+    return (
+      <label className="flex items-center gap-1">
+        <span className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>{label}</span>
+        <input
+          type="number"
+          value={value}
+          min={min}
+          readOnly={!onChange}
+          onChange={onChange ? (e) => onChange(Number(e.target.value)) : undefined}
+          style={{
+            ...inputStyle,
+            width: 56,
+            textAlign: 'center',
+            color: onChange ? 'var(--color-fg-default)' : 'var(--color-fg-muted)',
+            background: onChange ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)',
+            cursor: onChange ? 'text' : 'default',
+          }}
+        />
+      </label>
+    );
+  }
+
+  function subsection(title: string, content: React.ReactNode, withBorder = true) {
+    return (
+      <section
+        className="flex flex-col gap-3"
+        style={{
+          paddingBottom: 8,
+          marginBottom: 2,
+          borderBottom: withBorder ? '1px solid var(--color-border-muted)' : 'none',
+        }}
+      >
+        <h4
+          className="text-[11px] font-semibold uppercase tracking-wider"
+          style={{ color: 'var(--color-fg-muted)' }}
+        >
+          {title}
+        </h4>
+        {content}
+      </section>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {subsection(
+        'Armor Class',
+        statRow(
+          'AC',
+          totalAC,
+          <>
+            {modInput('Armor', acArmor, (v) => updateNumeric('armorClass.armor', v))}
+            {modInput('Shield', acShield, (v) => updateNumeric('armorClass.shield', v))}
+            {modInput('Dex', dexMod)}
+            {modInput('Dodge', acDodge, (v) => updateNumeric('armorClass.dodge', v))}
+            {modInput('Deflection', acDeflection, (v) => updateNumeric('armorClass.deflection', v))}
+            {modInput('Natural', acNatural, (v) => updateNumeric('armorClass.natural', v))}
+            {modInput('Misc', acMisc, (v) => updateNumeric('armorClass.misc', v))}
+            <div className="basis-full text-xs" style={{ color: 'var(--color-fg-muted)' }}>
+              Touch {touchAC} / Flat {flatFootedAC}
+            </div>
+          </>,
+        ),
+      )}
+
+      {subsection(
+        'Saving Throws',
+        <>
+          {statRow(
+            'Fortitude',
+            signed(fortitudeTotal),
+            <>
+              {modInput('Base', fortitudeBase)}
+              {modInput('Con', conMod)}
+              {modInput('Magic', combat.saves.fortitude.magic, (v) => updateNumeric('saves.fortitude.magic', v))}
+              {modInput('Misc', combat.saves.fortitude.misc, (v) => updateNumeric('saves.fortitude.misc', v))}
+              {modInput('Temp', combat.saves.fortitude.temp, (v) => updateNumeric('saves.fortitude.temp', v))}
+            </>,
+          )}
+
+          {statRow(
+            'Reflex',
+            signed(reflexTotal),
+            <>
+              {modInput('Base', reflexBase)}
+              {modInput('Dex', dexMod)}
+              {modInput('Magic', combat.saves.reflex.magic, (v) => updateNumeric('saves.reflex.magic', v))}
+              {modInput('Misc', combat.saves.reflex.misc, (v) => updateNumeric('saves.reflex.misc', v))}
+              {modInput('Temp', combat.saves.reflex.temp, (v) => updateNumeric('saves.reflex.temp', v))}
+            </>,
+          )}
+
+          {statRow(
+            'Will',
+            signed(willTotal),
+            <>
+              {modInput('Base', willBase)}
+              {modInput('Wis', wisMod)}
+              {modInput('Magic', combat.saves.will.magic, (v) => updateNumeric('saves.will.magic', v))}
+              {modInput('Misc', combat.saves.will.misc, (v) => updateNumeric('saves.will.misc', v))}
+              {modInput('Temp', combat.saves.will.temp, (v) => updateNumeric('saves.will.temp', v))}
+            </>,
+          )}
+        </>,
+      )}
+
+      {subsection(
+        'Attacks',
+        <>
+          {statRow(
+            'Melee Atk',
+            signed(meleeAttack),
+            <>
+              {modInput('BAB', bab)}
+              {modInput('Str', strMod)}
+              {modInput('Size', sizeMod)}
+            </>,
+          )}
+
+          {statRow(
+            'Ranged Atk',
+            signed(rangedAttack),
+            <>
+              {modInput('BAB', bab)}
+              {modInput('Dex', dexMod)}
+              {modInput('Size', sizeMod)}
+            </>,
+          )}
+        </>,
+      )}
+
+      {subsection(
+        'Movement',
+        <>
+          {statRow(
+            'Speed',
+            `${speedFeet} ft`,
+            <>
+              {modInput('Base', speedBase, (v) => updateNumeric('speed.base', v), 0)}
+              {modInput('Armor Adj', speedArmorAdjust, (v) => updateNumeric('speed.armorAdjust', v), -60)}
+              {modInput('Fly', speedFly, (v) => updateNumeric('speed.fly', v), 0)}
+              {modInput('Swim', speedSwim, (v) => updateNumeric('speed.swim', v), 0)}
+            </>,
+          )}
+
+          {statRow(
+            'Initiative',
+            signed(initiativeTotal),
+            <>
+              {modInput('Dex', dexMod)}
+              {modInput('Misc', initMisc, (v) => updateNumeric('initiative.miscBonus', v))}
+            </>,
+          )}
+        </>,
+        false,
+      )}
+
+      <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
+        Save inputs are ordered: base, magic, misc, temp. AC follows SRD: 10 + armor + shield + Dex + size + dodge + natural + deflection + misc.
+      </p>
+    </div>
+  );
+}
+
+// ── Main editor ───────────────────────────────────────────────────────────────
+
 interface CharacterEditorProps {
   characterId?: string;
   onCancel: () => void;
@@ -502,6 +854,27 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
   const calculatedCreateHitPoints = selectedClass
     ? Math.max(1, selectedClass.hitDieType + abilityModifier(totalScore(draft.abilityScores.constitution)))
     : 0;
+  const combatDexMod = abilityModifier(totalScore(draft.abilityScores.dexterity));
+  const combatConMod = abilityModifier(totalScore(draft.abilityScores.constitution));
+  const combatWisMod = abilityModifier(totalScore(draft.abilityScores.wisdom));
+  const combatFortitudeBase = baseSaveBonusFromClasses(draft.classes, 'fortitude');
+  const combatReflexBase = baseSaveBonusFromClasses(draft.classes, 'reflex');
+  const combatWillBase = baseSaveBonusFromClasses(draft.classes, 'will');
+  const combatSizeMod = SIZE_MODIFIERS[draft.size] ?? 0;
+  const combatAC = 10
+    + safeCombatNumber(draft.combat.armorClass.armor)
+    + safeCombatNumber(draft.combat.armorClass.shield)
+    + combatDexMod
+    + combatSizeMod
+    + safeCombatNumber(draft.combat.armorClass.dodge)
+    + safeCombatNumber(draft.combat.armorClass.natural)
+    + safeCombatNumber(draft.combat.armorClass.deflection)
+    + safeCombatNumber(draft.combat.armorClass.misc);
+  const combatInitiative = combatDexMod + safeCombatNumber(draft.combat.initiative.miscBonus);
+  const combatFortitude = combatFortitudeBase + combatConMod + safeCombatNumber(draft.combat.saves.fortitude.magic) + safeCombatNumber(draft.combat.saves.fortitude.misc) + safeCombatNumber(draft.combat.saves.fortitude.temp);
+  const combatReflex = combatReflexBase + combatDexMod + safeCombatNumber(draft.combat.saves.reflex.magic) + safeCombatNumber(draft.combat.saves.reflex.misc) + safeCombatNumber(draft.combat.saves.reflex.temp);
+  const combatWill = combatWillBase + combatWisMod + safeCombatNumber(draft.combat.saves.will.magic) + safeCombatNumber(draft.combat.saves.will.misc) + safeCombatNumber(draft.combat.saves.will.temp);
+  const combatSummary = `AC ${combatAC} · Init ${signed(combatInitiative)} · F/R/W ${signed(combatFortitude)}/${signed(combatReflex)}/${signed(combatWill)}`;
   const hasUnselectedClass = draft.classes.some((c) => !c.name.trim());
   const hasRequiredFields = draft.name.trim().length > 0
     && draft.classes.length > 0
@@ -551,6 +924,20 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           };
         });
 
+        const rawCombat = (data.combat as CharacterDraft['combat'] | undefined) ?? base.combat;
+        const normalizedCombat: CharacterDraft['combat'] = {
+          ...base.combat,
+          ...rawCombat,
+          initiative: { ...base.combat.initiative, ...(rawCombat.initiative ?? {}) },
+          speed: { ...base.combat.speed, ...(rawCombat.speed ?? {}) },
+          armorClass: { ...base.combat.armorClass, ...(rawCombat.armorClass ?? {}) },
+          saves: {
+            fortitude: { ...base.combat.saves.fortitude, ...(rawCombat.saves?.fortitude ?? {}) },
+            reflex: { ...base.combat.saves.reflex, ...(rawCombat.saves?.reflex ?? {}) },
+            will: { ...base.combat.saves.will, ...(rawCombat.saves?.will ?? {}) },
+          },
+        };
+
         const loaded: CharacterDraft = {
           ...base,
           name: typeof data.name === 'string' ? data.name : '',
@@ -578,6 +965,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
             : [],
           abilityScores: (data.abilityScores as CharacterDraft['abilityScores']) ?? base.abilityScores,
           hitPoints: (data.hitPoints as CharacterDraft['hitPoints']) ?? base.hitPoints,
+          combat: normalizedCombat,
           skills: mergedSkills,
         };
 
@@ -681,16 +1069,23 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
                 nonlethal: 0,
               },
             combat: {
-              initiative:  { miscBonus: 0 },
-              speed:       { base: 30, armorAdjust: 0 },
-              armorClass:  { armor: 0, shield: 0, natural: 0, deflection: 0, misc: 0 },
-              saves:       {
-                fortitude: { base: 0, magic: 0, misc: 0, temp: 0 },
-                reflex:    { base: 0, magic: 0, misc: 0, temp: 0 },
-                will:      { base: 0, magic: 0, misc: 0, temp: 0 },
+              ...draft.combat,
+              baseAttackBonus: baseAttackBonusFromClasses(draft.classes),
+              saves: {
+                ...draft.combat.saves,
+                fortitude: {
+                  ...draft.combat.saves.fortitude,
+                  base: baseSaveBonusFromClasses(draft.classes, 'fortitude'),
+                },
+                reflex: {
+                  ...draft.combat.saves.reflex,
+                  base: baseSaveBonusFromClasses(draft.classes, 'reflex'),
+                },
+                will: {
+                  ...draft.combat.saves.will,
+                  base: baseSaveBonusFromClasses(draft.classes, 'will'),
+                },
               },
-              baseAttackBonus: 0,
-              grappleBonus: 0,
             },
             feats: [],
             equipment: [],
@@ -820,149 +1215,194 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
       <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-4">
 
         {/* ── Identity ── */}
-        <SectionHeader>Identity</SectionHeader>
-        <div className="grid grid-cols-3 gap-4">
-          <Field label="Name" required>
-            <TextInput value={draft.name} onChange={(v) => setField('name', v)} placeholder="Character name" />
+        {/* ── Identity ── */}
+        <Accordion
+          title="Identity"
+          summary={[draft.name.trim(), draft.race].filter(Boolean).join(' · ') || undefined}
+          defaultOpen
+        >
+          <div className="grid grid-cols-3 gap-4">
+            <Field label="Name" required>
+              <TextInput value={draft.name} onChange={(v) => setField('name', v)} placeholder="Character name" />
+            </Field>
+            <Field label="Gender">
+              <Select value={draft.gender} onChange={(v) => setField('gender', v)} options={GENDERS} />
+            </Field>
+            <Field label="Race">
+              <select
+                value={draft.race}
+                onChange={(e) => setRace(e.target.value as CharacterDraft['race'])}
+                style={inputStyle}
+                disabled={isEdit}
+              >
+                {RACES.map((race) => (
+                  <option key={race} value={race}>{race}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Alignment">
+              <Select value={draft.alignment} onChange={(v) => setField('alignment', v)} options={ALIGNMENTS} />
+            </Field>
+            <Field label="Size">
+              <input
+                type="text"
+                value={draft.size}
+                readOnly
+                style={{
+                  ...inputStyle,
+                  color: 'var(--color-fg-muted)',
+                  cursor: 'default',
+                }}
+              />
+            </Field>
+            <Field label="Deity">
+              <TextInput value={draft.deity} onChange={(v) => setField('deity', v)} />
+            </Field>
+            <Field label="Age">
+              <TextInput value={draft.age} onChange={(v) => setField('age', v)} placeholder="e.g. 25" />
+            </Field>
+            <Field label="Height">
+              <TextInput value={draft.height} onChange={(v) => setField('height', v)} placeholder="e.g. 5'10&quot;" />
+            </Field>
+            <Field label="Weight">
+              <TextInput value={draft.weight} onChange={(v) => setField('weight', v)} placeholder="e.g. 180 lbs" />
+            </Field>
+            <Field label="Eyes">
+              <TextInput value={draft.eyes} onChange={(v) => setField('eyes', v)} />
+            </Field>
+            <Field label="Hair">
+              <TextInput value={draft.hair} onChange={(v) => setField('hair', v)} />
+            </Field>
+            <Field label="Skin">
+              <TextInput value={draft.skin} onChange={(v) => setField('skin', v)} />
+            </Field>
+          </div>
+          <Field label="Languages (comma-separated)">
+            <TextInput value={draft.languages} onChange={(v) => setField('languages', v)} placeholder="Common, Elvish…" />
           </Field>
-          <Field label="Gender">
-            <Select value={draft.gender} onChange={(v) => setField('gender', v)} options={GENDERS} />
-          </Field>
-          <Field label="Race">
-            <select
-              value={draft.race}
-              onChange={(e) => setRace(e.target.value as CharacterDraft['race'])}
-              style={inputStyle}
-              disabled={isEdit}
-            >
-              {RACES.map((race) => (
-                <option key={race} value={race}>{race}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Alignment">
-            <Select value={draft.alignment} onChange={(v) => setField('alignment', v)} options={ALIGNMENTS} />
-          </Field>
-          <Field label="Size">
-            <input
-              type="text"
-              value={draft.size}
-              readOnly
-              style={{
-                ...inputStyle,
-                color: 'var(--color-fg-muted)',
-                cursor: 'default',
-              }}
-            />
-          </Field>
-          <Field label="Deity">
-            <TextInput value={draft.deity} onChange={(v) => setField('deity', v)} />
-          </Field>
-          <Field label="Age">
-            <TextInput value={draft.age} onChange={(v) => setField('age', v)} placeholder="e.g. 25" />
-          </Field>
-          <Field label="Height">
-            <TextInput value={draft.height} onChange={(v) => setField('height', v)} placeholder="e.g. 5'10&quot;" />
-          </Field>
-          <Field label="Weight">
-            <TextInput value={draft.weight} onChange={(v) => setField('weight', v)} placeholder="e.g. 180 lbs" />
-          </Field>
-          <Field label="Eyes">
-            <TextInput value={draft.eyes} onChange={(v) => setField('eyes', v)} />
-          </Field>
-          <Field label="Hair">
-            <TextInput value={draft.hair} onChange={(v) => setField('hair', v)} />
-          </Field>
-          <Field label="Skin">
-            <TextInput value={draft.skin} onChange={(v) => setField('skin', v)} />
-          </Field>
-        </div>
-        <Field label="Languages (comma-separated)">
-          <TextInput value={draft.languages} onChange={(v) => setField('languages', v)} placeholder="Common, Elvish…" />
-        </Field>
+        </Accordion>
 
         {/* ── Classes ── */}
-        <SectionHeader>Class &amp; Level <span style={{ color: 'var(--color-danger-fg)', fontSize: '0.75rem' }}>*</span></SectionHeader>
-        <ClassesSection
-          classes={draft.classes}
-          onChange={setClasses}
-          isCreate={!isEdit}
-        />
-        {isEdit ? (
-          <div className="grid grid-cols-3 gap-4 max-w-xl">
-            <Field label="Hit Points">
-              <input
-                type="text"
-                inputMode="numeric"
-                value={String(draft.hitPoints.max)}
-                onChange={(e) => {
-                  const digitsOnly = e.target.value.replace(/\D+/g, '');
-                  const max = digitsOnly === '' ? 0 : Number(digitsOnly);
-                  setField('hitPoints', {
-                    ...draft.hitPoints,
-                    max,
-                    current: max,
-                  });
-                }}
-                style={{ ...inputStyle, width: 96 }}
-              />
-            </Field>
-            <Field label="Nonlethal">
-              <NumberInput
-                value={draft.hitPoints.nonlethal}
-                min={0}
-                onChange={(v) => setField('hitPoints', { ...draft.hitPoints, nonlethal: Math.max(0, Math.trunc(v)) })}
-              />
-            </Field>
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-4 max-w-xl">
-            <Field label="Hit Points">
-              <input
-                type="text"
-                value={calculatedCreateHitPoints}
-                readOnly
-                style={{ ...inputStyle, width: 96, color: 'var(--color-fg-muted)', cursor: 'default' }}
-              />
-            </Field>
-          </div>
-        )}
+        {/* ── Classes ── */}
+        <Accordion
+          title={<>Class &amp; Level <span style={{ color: 'var(--color-danger-fg)', fontSize: '0.75rem' }}>*</span></>}
+          summary={draft.classes.filter((c) => c.name).map((c) => `${c.name} ${c.level}`).join(' / ') || undefined}
+        >
+          <ClassesSection
+            classes={draft.classes}
+            onChange={setClasses}
+            isCreate={!isEdit}
+          />
+          {isEdit ? (
+            <div className="grid grid-cols-3 gap-4 max-w-xl">
+              <Field label="Hit Points">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={String(draft.hitPoints.max)}
+                  onChange={(e) => {
+                    const digitsOnly = e.target.value.replace(/\D+/g, '');
+                    const max = digitsOnly === '' ? 0 : Number(digitsOnly);
+                    setField('hitPoints', {
+                      ...draft.hitPoints,
+                      max,
+                      current: max,
+                    });
+                  }}
+                  style={{ ...inputStyle, width: 96 }}
+                />
+              </Field>
+              <Field label="Nonlethal">
+                <NumberInput
+                  value={draft.hitPoints.nonlethal}
+                  min={0}
+                  onChange={(v) => setField('hitPoints', { ...draft.hitPoints, nonlethal: Math.max(0, Math.trunc(v)) })}
+                />
+              </Field>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4 max-w-xl">
+              <Field label="Hit Points">
+                <input
+                  type="text"
+                  value={calculatedCreateHitPoints}
+                  readOnly
+                  style={{ ...inputStyle, width: 96, color: 'var(--color-fg-muted)', cursor: 'default' }}
+                />
+              </Field>
+            </div>
+          )}
+        </Accordion>
 
         {/* ── Ability Scores ── */}
-        <SectionHeader>Ability Scores</SectionHeader>
-        <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-          {spentAbilityPoints} / {ABILITY_POINT_BUY_BUDGET} points spent · {remainingAbilityPoints} remaining
-        </p>
-        <div className="flex flex-col gap-2">
-          {ABILITY_KEYS.map((key) => (
-            <AbilityScoreRow
-              key={key}
-              label={ABILITY_LABELS[key]}
-              score={draft.abilityScores[key]}
-              onBaseChange={(base) => setAbilityBase(key, base)}
-            />
-          ))}
-        </div>
+        {/* ── Ability Scores ── */}
+        <Accordion
+          title="Ability Scores"
+          summary={(
+            <>
+              <span style={{ marginRight: 10 }}><strong>Str</strong> {totalScore(draft.abilityScores.strength)}</span>
+              <span style={{ marginRight: 10 }}><strong>Dex</strong> {totalScore(draft.abilityScores.dexterity)}</span>
+              <span style={{ marginRight: 10 }}><strong>Con</strong> {totalScore(draft.abilityScores.constitution)}</span>
+              <span style={{ marginRight: 10 }}><strong>Int</strong> {totalScore(draft.abilityScores.intelligence)}</span>
+              <span style={{ marginRight: 10 }}><strong>Wis</strong> {totalScore(draft.abilityScores.wisdom)}</span>
+              <span><strong>Cha</strong> {totalScore(draft.abilityScores.charisma)}</span>
+            </>
+          )}
+        >
+          <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+            {spentAbilityPoints} / {ABILITY_POINT_BUY_BUDGET} points spent · {remainingAbilityPoints} remaining
+          </p>
+          <div className="flex flex-col gap-2">
+            {ABILITY_KEYS.map((key) => (
+              <AbilityScoreRow
+                key={key}
+                label={ABILITY_LABELS[key]}
+                score={draft.abilityScores[key]}
+                onBaseChange={(base) => setAbilityBase(key, base)}
+              />
+            ))}
+          </div>
+        </Accordion>
+
+        {/* ── Combat ── */}
+        <Accordion
+          title="Combat"
+          summary={combatSummary}
+        >
+          <CombatSection
+            combat={draft.combat}
+            classes={draft.classes}
+            abilityScores={draft.abilityScores}
+            size={draft.size}
+            onCombatChange={(value) => setField('combat', value)}
+          />
+        </Accordion>
 
         {/* ── Skills ── */}
-        <SectionHeader>Skills</SectionHeader>
-        <SkillsSection
-          skills={draft.skills}
-          abilityScores={draft.abilityScores}
-          onChange={(s) => setField('skills', s)}
-          totalSkillPoints={availableSkillPoints}
-          spentPoints={spentPoints}
-          totalLevel={totalLevel}
-        />
+        {/* ── Skills ── */}
+        <Accordion
+          title="Skills"
+          summary={`${spentPoints} / ${availableSkillPoints} pts allocated`}
+        >
+          <SkillsSection
+            skills={draft.skills}
+            abilityScores={draft.abilityScores}
+            onChange={(s) => setField('skills', s)}
+            totalSkillPoints={availableSkillPoints}
+            spentPoints={spentPoints}
+            totalLevel={totalLevel}
+          />
+        </Accordion>
 
         {/* ── Description / Backstory ── */}
-        <SectionHeader>Background</SectionHeader>
-        <Field label="Description">
-          <Textarea value={draft.description} onChange={(v) => setField('description', v)} />
-        </Field>
-        <Field label="Backstory">
-          <Textarea value={draft.backstory} onChange={(v) => setField('backstory', v)} rows={5} />
-        </Field>
+        <Accordion title="Background">
+          <Field label="Description">
+            <Textarea value={draft.description} onChange={(v) => setField('description', v)} />
+          </Field>
+          <Field label="Backstory">
+            <Textarea value={draft.backstory} onChange={(v) => setField('backstory', v)} rows={5} />
+          </Field>
+        </Accordion>
 
         {/* ── Actions ── */}
         {(saving || error) && (

@@ -52,6 +52,15 @@
   --color-neutral-muted:           rgba(175,184,193,0.2);
   --color-neutral-subtle:          rgba(234,238,242,0.5);
 
+  /* ── Buttons ──────────────────────────────────────────────── */
+  --color-btn-primary-bg:          #1f883d;
+  --color-btn-primary-text:        #ffffff;
+  --color-btn-primary-hover-bg:    #1a7f37;
+  --color-btn-primary-border:      rgba(31,35,40,0.15);
+  --color-btn-bg:                  #f6f8fa;
+  --color-btn-text:                #24292f;
+  --color-btn-border:              #d0d7de;
+
   /* ── Typography ───────────────────────────────────────────── */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
                Helvetica, Arial, sans-serif, "Apple Color Emoji",
@@ -81,8 +90,7 @@
 }
 
 /* ── Dark mode overrides ──────────────────────────────────────── */
-@media (prefers-color-scheme: dark) {
-  :root {
+:root[data-theme='dark'] {
     --color-canvas-default:     #0d1117;
     --color-canvas-overlay:     #161b22;
     --color-canvas-inset:       #010409;
@@ -121,11 +129,18 @@
     --color-neutral-muted:         rgba(110,118,129,0.4);
     --color-neutral-subtle:        rgba(110,118,129,0.1);
 
+    --color-btn-primary-bg:        #238636;
+    --color-btn-primary-text:      #ffffff;
+    --color-btn-primary-hover-bg:  #2ea043;
+    --color-btn-primary-border:    rgba(240,246,252,0.1);
+    --color-btn-bg:                #21262d;
+    --color-btn-text:              #c9d1d9;
+    --color-btn-border:            #30363d;
+
     --shadow-sm:          0 0 transparent;
     --shadow-md:          0 3px 6px #010409;
     --shadow-lg:          0 8px 24px #010409;
     --shadow-extra-large: 0 12px 28px #010409;
-  }
 }
 
 /* ── Base reset ───────────────────────────────────────────────── */

@@ -39,6 +39,68 @@ export const CLASS_SKILL_POINTS_PER_LEVEL: Readonly<Record<ClassName, number>> =
   Wizard: 2,
 };
 
+type ProgressionRate = 'good' | 'average' | 'poor';
+type SaveType = 'fortitude' | 'reflex' | 'will';
+
+const CLASS_BAB_PROGRESSION: Readonly<Record<ClassName, ProgressionRate>> = {
+  Barbarian: 'good',
+  Bard: 'average',
+  Cleric: 'average',
+  Druid: 'average',
+  Fighter: 'good',
+  Monk: 'average',
+  Paladin: 'good',
+  Ranger: 'good',
+  Rogue: 'average',
+  Sorcerer: 'poor',
+  Wizard: 'poor',
+};
+
+const CLASS_SAVE_PROGRESSION: Readonly<Record<ClassName, Readonly<Record<SaveType, 'good' | 'poor'>>>> = {
+  Barbarian: { fortitude: 'good', reflex: 'poor', will: 'poor' },
+  Bard: { fortitude: 'poor', reflex: 'good', will: 'good' },
+  Cleric: { fortitude: 'good', reflex: 'poor', will: 'good' },
+  Druid: { fortitude: 'good', reflex: 'poor', will: 'good' },
+  Fighter: { fortitude: 'good', reflex: 'poor', will: 'poor' },
+  Monk: { fortitude: 'good', reflex: 'good', will: 'good' },
+  Paladin: { fortitude: 'good', reflex: 'poor', will: 'poor' },
+  Ranger: { fortitude: 'good', reflex: 'good', will: 'poor' },
+  Rogue: { fortitude: 'poor', reflex: 'good', will: 'poor' },
+  Sorcerer: { fortitude: 'poor', reflex: 'poor', will: 'good' },
+  Wizard: { fortitude: 'poor', reflex: 'poor', will: 'good' },
+};
+
+function babByProgression(level: number, progression: ProgressionRate) {
+  if (progression === 'good') return level;
+  if (progression === 'average') return Math.floor((3 * level) / 4);
+  return Math.floor(level / 2);
+}
+
+function saveByProgression(level: number, progression: 'good' | 'poor') {
+  if (progression === 'good') return 2 + Math.floor(level / 2);
+  return Math.floor(level / 3);
+}
+
+export function baseAttackBonusFromClasses(classes: CharacterDraft['classes']) {
+  return classes.reduce((sum, entry) => {
+    const className = entry.name as ClassName;
+    const progression = CLASS_BAB_PROGRESSION[className];
+    if (!progression) return sum;
+    const level = Math.max(0, Math.trunc(entry.level || 0));
+    return sum + babByProgression(level, progression);
+  }, 0);
+}
+
+export function baseSaveBonusFromClasses(classes: CharacterDraft['classes'], saveType: SaveType) {
+  return classes.reduce((sum, entry) => {
+    const className = entry.name as ClassName;
+    const progression = CLASS_SAVE_PROGRESSION[className]?.[saveType];
+    if (!progression) return sum;
+    const level = Math.max(0, Math.trunc(entry.level || 0));
+    return sum + saveByProgression(level, progression);
+  }, 0);
+}
+
 export const CLASS_SKILLS: Readonly<Record<ClassName, ReadonlySet<string>>> = {
   Barbarian: new Set(['Climb', 'Craft', 'Handle Animal', 'Intimidate', 'Jump', 'Listen', 'Ride', 'Survival', 'Swim']),
   Bard: new Set([
@@ -277,6 +339,18 @@ export function newCharacterDraft(): CharacterDraft {
       charisma:     { ...BLANK_SCORE },
     },
     hitPoints: { max: 0, current: 0, nonlethal: 0 },
+    combat: {
+      initiative: { miscBonus: 0 },
+      speed: { base: 30, armorAdjust: 0, fly: 0, swim: 0 },
+      armorClass: { armor: 0, shield: 0, dodge: 0, natural: 0, deflection: 0, misc: 0 },
+      saves: {
+        fortitude: { base: 0, magic: 0, misc: 0, temp: 0 },
+        reflex: { base: 0, magic: 0, misc: 0, temp: 0 },
+        will: { base: 0, magic: 0, misc: 0, temp: 0 },
+      },
+      baseAttackBonus: 0,
+      grappleBonus: 0,
+    },
     skills: SKILL_DEFS.map((def) => ({
       name: def.name,
       keyAbility: def.keyAbility,

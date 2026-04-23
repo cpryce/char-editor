@@ -154,7 +154,6 @@ export function CharactersPage({ onNewCharacter, onEditCharacter }: CharactersPa
                 >
                   <td
                     className="px-4 py-2 font-medium"
-                    style={{ color: 'var(--color-accent-fg)' }}
                   >
                     {char.name}
                   </td>
