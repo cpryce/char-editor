@@ -17,7 +17,7 @@ const PORT = process.env.PORT ?? 3001;
 const MONGO_URI = process.env.MONGO_URI ?? '';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
-const COOKIE_SAME_SITE = (process.env.COOKIE_SAME_SITE ?? 'lax') as 'lax' | 'strict' | 'none';
+const COOKIE_SAME_SITE = (process.env.COOKIE_SAME_SITE ?? (IS_PRODUCTION ? 'none' : 'lax')) as 'lax' | 'strict' | 'none';
 const COOKIE_SECURE = process.env.COOKIE_SECURE === 'false' ? false : IS_PRODUCTION;
 
 // ── Middleware ──────────────────────────────────────────────────
