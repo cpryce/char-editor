@@ -22,7 +22,7 @@ function newId() { return `c-${Date.now()}-${_idCounter++}`; }
 function initiativeModifierFromCharacter(char) {
   const dex = char.abilityScores?.dexterity;
   const dexTotal = dex
-    ? (dex.tempScore ?? (dex.base + dex.racial + dex.enhancement + dex.misc + dex.temp + dex.levelUp))
+    ? (dex.temp ?? (dex.base + dex.racial + dex.enhancement + dex.misc + (dex.tempMod ?? 0) + dex.levelUp))
     : 10;
   const dexMod = Math.floor((dexTotal - 10) / 2);
   const initiativeMisc = Number(char.combat?.initiative?.miscBonus ?? 0);

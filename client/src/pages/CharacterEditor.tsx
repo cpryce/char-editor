@@ -223,8 +223,8 @@ function AbilityScoreRow({
   earnedPoints?: number;
   spentPoints?: number;
   onEnhancementChange?: (value: number) => void;
-  tempScore: number;
-  onTempScoreChange: (v: number) => void;
+  tempScore: number | null;
+  onTempScoreChange: (v: number | null) => void;
 }) {
   const total = totalScore(score);
   const mod = abilityModifier(total);
@@ -232,8 +232,8 @@ function AbilityScoreRow({
   const showLevelUp = isEdit && earnedPoints > 0;
   const availableToAdd = earnedPoints - spentPoints;
 
-  const tempMod = abilityModifier(tempScore);
-  const tempModStr = tempMod >= 0 ? `+${tempMod}` : `${tempMod}`;
+  const tempMod = tempScore !== null ? abilityModifier(tempScore) : null;
+  const tempModStr = tempMod === null ? '—' : tempMod >= 0 ? `+${tempMod}` : `${tempMod}`;
 
   return (
     <div
@@ -327,23 +327,33 @@ function AbilityScoreRow({
         </span>
       </div>
 
-      {/* Temp score + temp bonus — local "what if" calculator */}
+      {/* Temp — local "what if" calculator */}
       <div className="flex items-center gap-3 ml-4 pl-4" style={{ borderLeft: '1px solid var(--color-border-muted)' }}>
         <div className="flex flex-col items-center gap-0.5">
-          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>temp score</span>
+          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>temp</span>
           <input
             type="number"
             aria-label={`${label} temporary score`}
-            value={tempScore}
-            onChange={(e) => onTempScoreChange(e.target.valueAsNumber || 0)}
+            value={tempScore ?? ''}
+            onChange={(e) => {
+              const raw = e.target.value;
+              onTempScoreChange(raw === '' ? null : e.target.valueAsNumber);
+            }}
             style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px' }}
           />
         </div>
         <div className="flex flex-col items-center gap-0.5">
-          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>temp bonus</span>
+          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>temp mod</span>
           <span
             className="text-sm font-semibold"
-            style={{ color: tempMod >= 0 ? 'var(--color-success-fg)' : 'var(--color-danger-fg)', minWidth: 28, textAlign: 'center', lineHeight: '1.6rem' }}
+            style={{
+              color: tempMod === null
+                ? 'var(--color-fg-subtle)'
+                : tempMod >= 0 ? 'var(--color-success-fg)' : 'var(--color-danger-fg)',
+              minWidth: 28,
+              textAlign: 'center',
+              lineHeight: '1.6rem',
+            }}
           >
             {tempModStr}
           </span>
@@ -1209,21 +1219,21 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
   const wisTotal = totalScore(draft.abilityScores.wisdom);
   const chaTotal = totalScore(draft.abilityScores.charisma);
   const [tempScores, setTempScores] = useState<Record<AbilityKey, number>>(() => ({
-    strength:     draft.abilityScores.strength.tempScore     ?? strTotal,
-    dexterity:    draft.abilityScores.dexterity.tempScore    ?? dexTotal,
-    constitution: draft.abilityScores.constitution.tempScore ?? conTotal,
-    intelligence: draft.abilityScores.intelligence.tempScore ?? intTotal,
-    wisdom:       draft.abilityScores.wisdom.tempScore       ?? wisTotal,
-    charisma:     draft.abilityScores.charisma.tempScore     ?? chaTotal,
+    strength:     draft.abilityScores.strength.temp     ?? strTotal,
+    dexterity:    draft.abilityScores.dexterity.temp    ?? dexTotal,
+    constitution: draft.abilityScores.constitution.temp ?? conTotal,
+    intelligence: draft.abilityScores.intelligence.temp ?? intTotal,
+    wisdom:       draft.abilityScores.wisdom.temp       ?? wisTotal,
+    charisma:     draft.abilityScores.charisma.temp     ?? chaTotal,
   }));
   useEffect(() => {
     setTempScores((prev) => ({
-      strength:     draft.abilityScores.strength.tempScore     ?? (prev.strength     === strTotal ? strTotal : prev.strength),
-      dexterity:    draft.abilityScores.dexterity.tempScore    ?? (prev.dexterity    === dexTotal ? dexTotal : prev.dexterity),
-      constitution: draft.abilityScores.constitution.tempScore ?? (prev.constitution === conTotal ? conTotal : prev.constitution),
-      intelligence: draft.abilityScores.intelligence.tempScore ?? (prev.intelligence === intTotal ? intTotal : prev.intelligence),
-      wisdom:       draft.abilityScores.wisdom.tempScore       ?? (prev.wisdom       === wisTotal ? wisTotal : prev.wisdom),
-      charisma:     draft.abilityScores.charisma.tempScore     ?? (prev.charisma     === chaTotal ? chaTotal : prev.charisma),
+      strength:     draft.abilityScores.strength.temp     ?? (prev.strength     === strTotal ? strTotal : prev.strength),
+      dexterity:    draft.abilityScores.dexterity.temp    ?? (prev.dexterity    === dexTotal ? dexTotal : prev.dexterity),
+      constitution: draft.abilityScores.constitution.temp ?? (prev.constitution === conTotal ? conTotal : prev.constitution),
+      intelligence: draft.abilityScores.intelligence.temp ?? (prev.intelligence === intTotal ? intTotal : prev.intelligence),
+      wisdom:       draft.abilityScores.wisdom.temp       ?? (prev.wisdom       === wisTotal ? wisTotal : prev.wisdom),
+      charisma:     draft.abilityScores.charisma.temp     ?? (prev.charisma     === chaTotal ? chaTotal : prev.charisma),
     }));
   }, [strTotal, dexTotal, conTotal, intTotal, wisTotal, chaTotal]);
 
@@ -1476,7 +1486,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
       ...d,
       abilityScores: {
         ...d.abilityScores,
-        [key]: { ...d.abilityScores[key], tempScore: value },
+        [key]: { ...d.abilityScores[key], temp: value },
       },
     }));
   }, [])
@@ -1872,9 +1882,9 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
                 earnedPoints={earnedLevelUpPoints}
                 spentPoints={spentLevelUpPoints}
                 onEnhancementChange={(val) => setEnhancement(key, val)}
-                tempScore={tempScores[key]}
+                tempScore={draft.abilityScores[key].temp}
                 onTempScoreChange={(val) => {
-                  setTempScores((prev) => ({ ...prev, [key]: val }));
+                  setTempScores((prev) => ({ ...prev, [key]: val ?? totalScore(draft.abilityScores[key]) }));
                   setAbilityTempScore(key, val);
                 }}
               />

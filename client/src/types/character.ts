@@ -34,9 +34,11 @@ export interface AbilityScore {
   racial: number;
   enhancement: number;
   misc: number;
-  temp: number;
+  /** Temporary bonus added into the total score (e.g. from a spell). Null until set. */
+  tempMod: number | null;
   levelUp: number;
-  tempScore: number | null;
+  /** Temporary score override for "what-if" display and combat calculations. Null until set. */
+  temp: number | null;
 }
 
 export interface Skill {

@@ -10,9 +10,9 @@ const abilityScoreSchema = new Schema(
     racial:      { type: Number, default: 0 },
     enhancement: { type: Number, default: 0 },
     misc:        { type: Number, default: 0 },
-    temp:        { type: Number, default: 0 },
+    tempMod:     { type: Number, default: null },
     levelUp:     { type: Number, default: 0 },
-    tempScore:   { type: Number, default: null },
+    temp:        { type: Number, default: null },
   },
   { _id: false },
 );
