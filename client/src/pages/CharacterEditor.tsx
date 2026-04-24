@@ -212,6 +212,7 @@ function safeCombatNumber(value: unknown) {
 function AbilityScoreRow({
   label, score, onBaseChange, isEdit = false,
   levelUp = 0, onLevelUpChange, earnedPoints = 0, spentPoints = 0,
+  onEnhancementChange, tempScore, onTempScoreChange,
 }: {
   label: string;
   score: AbilityScore;
@@ -221,12 +222,18 @@ function AbilityScoreRow({
   onLevelUpChange?: (value: number) => void;
   earnedPoints?: number;
   spentPoints?: number;
+  onEnhancementChange?: (value: number) => void;
+  tempScore: number;
+  onTempScoreChange: (v: number) => void;
 }) {
   const total = totalScore(score);
   const mod = abilityModifier(total);
   const modStr = mod >= 0 ? `+${mod}` : `${mod}`;
   const showLevelUp = isEdit && earnedPoints > 0;
   const availableToAdd = earnedPoints - spentPoints;
+
+  const tempMod = abilityModifier(tempScore);
+  const tempModStr = tempMod >= 0 ? `+${tempMod}` : `${tempMod}`;
 
   return (
     <div
@@ -268,6 +275,20 @@ function AbilityScoreRow({
         </span>
       </div>
 
+      {/* Enhancement bonus — magic items, shown in edit mode */}
+      {isEdit && (
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>enh</span>
+          <input
+            type="number"
+            aria-label={`${label} enhancement bonus`}
+            value={score.enhancement}
+            onChange={(e) => onEnhancementChange?.(e.target.valueAsNumber || 0)}
+            style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px' }}
+          />
+        </div>
+      )}
+
       {/* Level-up bonus — shown in edit mode when points have been earned */}
       {showLevelUp && (
         <div className="flex flex-col items-center gap-0.5">
@@ -304,6 +325,29 @@ function AbilityScoreRow({
         >
           {modStr}
         </span>
+      </div>
+
+      {/* Temp score + temp bonus — local "what if" calculator */}
+      <div className="flex items-center gap-3 ml-4 pl-4" style={{ borderLeft: '1px solid var(--color-border-muted)' }}>
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>temp score</span>
+          <input
+            type="number"
+            aria-label={`${label} temporary score`}
+            value={tempScore}
+            onChange={(e) => onTempScoreChange(e.target.valueAsNumber || 0)}
+            style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px' }}
+          />
+        </div>
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>temp bonus</span>
+          <span
+            className="text-sm font-semibold"
+            style={{ color: tempMod >= 0 ? 'var(--color-success-fg)' : 'var(--color-danger-fg)', minWidth: 28, textAlign: 'center', lineHeight: '1.6rem' }}
+          >
+            {tempModStr}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -613,20 +657,20 @@ function SkillsSection({
 function CombatSection({
   combat,
   classes,
-  abilityScores,
   size,
   onCombatChange,
+  tempScores,
 }: {
   combat: CharacterDraft['combat'];
   classes: CharacterDraft['classes'];
-  abilityScores: CharacterDraft['abilityScores'];
   size: CharacterDraft['size'];
   onCombatChange: (value: CharacterDraft['combat']) => void;
+  tempScores: Record<AbilityKey, number>;
 }) {
-  const dexMod = abilityModifier(totalScore(abilityScores.dexterity));
-  const conMod = abilityModifier(totalScore(abilityScores.constitution));
-  const wisMod = abilityModifier(totalScore(abilityScores.wisdom));
-  const strMod = abilityModifier(totalScore(abilityScores.strength));
+  const dexMod = abilityModifier(tempScores.dexterity);
+  const conMod = abilityModifier(tempScores.constitution);
+  const wisMod = abilityModifier(tempScores.wisdom);
+  const strMod = abilityModifier(tempScores.strength);
   const sizeMod = SIZE_MODIFIERS[size] ?? 0;
   const acArmor = safeCombatNumber(combat.armorClass.armor);
   const acShield = safeCombatNumber(combat.armorClass.shield);
@@ -663,9 +707,9 @@ function CombatSection({
     + acMisc;
 
   const initiativeTotal = dexMod + initMisc;
-  const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc) + safeCombatNumber(combat.saves.fortitude.temp);
-  const reflexTotal = reflexBase + dexMod + safeCombatNumber(combat.saves.reflex.magic) + safeCombatNumber(combat.saves.reflex.misc) + safeCombatNumber(combat.saves.reflex.temp);
-  const willTotal = willBase + wisMod + safeCombatNumber(combat.saves.will.magic) + safeCombatNumber(combat.saves.will.misc) + safeCombatNumber(combat.saves.will.temp);
+  const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc);
+  const reflexTotal = reflexBase + dexMod + safeCombatNumber(combat.saves.reflex.magic) + safeCombatNumber(combat.saves.reflex.misc);
+  const willTotal = willBase + wisMod + safeCombatNumber(combat.saves.will.magic) + safeCombatNumber(combat.saves.will.misc);
 
   const meleeAttack = bab + strMod + sizeMod;
   const rangedAttack = bab + dexMod + sizeMod;
@@ -800,7 +844,6 @@ function CombatSection({
               {modInput('Con', conMod)}
               {modInput('Magic', combat.saves.fortitude.magic, (v) => updateNumeric('saves.fortitude.magic', v))}
               {modInput('Misc', combat.saves.fortitude.misc, (v) => updateNumeric('saves.fortitude.misc', v))}
-              {modInput('Temp', combat.saves.fortitude.temp, (v) => updateNumeric('saves.fortitude.temp', v))}
             </>,
           )}
 
@@ -812,7 +855,6 @@ function CombatSection({
               {modInput('Dex', dexMod)}
               {modInput('Magic', combat.saves.reflex.magic, (v) => updateNumeric('saves.reflex.magic', v))}
               {modInput('Misc', combat.saves.reflex.misc, (v) => updateNumeric('saves.reflex.misc', v))}
-              {modInput('Temp', combat.saves.reflex.temp, (v) => updateNumeric('saves.reflex.temp', v))}
             </>,
           )}
 
@@ -824,7 +866,6 @@ function CombatSection({
               {modInput('Wis', wisMod)}
               {modInput('Magic', combat.saves.will.magic, (v) => updateNumeric('saves.will.magic', v))}
               {modInput('Misc', combat.saves.will.misc, (v) => updateNumeric('saves.will.misc', v))}
-              {modInput('Temp', combat.saves.will.temp, (v) => updateNumeric('saves.will.temp', v))}
             </>,
           )}
         </>,
@@ -1160,6 +1201,32 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
   const totalLevel = totalCharacterLevel(draft.classes);
   const earnedLevelUpPoints = Math.floor(totalLevel / 4);
   const spentLevelUpPoints = ABILITY_KEYS.reduce((sum, key) => sum + (draft.abilityScores[key].levelUp ?? 0), 0);
+
+  const strTotal = totalScore(draft.abilityScores.strength);
+  const dexTotal = totalScore(draft.abilityScores.dexterity);
+  const conTotal = totalScore(draft.abilityScores.constitution);
+  const intTotal = totalScore(draft.abilityScores.intelligence);
+  const wisTotal = totalScore(draft.abilityScores.wisdom);
+  const chaTotal = totalScore(draft.abilityScores.charisma);
+  const [tempScores, setTempScores] = useState<Record<AbilityKey, number>>(() => ({
+    strength:     draft.abilityScores.strength.tempScore     ?? strTotal,
+    dexterity:    draft.abilityScores.dexterity.tempScore    ?? dexTotal,
+    constitution: draft.abilityScores.constitution.tempScore ?? conTotal,
+    intelligence: draft.abilityScores.intelligence.tempScore ?? intTotal,
+    wisdom:       draft.abilityScores.wisdom.tempScore       ?? wisTotal,
+    charisma:     draft.abilityScores.charisma.tempScore     ?? chaTotal,
+  }));
+  useEffect(() => {
+    setTempScores((prev) => ({
+      strength:     draft.abilityScores.strength.tempScore     ?? (prev.strength     === strTotal ? strTotal : prev.strength),
+      dexterity:    draft.abilityScores.dexterity.tempScore    ?? (prev.dexterity    === dexTotal ? dexTotal : prev.dexterity),
+      constitution: draft.abilityScores.constitution.tempScore ?? (prev.constitution === conTotal ? conTotal : prev.constitution),
+      intelligence: draft.abilityScores.intelligence.tempScore ?? (prev.intelligence === intTotal ? intTotal : prev.intelligence),
+      wisdom:       draft.abilityScores.wisdom.tempScore       ?? (prev.wisdom       === wisTotal ? wisTotal : prev.wisdom),
+      charisma:     draft.abilityScores.charisma.tempScore     ?? (prev.charisma     === chaTotal ? chaTotal : prev.charisma),
+    }));
+  }, [strTotal, dexTotal, conTotal, intTotal, wisTotal, chaTotal]);
+
   const intelligenceMod = abilityModifier(totalScore(draft.abilityScores.intelligence));
   const availableSkillPoints = totalSkillPointsAvailable(draft.classes, intelligenceMod, draft.race);
   const spentPoints = spentSkillPoints(draft.skills);
@@ -1184,9 +1251,9 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
     + safeCombatNumber(draft.combat.armorClass.deflection)
     + safeCombatNumber(draft.combat.armorClass.misc);
   const combatInitiative = combatDexMod + safeCombatNumber(draft.combat.initiative.miscBonus);
-  const combatFortitude = combatFortitudeBase + combatConMod + safeCombatNumber(draft.combat.saves.fortitude.magic) + safeCombatNumber(draft.combat.saves.fortitude.misc) + safeCombatNumber(draft.combat.saves.fortitude.temp);
-  const combatReflex = combatReflexBase + combatDexMod + safeCombatNumber(draft.combat.saves.reflex.magic) + safeCombatNumber(draft.combat.saves.reflex.misc) + safeCombatNumber(draft.combat.saves.reflex.temp);
-  const combatWill = combatWillBase + combatWisMod + safeCombatNumber(draft.combat.saves.will.magic) + safeCombatNumber(draft.combat.saves.will.misc) + safeCombatNumber(draft.combat.saves.will.temp);
+  const combatFortitude = combatFortitudeBase + combatConMod + safeCombatNumber(draft.combat.saves.fortitude.magic) + safeCombatNumber(draft.combat.saves.fortitude.misc);
+  const combatReflex = combatReflexBase + combatDexMod + safeCombatNumber(draft.combat.saves.reflex.magic) + safeCombatNumber(draft.combat.saves.reflex.misc);
+  const combatWill = combatWillBase + combatWisMod + safeCombatNumber(draft.combat.saves.will.magic) + safeCombatNumber(draft.combat.saves.will.misc);
   const combatSummary = `AC ${combatAC} · Init ${signed(combatInitiative)} · F/R/W ${signed(combatFortitude)}/${signed(combatReflex)}/${signed(combatWill)}`;
   const hasUnselectedClass = draft.classes.some((c) => !c.name.trim());
   const hasRequiredFields = draft.name.trim().length > 0
@@ -1387,6 +1454,31 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
       }));
       return { ...d, abilityScores: newScores, skills };
     });
+  }, [])
+
+  const setEnhancement = useCallback((key: AbilityKey, value: number) => {
+    setDraft((d) => {
+      const newScores = {
+        ...d.abilityScores,
+        [key]: { ...d.abilityScores[key], enhancement: value },
+      };
+      const recalculatedSkills = applyClassAndRacialSkillRules(d.skills, d.classes, d.race);
+      const skills = recalculatedSkills.map((sk) => ({
+        ...sk,
+        bonus: computeSkillBonus(sk, newScores),
+      }));
+      return { ...d, abilityScores: newScores, skills };
+    });
+  }, [])
+
+  const setAbilityTempScore = useCallback((key: AbilityKey, value: number | null) => {
+    setDraft((d) => ({
+      ...d,
+      abilityScores: {
+        ...d.abilityScores,
+        [key]: { ...d.abilityScores[key], tempScore: value },
+      },
+    }));
   }, [])
 
   const setRace = useCallback((race: CharacterDraft['race']) => {
@@ -1779,9 +1871,20 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
                 onLevelUpChange={(val) => setLevelUp(key, val)}
                 earnedPoints={earnedLevelUpPoints}
                 spentPoints={spentLevelUpPoints}
+                onEnhancementChange={(val) => setEnhancement(key, val)}
+                tempScore={tempScores[key]}
+                onTempScoreChange={(val) => {
+                  setTempScores((prev) => ({ ...prev, [key]: val }));
+                  setAbilityTempScore(key, val);
+                }}
               />
             ))}
           </div>
+          {isEdit && (
+            <p className="text-xs mt-2" style={{ color: 'var(--color-fg-subtle)' }}>
+              enh = permanent stat enhancement
+            </p>
+          )}
         </Accordion>
 
         {/* ── Feats ── */}
@@ -1818,9 +1921,9 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           <CombatSection
             combat={draft.combat}
             classes={draft.classes}
-            abilityScores={draft.abilityScores}
             size={draft.size}
             onCombatChange={(value) => setField('combat', value)}
+            tempScores={tempScores}
           />
         </Accordion>
 

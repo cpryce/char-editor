@@ -12,6 +12,7 @@ const abilityScoreSchema = new Schema(
     misc:        { type: Number, default: 0 },
     temp:        { type: Number, default: 0 },
     levelUp:     { type: Number, default: 0 },
+    tempScore:   { type: Number, default: null },
   },
   { _id: false },
 );

@@ -36,6 +36,7 @@ export interface AbilityScore {
   misc: number;
   temp: number;
   levelUp: number;
+  tempScore: number | null;
 }
 
 export interface Skill {

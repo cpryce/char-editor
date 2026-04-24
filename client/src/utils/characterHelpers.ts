@@ -398,7 +398,7 @@ const SKILL_DEFS: { name: string; keyAbility: string | null; trainedOnly: boolea
   { name: 'Use Rope',                              keyAbility: 'dexterity',   trainedOnly: false, armorCheckPenalty: false },
 ];
 
-const BLANK_SCORE: AbilityScore = { base: 8, racial: 0, enhancement: 0, misc: 0, temp: 0, levelUp: 0 };
+const BLANK_SCORE: AbilityScore = { base: 8, racial: 0, enhancement: 0, misc: 0, temp: 0, levelUp: 0, tempScore: null };
 
 export function clampAbilityBaseScore(score: number) {
   if (Number.isNaN(score)) return 8;

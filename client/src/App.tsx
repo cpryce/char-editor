@@ -330,7 +330,7 @@ function App() {
       {/* Body: sidebar + content */}
       <div className="flex flex-1 overflow-hidden">
         <Sidebar active={section} onNavigate={(id) => { setSection(id as Section); setView('list'); }} />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto pb-6">
           {section === 'custom-feats' && (
             <CustomFeatsPage />
           )}
