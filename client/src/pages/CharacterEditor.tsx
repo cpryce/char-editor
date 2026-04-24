@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import type { CharacterDraft, AbilityScore, FeatSlot } from '../types/character';
-import { RACES, ALIGNMENTS, GENDERS, CLASSES, HIT_DIE_BY_CLASS } from '../types/character';
+import { HIT_DIE_BY_CLASS } from '../types/character';
 import {
   newCharacterDraft,
   abilityModifier,
@@ -25,25 +24,17 @@ import {
   deriveSelectableFeats,
   mergeSelectableFeats,
 } from '../utils/characterHelpers';
-import type { DerivedClassFeature } from '../utils/characterHelpers';
-import { FeatAutocomplete } from '../components/FeatAutocomplete';
-import type { FeatCategory, FeatCatalogEntry } from '../components/FeatAutocomplete';
 import { FEAT_BY_NAME } from '../data/feats';
+import type { FeatCatalogEntry } from '../components/FeatAutocomplete';
 import type { CustomFeat } from '../types/customFeat';
+import { IdentitySection } from './character-editor/IdentitySection';
+import { BackgroundSection } from './character-editor/BackgroundSection';
+import { ClassLevelSection } from './character-editor/ClassLevelSection';
+import { AbilityScoresSection, ABILITY_KEYS } from './character-editor/AbilityScoresSection';
+import { FeatsSection } from './character-editor/FeatsSection';
+import type { AbilityKey } from './character-editor/AbilityScoresSection';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>
-        {label}
-        {required && <span style={{ color: 'var(--color-danger-fg)', marginLeft: 2 }}>*</span>}
-      </span>
-      {children}
-    </label>
-  );
-}
 
 const inputStyle: React.CSSProperties = {
   background: 'var(--color-canvas-default)',
@@ -54,69 +45,6 @@ const inputStyle: React.CSSProperties = {
   fontSize: 14,
   width: '100%',
 };
-
-function TextInput({
-  value, onChange, placeholder, onBlur, error,
-}: { value: string; onChange: (v: string) => void; placeholder?: string; onBlur?: () => void; error?: string }) {
-  return (
-    <>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
-        placeholder={placeholder}
-        style={{
-          ...inputStyle,
-          ...(error ? { borderColor: 'var(--color-danger-fg)' } : {}),
-        }}
-      />
-      {error && (
-        <span className="text-xs mt-0.5" style={{ color: 'var(--color-danger-fg)' }}>{error}</span>
-      )}
-    </>
-  );
-}
-
-function NumberInput({
-  value, onChange, min = 0, 'aria-label': ariaLabel,
-}: { value: number; onChange: (v: number) => void; min?: number; 'aria-label'?: string }) {
-  return (
-    <input
-      type="number"
-      value={value}
-      min={min}
-      aria-label={ariaLabel}
-      onChange={(e) => onChange(Number(e.target.value))}
-      style={{ ...inputStyle, width: 72 }}
-    />
-  );
-}
-
-function Select<T extends string>({
-  value, onChange, options,
-}: { value: T; onChange: (v: T) => void; options: readonly T[] }) {
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value as T)} style={inputStyle}>
-      {options.map((o) => (
-        <option key={o} value={o}>{o}</option>
-      ))}
-    </select>
-  );
-}
-
-function Textarea({
-  value, onChange, rows = 3,
-}: { value: string; onChange: (v: string) => void; rows?: number }) {
-  return (
-    <textarea
-      value={value}
-      rows={rows}
-      onChange={(e) => onChange(e.target.value)}
-      style={{ ...inputStyle, resize: 'vertical' }}
-    />
-  );
-}
 
 function Accordion({
   title, summary, defaultOpen = false, children,
@@ -181,13 +109,6 @@ function Accordion({
 }
 
 // ── Ability Scores section ────────────────────────────────────────────────────
-
-const ABILITY_KEYS = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'] as const;
-type AbilityKey = (typeof ABILITY_KEYS)[number];
-const ABILITY_LABELS: Record<AbilityKey, string> = {
-  strength: 'STR', dexterity: 'DEX', constitution: 'CON',
-  intelligence: 'INT', wisdom: 'WIS', charisma: 'CHA',
-};
 
 const SIZE_MODIFIERS: Record<CharacterDraft['size'], number> = {
   Fine: 8,
@@ -328,254 +249,6 @@ function deriveCombatStats({
     rangedAttack,
     speedFeet,
   };
-}
-
-function AbilityScoreRow({
-  label, score, onBaseChange, isEdit = false,
-  levelUp = 0, onLevelUpChange, earnedPoints = 0, spentPoints = 0,
-  onEnhancementChange, tempScore, onTempScoreChange,
-}: {
-  label: string;
-  score: AbilityScore;
-  onBaseChange: (base: number) => void;
-  isEdit?: boolean;
-  levelUp?: number;
-  onLevelUpChange?: (value: number) => void;
-  earnedPoints?: number;
-  spentPoints?: number;
-  onEnhancementChange?: (value: number) => void;
-  tempScore: number | null;
-  onTempScoreChange: (v: number | null) => void;
-}) {
-  const total = totalScore(score);
-  const mod = abilityModifier(total);
-  const modStr = mod >= 0 ? `+${mod}` : `${mod}`;
-  const showLevelUp = isEdit && earnedPoints > 0;
-  const availableToAdd = earnedPoints - spentPoints;
-
-  const tempMod = abilityModifier(tempScore !== null ? tempScore : total);
-  const tempModStr = tempMod >= 0 ? `+${tempMod}` : `${tempMod}`;
-
-  return (
-    <div
-      className="flex items-center gap-3 py-1"
-      style={{ borderBottom: '1px solid var(--color-border-muted)' }}
-    >
-      <span className="w-8 text-xs font-semibold" style={{ color: 'var(--color-fg-default)' }}>
-        {label}
-      </span>
-
-      {/* Base — editable in both create and edit mode */}
-      <div className="flex flex-col items-center gap-0.5">
-        <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>base</span>
-        <input
-          type="number"
-          aria-label={`${label} base score`}
-          value={score.base}
-          min={8}
-          max={18}
-          onChange={(e) => onBaseChange(e.target.valueAsNumber)}
-          style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px' }}
-        />
-      </div>
-
-      {/* Racial — read-only */}
-      <div className="flex flex-col items-center gap-0.5" style={{ minWidth: 44 }}>
-        <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>racial</span>
-        <span
-          className="text-sm font-medium"
-          style={{
-            color: score.racial === 0 ? 'var(--color-fg-subtle)' : score.racial > 0 ? 'var(--color-success-fg)' : 'var(--color-danger-fg)',
-            minWidth: 28,
-            textAlign: 'center',
-            lineHeight: '1.6rem',
-          }}
-        >
-          {score.racial === 0 ? '0' : score.racial > 0 ? `+${score.racial}` : `${score.racial}`}
-        </span>
-      </div>
-
-      {/* Enhancement bonus — magic items, shown in edit mode */}
-      {isEdit && (
-        <div className="flex flex-col items-center gap-0.5">
-          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>enh</span>
-          <input
-            type="number"
-            aria-label={`${label} enhancement bonus`}
-            value={score.enhancement}
-            onChange={(e) => onEnhancementChange?.(e.target.valueAsNumber || 0)}
-            style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px' }}
-          />
-        </div>
-      )}
-
-      {/* Level-up bonus — shown in edit mode when points have been earned */}
-      {showLevelUp && (
-        <div className="flex flex-col items-center gap-0.5">
-          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>lvl up</span>
-          <input
-            type="number"
-            aria-label={`${label} level-up bonus`}
-            value={levelUp}
-            min={0}
-            max={levelUp + availableToAdd}
-            onChange={(e) => {
-              const next = Math.max(0, Math.min(levelUp + availableToAdd, e.target.valueAsNumber || 0));
-              onLevelUpChange?.(next);
-            }}
-            style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px' }}
-          />
-        </div>
-      )}
-
-      {/* Total */}
-      <div className="flex flex-col items-center ml-1">
-        <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>total</span>
-        <span className="text-sm font-semibold" style={{ color: 'var(--color-fg-default)', minWidth: 28, textAlign: 'center' }}>
-          {total}
-        </span>
-      </div>
-
-      {/* Modifier */}
-      <div className="flex flex-col items-center ml-1">
-        <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>mod</span>
-        <span
-          className="text-sm font-semibold"
-          style={{ color: mod >= 0 ? 'var(--color-success-fg)' : 'var(--color-danger-fg)', minWidth: 28, textAlign: 'center' }}
-        >
-          {modStr}
-        </span>
-      </div>
-
-      {/* Temp — local "what if" calculator */}
-      <div className="flex items-center gap-3 ml-4 pl-4" style={{ borderLeft: '1px solid var(--color-border-muted)' }}>
-        <div className="flex flex-col items-center gap-0.5">
-          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>temp</span>
-          <input
-            type="number"
-            aria-label={`${label} temporary score`}
-            value={tempScore ?? ''}
-            onChange={(e) => {
-              const raw = e.target.value;
-              onTempScoreChange(raw === '' ? null : e.target.valueAsNumber);
-            }}
-            style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px' }}
-          />
-        </div>
-        <div className="flex flex-col items-center gap-0.5">
-          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>temp mod</span>
-          <span
-            className="text-sm font-semibold"
-            style={{
-              color: tempMod >= 0 ? 'var(--color-success-fg)' : 'var(--color-danger-fg)',
-              minWidth: 28,
-              textAlign: 'center',
-              lineHeight: '1.6rem',
-            }}
-          >
-            {tempModStr}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Classes section ───────────────────────────────────────────────────────────
-
-function ClassesSection({
-  classes, onChange, isCreate = false,
-}: {
-  classes: CharacterDraft['classes'];
-  onChange: (c: CharacterDraft['classes']) => void;
-  isCreate?: boolean;
-}) {
-  const classSelectWidth = `${Math.max('— Select class —'.length, ...CLASSES.map((className) => className.length)) + 2}ch`;
-
-  // ── Create mode: single class dropdown, level always 1 ──
-  if (isCreate) {
-    const selectedName = classes[0]?.name ?? '';
-    function handleClassChange(name: string) {
-      if (!name) { onChange([]); return; }
-      onChange([{ name, level: 1, hitDieType: HIT_DIE_BY_CLASS[name] ?? 8, hpRolled: [] }]);
-    }
-    return (
-      <div className="flex flex-col items-start gap-3">
-        <div className="flex items-center gap-3">
-          <select
-            aria-label="Class"
-            value={selectedName}
-            onChange={(e) => handleClassChange(e.target.value)}
-            style={{ ...inputStyle, width: classSelectWidth }}
-          >
-            <option value="">— Select class —</option>
-            {CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          {selectedName && (
-            <span className="text-sm" style={{ color: 'var(--color-fg-default)' }}>
-              Level 1 &nbsp;·&nbsp; d{HIT_DIE_BY_CLASS[selectedName]} hit die
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Edit mode: multi-class with add and level edits ──
-  function add() {
-    onChange([...classes, { name: '', level: 1, hitDieType: 8, hpRolled: [] }]);
-  }
-  function update(i: number, field: 'name' | 'level', value: string | number) {
-    const updated = classes.map((c, idx) => {
-      if (idx !== i) return c;
-      if (field === 'name') {
-        const name = value as string;
-        return { ...c, name, hitDieType: HIT_DIE_BY_CLASS[name] ?? 8 };
-      }
-      return { ...c, level: value as number };
-    });
-    onChange(updated);
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      {classes.map((c, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <select
-            aria-label={i === 0 ? 'Class' : `Multiclass ${i + 1}`}
-            value={c.name}
-            onChange={(e) => update(i, 'name', e.target.value)}
-            style={{ ...inputStyle, width: classSelectWidth }}
-            disabled={i === 0}
-            required={i > 0}
-          >
-            <option value="">— Select class —</option>
-            {CLASSES.map((className) => (
-              <option key={className} value={className}>{className}</option>
-            ))}
-          </select>
-          <span className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>Lv</span>
-          <NumberInput value={c.level} min={1} aria-label={`${c.name || 'Class'} level`} onChange={(v) => update(i, 'level', v)} />
-          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>{c.name ? `d${c.hitDieType}` : ''}</span>
-        </div>
-      ))}
-      <button
-        type="button"
-        onClick={add}
-        className="text-xs px-3 py-1 rounded self-start"
-        style={{
-          border: '1px solid var(--color-border-default)',
-          color: 'var(--color-fg-default)',
-          cursor: 'pointer',
-        }}
-      >
-        + Add Class
-      </button>
-      <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
-        Character Level: {totalCharacterLevel(classes)}
-      </p>
-    </div>
-  );
 }
 
 // ── Skills section ────────────────────────────────────────────────────────────
@@ -1038,250 +711,8 @@ function CombatSection({
   );
 }
 
-function InfoButton({ text }: { text: string }) {
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
 
-  return (
-    <>
-      <span
-        role="img"
-        aria-label="More information"
-        onMouseEnter={(e) => setPos({ x: e.clientX, y: e.clientY })}
-        onMouseMove={(e) => setPos({ x: e.clientX, y: e.clientY })}
-        onMouseLeave={() => setPos(null)}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 14,
-          height: 14,
-          borderRadius: '50%',
-          border: '1px solid currentColor',
-          color: 'var(--color-fg-muted)',
-          fontSize: 9,
-          fontWeight: 'bold',
-          lineHeight: 1,
-          cursor: 'help',
-          marginLeft: 5,
-          flexShrink: 0,
-          verticalAlign: 'middle',
-          userSelect: 'none',
-        }}
-      >
-        ?
-      </span>
-      {pos !== null && createPortal(
-        <div
-          role="tooltip"
-          style={{
-            position: 'fixed',
-            top: pos.y + 14,
-            left: pos.x + 14,
-            zIndex: 9999,
-            background: 'var(--color-canvas-overlay, #fff)',
-            border: '1px solid var(--color-border-default)',
-            borderRadius: 6,
-            padding: '8px 10px',
-            fontSize: 12,
-            lineHeight: 1.6,
-            maxWidth: 380,
-            whiteSpace: 'normal',
-            color: 'var(--color-fg-default)',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-            pointerEvents: 'none',
-          }}
-        >
-          {text}
-        </div>,
-        document.body,
-      )}
-    </>
-  );
-}
 
-function ClassFeaturesSection({ features }: { features: DerivedClassFeature[] }) {
-  if (features.length === 0) {
-    return (
-      <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-        Select a class to see class features.
-      </p>
-    );
-  }
-
-  return (
-    <div className="rounded overflow-hidden" style={{ border: '1px solid var(--color-border-default)' }}>
-      <table aria-label="Class features" className="w-full text-xs border-collapse">
-        <thead>
-          <tr style={{ background: 'var(--color-canvas-subtle)' }}>
-            {['Feature', 'Class (Level)', 'Description'].map((header) => (
-              <th key={header} className="px-3 py-2 text-left font-medium"
-                style={{ color: 'var(--color-fg-muted)', borderBottom: '1px solid var(--color-border-default)' }}>
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {features.map((feature, index) => (
-            <tr
-              key={`${feature.className}-${feature.id}`}
-              style={{
-                background: index % 2 === 0 ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)',
-                borderBottom: '1px solid var(--color-border-muted)',
-              }}
-            >
-              <td className="px-3 py-2 font-medium" style={{ color: 'var(--color-fg-default)', whiteSpace: 'nowrap' }}>
-                {feature.name}
-              </td>
-              <td className="px-3 py-2" style={{ color: 'var(--color-fg-muted)', whiteSpace: 'nowrap' }}>
-                {feature.className} {feature.minLevel}
-              </td>
-              <td className="px-3 py-2" style={{ color: 'var(--color-fg-muted)' }}>
-                {feature.shortDescription}
-                <InfoButton text={feature.fullDescription} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function getAllowedCategories(feat: FeatSlot): ReadonlyArray<FeatCategory> | undefined {
-  if (feat.type === 'Fighter Bonus Feat') return ['Fighter Bonus Feat'];
-  if (/^Wizard Level/.test(feat.sourceLabel)) return ['Item Creation', 'Metamagic', 'Special'];
-  return undefined;
-}
-
-function SelectableFeatsSection({
-  feats,
-  onChange,
-  extraFeats,
-}: {
-  feats: FeatSlot[];
-  onChange: (feats: FeatSlot[]) => void;
-  extraFeats?: ReadonlyArray<FeatCatalogEntry>;
-}) {
-  // Names selected in other slots — used to block duplicate non-repeatable feats.
-  const takenNames = useMemo(
-    () => new Set(feats.map((f) => f.name).filter(Boolean)),
-    [feats],
-  );
-  function updateName(i: number, name: string, shortDescription?: string) {
-    onChange(feats.map((f, idx) =>
-      idx === i ? { ...f, name, shortDescription: shortDescription ?? '' } : f,
-    ));
-  }
-
-  function removeFeat(i: number) {
-    onChange(feats.filter((_, idx) => idx !== i));
-  }
-
-  function addFeat() {
-    onChange([...feats, { name: '', type: 'General', source: 'Special', sourceLabel: 'Additional' }]);
-  }
-
-  const TABLE_HEADERS = ['Feat', 'Description', 'Type', 'Source', ''];
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="rounded overflow-hidden" style={{ border: '1px solid var(--color-border-default)' }}>
-        <table aria-label="Selectable feats" className="w-full text-xs border-collapse">
-          <thead>
-            <tr style={{ background: 'var(--color-canvas-subtle)' }}>
-              {TABLE_HEADERS.map((header) => (
-                <th key={header} className="px-3 py-2 text-left font-medium"
-                  style={{ color: 'var(--color-fg-muted)', borderBottom: '1px solid var(--color-border-default)' }}>
-                  {header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {feats.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-3 py-3 text-center"
-                  style={{ color: 'var(--color-fg-subtle)' }}>
-                  No feat slots yet — select a class to populate.
-                </td>
-              </tr>
-            )}
-            {feats.map((feat, i) => (
-              <tr key={i}
-                style={{
-                  background: i % 2 === 0 ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)',
-                  borderBottom: '1px solid var(--color-border-muted)',
-                }}
-              >
-                <td className="px-3 py-1">
-                  <FeatAutocomplete
-                    ariaLabel={`${feat.sourceLabel} feat name`}
-                    value={feat.name}
-                    onChange={(name, sd) => updateName(i, name, sd)}
-                    allowedCategories={getAllowedCategories(feat)}
-                    takenNames={takenNames}
-                    extraFeats={extraFeats}
-                    placeholder={
-                      feat.type === 'Fighter Bonus Feat'
-                        ? 'Choose fighter bonus feat…'
-                        : /^Wizard Level/.test(feat.sourceLabel)
-                          ? 'Choose metamagic / item creation feat…'
-                          : 'Search feats…'
-                    }
-                    style={{ ...inputStyle, width: '100%', minWidth: 180 }}
-                  />
-                </td>
-                <td className="px-3 py-1" style={{ color: 'var(--color-fg-muted)', fontSize: 11 }}>
-                  {feat.shortDescription ?? ''}
-                </td>
-                <td className="px-3 py-1" style={{ color: 'var(--color-fg-default)', whiteSpace: 'nowrap' }}>
-                  {feat.type}
-                </td>
-                <td className="px-3 py-1" style={{ color: 'var(--color-fg-muted)', whiteSpace: 'nowrap' }}>
-                  {feat.sourceLabel}
-                </td>
-                <td className="px-3 py-1 text-center">
-                  {feat.source === 'Special' && (
-                    <button
-                      type="button"
-                      aria-label={`Remove additional feat ${i + 1}`}
-                      onClick={() => removeFeat(i)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--color-fg-muted)',
-                        cursor: 'pointer',
-                        fontSize: 14,
-                        lineHeight: 1,
-                        padding: '0 4px',
-                      }}
-                    >
-                      ×
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <button
-        type="button"
-        onClick={addFeat}
-        className="text-xs px-3 py-1 rounded self-start"
-        style={{
-          border: '1px solid var(--color-border-default)',
-          color: 'var(--color-fg-default)',
-          cursor: 'pointer',
-          background: 'transparent',
-        }}
-      >
-        + Add Feat
-      </button>
-    </div>
-  );
-}
 
 // ── Main editor ───────────────────────────────────────────────────────────────
 
@@ -1808,71 +1239,18 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           summary={[draft.name.trim(), draft.race].filter(Boolean).join(' · ') || undefined}
           defaultOpen
         >
-          <div className="grid grid-cols-3 gap-4">
-            <Field label="Name" required>
-              <TextInput
-                value={draft.name}
-                onChange={(v) => setField('name', v)}
-                onBlur={() => setNameTouched(true)}
-                error={nameError}
-                placeholder="Character name"
-              />
-            </Field>
-            <Field label="Gender">
-              <Select value={draft.gender} onChange={(v) => setField('gender', v)} options={GENDERS} />
-            </Field>
-            <Field label="Race">
-              <select
-                value={draft.race}
-                onChange={(e) => setRace(e.target.value as CharacterDraft['race'])}
-                style={inputStyle}
-                disabled={isEdit}
-              >
-                {RACES.map((race) => (
-                  <option key={race} value={race}>{race}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Alignment">
-              <Select value={draft.alignment} onChange={(v) => setField('alignment', v)} options={ALIGNMENTS} />
-            </Field>
-            <Field label="Size">
-              <input
-                type="text"
-                value={draft.size}
-                readOnly
-                style={{
-                  ...inputStyle,
-                  color: 'var(--color-fg-muted)',
-                  cursor: 'default',
-                }}
-              />
-            </Field>
-            <Field label="Deity">
-              <TextInput value={draft.deity} onChange={(v) => setField('deity', v)} />
-            </Field>
-            <Field label="Age">
-              <TextInput value={draft.age} onChange={(v) => setField('age', v)} placeholder="e.g. 25" />
-            </Field>
-            <Field label="Height">
-              <TextInput value={draft.height} onChange={(v) => setField('height', v)} placeholder="e.g. 5'10&quot;" />
-            </Field>
-            <Field label="Weight">
-              <TextInput value={draft.weight} onChange={(v) => setField('weight', v)} placeholder="e.g. 180 lbs" />
-            </Field>
-            <Field label="Eyes">
-              <TextInput value={draft.eyes} onChange={(v) => setField('eyes', v)} />
-            </Field>
-            <Field label="Hair">
-              <TextInput value={draft.hair} onChange={(v) => setField('hair', v)} />
-            </Field>
-            <Field label="Skin">
-              <TextInput value={draft.skin} onChange={(v) => setField('skin', v)} />
-            </Field>
-          </div>
-          <Field label="Languages (comma-separated)">
-            <TextInput value={draft.languages} onChange={(v) => setField('languages', v)} placeholder="Common, Elvish…" />
-          </Field>
+          <IdentitySection
+            draft={draft}
+            isEdit={isEdit}
+            nameError={nameError}
+            inputStyle={inputStyle}
+            onNameChange={(value) => setField('name', value)}
+            onNameBlur={() => setNameTouched(true)}
+            onGenderChange={(value) => setField('gender', value)}
+            onRaceChange={setRace}
+            onAlignmentChange={(value) => setField('alignment', value)}
+            onTextFieldChange={(field, value) => setField(field, value)}
+          />
         </Accordion>
 
         {/* ── Classes ── */}
@@ -1881,50 +1259,15 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           title={<>Class &amp; Level <span style={{ color: 'var(--color-danger-fg)', fontSize: '0.75rem' }}>*</span></>}
           summary={draft.classes.filter((c) => c.name).map((c) => `${c.name} ${c.level}`).join(' / ') || undefined}
         >
-          <ClassesSection
+          <ClassLevelSection
             classes={draft.classes}
-            onChange={setClasses}
-            isCreate={!isEdit}
+            isEdit={isEdit}
+            hitPoints={draft.hitPoints}
+            calculatedCreateHitPoints={calculatedCreateHitPoints}
+            inputStyle={inputStyle}
+            onClassesChange={setClasses}
+            onHitPointsChange={(next) => setField('hitPoints', next)}
           />
-          {isEdit ? (
-            <div className="grid grid-cols-3 gap-4 max-w-xl">
-              <Field label="Hit Points">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={String(draft.hitPoints.max)}
-                  onChange={(e) => {
-                    const digitsOnly = e.target.value.replace(/\D+/g, '');
-                    const max = digitsOnly === '' ? 0 : Number(digitsOnly);
-                    setField('hitPoints', {
-                      ...draft.hitPoints,
-                      max,
-                      current: max,
-                    });
-                  }}
-                  style={{ ...inputStyle, width: 96 }}
-                />
-              </Field>
-              <Field label="Nonlethal">
-                <NumberInput
-                  value={draft.hitPoints.nonlethal}
-                  min={0}
-                  onChange={(v) => setField('hitPoints', { ...draft.hitPoints, nonlethal: Math.max(0, Math.trunc(v)) })}
-                />
-              </Field>
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-4 max-w-xl">
-              <Field label="Hit Points">
-                <input
-                  type="text"
-                  value={calculatedCreateHitPoints}
-                  readOnly
-                  style={{ ...inputStyle, width: 96, color: 'var(--color-fg-muted)', cursor: 'default' }}
-                />
-              </Field>
-            </div>
-          )}
         </Accordion>
 
         {/* ── Ability Scores ── */}
@@ -1942,38 +1285,22 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
             </>
           )}
         >
-          <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-            {spentAbilityPoints} / {ABILITY_POINT_BUY_BUDGET} points spent · {remainingAbilityPoints} remaining
-            {isEdit && earnedLevelUpPoints > 0 && (
-              <> · Level-up: {spentLevelUpPoints} / {earnedLevelUpPoints} assigned</>
-            )}
-          </p>
-          <div className="flex flex-col gap-2">
-            {ABILITY_KEYS.map((key) => (
-              <AbilityScoreRow
-                key={key}
-                label={ABILITY_LABELS[key]}
-                score={draft.abilityScores[key]}
-                onBaseChange={(base) => setAbilityBase(key, base)}
-                isEdit={isEdit}
-                levelUp={draft.abilityScores[key].levelUp ?? 0}
-                onLevelUpChange={(val) => setLevelUp(key, val)}
-                earnedPoints={earnedLevelUpPoints}
-                spentPoints={spentLevelUpPoints}
-                onEnhancementChange={(val) => setEnhancement(key, val)}
-                tempScore={draft.abilityScores[key].temp}
-                onTempScoreChange={(val) => {
-                  setTempScores((prev) => ({ ...prev, [key]: val ?? abilityTotals[key] }));
-                  setAbilityTempScore(key, val);
-                }}
-              />
-            ))}
-          </div>
-          {isEdit && (
-            <p className="text-xs mt-2" style={{ color: 'var(--color-fg-subtle)' }}>
-              enh = permanent stat enhancement
-            </p>
-          )}
+          <AbilityScoresSection
+            abilityScores={draft.abilityScores}
+            isEdit={isEdit}
+            spentAbilityPoints={spentAbilityPoints}
+            remainingAbilityPoints={remainingAbilityPoints}
+            earnedLevelUpPoints={earnedLevelUpPoints}
+            spentLevelUpPoints={spentLevelUpPoints}
+            inputStyle={inputStyle}
+            onBaseChange={setAbilityBase}
+            onLevelUpChange={setLevelUp}
+            onEnhancementChange={setEnhancement}
+            onTempScoreChange={(key, val) => {
+              setTempScores((prev) => ({ ...prev, [key]: val ?? abilityTotals[key] }));
+              setAbilityTempScore(key, val);
+            }}
+          />
         </Accordion>
 
         {/* ── Feats ── */}
@@ -1981,24 +1308,12 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           title="Feats"
           summary={`${classFeatures.length} features · ${draft.feats.length} slots`}
         >
-          <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-fg-muted)' }}>
-            Class Features
-          </p>
-          <p className="text-sm mb-2" style={{ color: 'var(--color-fg-subtle)' }}>
-            Features granted automatically by class. Hover a feature name to see the full description.
-          </p>
-          <ClassFeaturesSection features={classFeatures} />
-
-          <p className="text-xs font-semibold uppercase tracking-wider mt-4 mb-1" style={{ color: 'var(--color-fg-muted)' }}>
-            Feat Slots
-          </p>
-          <p className="text-sm mb-2" style={{ color: 'var(--color-fg-subtle)' }}>
-            Slots granted by character level, race, and class bonus feats. Enter the chosen feat name.
-          </p>
-          <SelectableFeatsSection
+          <FeatsSection
+            classFeatures={classFeatures}
             feats={draft.feats}
-            onChange={(feats) => setField('feats', feats)}
+            onFeatsChange={(feats) => setField('feats', feats)}
             extraFeats={filteredCustomFeats}
+            inputStyle={inputStyle}
           />
         </Accordion>
 
@@ -2032,12 +1347,13 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
 
         {/* ── Description / Backstory ── */}
         <Accordion title="Background">
-          <Field label="Description">
-            <Textarea value={draft.description} onChange={(v) => setField('description', v)} />
-          </Field>
-          <Field label="Backstory">
-            <Textarea value={draft.backstory} onChange={(v) => setField('backstory', v)} rows={5} />
-          </Field>
+          <BackgroundSection
+            description={draft.description}
+            backstory={draft.backstory}
+            inputStyle={inputStyle}
+            onDescriptionChange={(value) => setField('description', value)}
+            onBackstoryChange={(value) => setField('backstory', value)}
+          />
         </Accordion>
 
         {/* ── Actions ── */}
