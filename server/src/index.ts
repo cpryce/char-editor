@@ -110,21 +110,34 @@ app.get(
     failureRedirect: `${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=auth_failed`,
   }),
   (req, res) => {
+    console.log('POST /auth/google/callback - User authenticated:', req.user);
+    console.log('POST /auth/google/callback - req.isAuthenticated():', req.isAuthenticated());
+    console.log('POST /auth/google/callback - About to save session');
+
     req.session.save((err) => {
       if (err) {
         console.error('Session save error:', err);
         return res.redirect(`${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=session_failed`);
       }
+      console.log('POST /auth/google/callback - Session saved successfully, redirecting to:', process.env.CLIENT_URL ?? 'http://localhost:5173');
       res.redirect(process.env.CLIENT_URL ?? 'http://localhost:5173');
     });
   },
 );
 
 app.get('/auth/me', (req, res) => {
+  console.log('GET /auth/me - req.isAuthenticated():', req.isAuthenticated());
+  console.log('GET /auth/me - req.user:', req.user);
+  console.log('GET /auth/me - req.session:', req.session);
+  console.log('GET /auth/me - req.sessionID:', req.sessionID);
+  console.log('GET /auth/me - req.cookies:', req.cookies);
+
   if (req.isAuthenticated()) {
     const u = req.user as { _id: mongoose.Types.ObjectId; name?: string; email: string; avatar?: string };
+    console.log('GET /auth/me - Returning authenticated user:', { id: u._id, name: u.name, email: u.email });
     res.json({ id: u._id, name: u.name, email: u.email, avatar: u.avatar });
   } else {
+    console.log('GET /auth/me - User not authenticated, returning 401');
     res.status(401).json({ error: 'Not authenticated' });
   }
 });
