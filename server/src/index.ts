@@ -1,3 +1,4 @@
+// Webhook test - if this deploys automatically, the GitHub integration is working
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
