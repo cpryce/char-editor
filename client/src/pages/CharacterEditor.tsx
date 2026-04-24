@@ -209,6 +209,127 @@ function safeCombatNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
+function deriveAbilityTotals(scores: CharacterDraft['abilityScores']): Record<AbilityKey, number> {
+  return {
+    strength: totalScore(scores.strength),
+    dexterity: totalScore(scores.dexterity),
+    constitution: totalScore(scores.constitution),
+    intelligence: totalScore(scores.intelligence),
+    wisdom: totalScore(scores.wisdom),
+    charisma: totalScore(scores.charisma),
+  };
+}
+
+type CombatDerivedStats = {
+  dexMod: number;
+  conMod: number;
+  wisMod: number;
+  strMod: number;
+  sizeMod: number;
+  acArmor: number;
+  acShield: number;
+  acDodge: number;
+  acNatural: number;
+  acDeflection: number;
+  acMisc: number;
+  initMisc: number;
+  speedBase: number;
+  speedArmorAdjust: number;
+  speedFly: number;
+  speedSwim: number;
+  bab: number;
+  fortitudeBase: number;
+  reflexBase: number;
+  willBase: number;
+  totalAC: number;
+  touchAC: number;
+  flatFootedAC: number;
+  initiativeTotal: number;
+  fortitudeTotal: number;
+  reflexTotal: number;
+  willTotal: number;
+  meleeAttack: number;
+  rangedAttack: number;
+  speedFeet: number;
+};
+
+function deriveCombatStats({
+  combat,
+  classes,
+  size,
+  tempScores,
+}: {
+  combat: CharacterDraft['combat'];
+  classes: CharacterDraft['classes'];
+  size: CharacterDraft['size'];
+  tempScores: Record<AbilityKey, number>;
+}): CombatDerivedStats {
+  const dexMod = abilityModifier(tempScores.dexterity);
+  const conMod = abilityModifier(tempScores.constitution);
+  const wisMod = abilityModifier(tempScores.wisdom);
+  const strMod = abilityModifier(tempScores.strength);
+  const sizeMod = SIZE_MODIFIERS[size] ?? 0;
+  const acArmor = safeCombatNumber(combat.armorClass.armor);
+  const acShield = safeCombatNumber(combat.armorClass.shield);
+  const acDodge = safeCombatNumber(combat.armorClass.dodge);
+  const acNatural = safeCombatNumber(combat.armorClass.natural);
+  const acDeflection = safeCombatNumber(combat.armorClass.deflection);
+  const acMisc = safeCombatNumber(combat.armorClass.misc);
+  const initMisc = safeCombatNumber(combat.initiative.miscBonus);
+  const speedBase = safeCombatNumber(combat.speed.base);
+  const speedArmorAdjust = safeCombatNumber(combat.speed.armorAdjust);
+  const speedFly = safeCombatNumber(combat.speed.fly);
+  const speedSwim = safeCombatNumber(combat.speed.swim);
+  const bab = baseAttackBonusFromClasses(classes);
+  const fortitudeBase = baseSaveBonusFromClasses(classes, 'fortitude');
+  const reflexBase = baseSaveBonusFromClasses(classes, 'reflex');
+  const willBase = baseSaveBonusFromClasses(classes, 'will');
+
+  const totalAC = 10 + acArmor + acShield + dexMod + sizeMod + acDodge + acNatural + acDeflection + acMisc;
+  const touchAC = 10 + dexMod + sizeMod + acDodge + acDeflection + acMisc;
+  const flatFootedAC = 10 + acArmor + acShield + sizeMod + acNatural + acDeflection + acMisc;
+  const initiativeTotal = dexMod + initMisc;
+  const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc);
+  const reflexTotal = reflexBase + dexMod + safeCombatNumber(combat.saves.reflex.magic) + safeCombatNumber(combat.saves.reflex.misc);
+  const willTotal = willBase + wisMod + safeCombatNumber(combat.saves.will.magic) + safeCombatNumber(combat.saves.will.misc);
+  const meleeAttack = bab + strMod + sizeMod;
+  const rangedAttack = bab + dexMod + sizeMod;
+  const speedFeet = Math.max(0, speedBase + speedArmorAdjust);
+
+  return {
+    dexMod,
+    conMod,
+    wisMod,
+    strMod,
+    sizeMod,
+    acArmor,
+    acShield,
+    acDodge,
+    acNatural,
+    acDeflection,
+    acMisc,
+    initMisc,
+    speedBase,
+    speedArmorAdjust,
+    speedFly,
+    speedSwim,
+    bab,
+    fortitudeBase,
+    reflexBase,
+    willBase,
+    totalAC,
+    touchAC,
+    flatFootedAC,
+    initiativeTotal,
+    fortitudeTotal,
+    reflexTotal,
+    willTotal,
+    meleeAttack,
+    rangedAttack,
+    speedFeet,
+  };
+}
+
 function AbilityScoreRow({
   label, score, onBaseChange, isEdit = false,
   levelUp = 0, onLevelUpChange, earnedPoints = 0, spentPoints = 0,
@@ -232,8 +353,8 @@ function AbilityScoreRow({
   const showLevelUp = isEdit && earnedPoints > 0;
   const availableToAdd = earnedPoints - spentPoints;
 
-  const tempMod = tempScore !== null ? abilityModifier(tempScore) : null;
-  const tempModStr = tempMod === null ? '—' : tempMod >= 0 ? `+${tempMod}` : `${tempMod}`;
+  const tempMod = abilityModifier(tempScore !== null ? tempScore : total);
+  const tempModStr = tempMod >= 0 ? `+${tempMod}` : `${tempMod}`;
 
   return (
     <div
@@ -244,7 +365,7 @@ function AbilityScoreRow({
         {label}
       </span>
 
-      {/* Base — editable only in create mode */}
+      {/* Base — editable in both create and edit mode */}
       <div className="flex flex-col items-center gap-0.5">
         <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>base</span>
         <input
@@ -253,9 +374,8 @@ function AbilityScoreRow({
           value={score.base}
           min={8}
           max={18}
-          disabled={isEdit}
           onChange={(e) => onBaseChange(e.target.valueAsNumber)}
-          style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px', opacity: isEdit ? 0.6 : 1 }}
+          style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px' }}
         />
       </div>
 
@@ -347,9 +467,7 @@ function AbilityScoreRow({
           <span
             className="text-sm font-semibold"
             style={{
-              color: tempMod === null
-                ? 'var(--color-fg-subtle)'
-                : tempMod >= 0 ? 'var(--color-success-fg)' : 'var(--color-danger-fg)',
+              color: tempMod >= 0 ? 'var(--color-success-fg)' : 'var(--color-danger-fg)',
               minWidth: 28,
               textAlign: 'center',
               lineHeight: '1.6rem',
@@ -666,64 +784,45 @@ function SkillsSection({
 
 function CombatSection({
   combat,
-  classes,
-  size,
   onCombatChange,
-  tempScores,
+  derivedCombat,
 }: {
   combat: CharacterDraft['combat'];
-  classes: CharacterDraft['classes'];
-  size: CharacterDraft['size'];
   onCombatChange: (value: CharacterDraft['combat']) => void;
-  tempScores: Record<AbilityKey, number>;
+  derivedCombat: CombatDerivedStats;
 }) {
-  const dexMod = abilityModifier(tempScores.dexterity);
-  const conMod = abilityModifier(tempScores.constitution);
-  const wisMod = abilityModifier(tempScores.wisdom);
-  const strMod = abilityModifier(tempScores.strength);
-  const sizeMod = SIZE_MODIFIERS[size] ?? 0;
-  const acArmor = safeCombatNumber(combat.armorClass.armor);
-  const acShield = safeCombatNumber(combat.armorClass.shield);
-  const acDodge = safeCombatNumber(combat.armorClass.dodge);
-  const acNatural = safeCombatNumber(combat.armorClass.natural);
-  const acDeflection = safeCombatNumber(combat.armorClass.deflection);
-  const acMisc = safeCombatNumber(combat.armorClass.misc);
-  const initMisc = safeCombatNumber(combat.initiative.miscBonus);
-  const speedBase = safeCombatNumber(combat.speed.base);
-  const speedArmorAdjust = safeCombatNumber(combat.speed.armorAdjust);
-  const speedFly = safeCombatNumber(combat.speed.fly);
-  const speedSwim = safeCombatNumber(combat.speed.swim);
-  const bab = baseAttackBonusFromClasses(classes);
-  const fortitudeBase = baseSaveBonusFromClasses(classes, 'fortitude');
-  const reflexBase = baseSaveBonusFromClasses(classes, 'reflex');
-  const willBase = baseSaveBonusFromClasses(classes, 'will');
-
-  const totalAC = 10
-    + acArmor
-    + acShield
-    + dexMod
-    + sizeMod
-    + acDodge
-    + acNatural
-    + acDeflection
-    + acMisc;
-  const touchAC = 10 + dexMod + sizeMod + acDodge + acDeflection + acMisc;
-  const flatFootedAC = 10
-    + acArmor
-    + acShield
-    + sizeMod
-    + acNatural
-    + acDeflection
-    + acMisc;
-
-  const initiativeTotal = dexMod + initMisc;
-  const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc);
-  const reflexTotal = reflexBase + dexMod + safeCombatNumber(combat.saves.reflex.magic) + safeCombatNumber(combat.saves.reflex.misc);
-  const willTotal = willBase + wisMod + safeCombatNumber(combat.saves.will.magic) + safeCombatNumber(combat.saves.will.misc);
-
-  const meleeAttack = bab + strMod + sizeMod;
-  const rangedAttack = bab + dexMod + sizeMod;
-  const speedFeet = Math.max(0, speedBase + speedArmorAdjust);
+  const {
+    dexMod,
+    conMod,
+    wisMod,
+    strMod,
+    sizeMod,
+    acArmor,
+    acShield,
+    acDodge,
+    acNatural,
+    acDeflection,
+    acMisc,
+    initMisc,
+    speedBase,
+    speedArmorAdjust,
+    speedFly,
+    speedSwim,
+    bab,
+    fortitudeBase,
+    reflexBase,
+    willBase,
+    totalAC,
+    touchAC,
+    flatFootedAC,
+    initiativeTotal,
+    fortitudeTotal,
+    reflexTotal,
+    willTotal,
+    meleeAttack,
+    rangedAttack,
+    speedFeet,
+  } = derivedCombat;
 
   function updateNumeric(path: string, value: number) {
     const safe = Number.isFinite(value) ? Math.trunc(value) : 0;
@@ -1211,60 +1310,41 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
   const totalLevel = totalCharacterLevel(draft.classes);
   const earnedLevelUpPoints = Math.floor(totalLevel / 4);
   const spentLevelUpPoints = ABILITY_KEYS.reduce((sum, key) => sum + (draft.abilityScores[key].levelUp ?? 0), 0);
+  const abilityTotals = useMemo(() => deriveAbilityTotals(draft.abilityScores), [draft.abilityScores]);
 
-  const strTotal = totalScore(draft.abilityScores.strength);
-  const dexTotal = totalScore(draft.abilityScores.dexterity);
-  const conTotal = totalScore(draft.abilityScores.constitution);
-  const intTotal = totalScore(draft.abilityScores.intelligence);
-  const wisTotal = totalScore(draft.abilityScores.wisdom);
-  const chaTotal = totalScore(draft.abilityScores.charisma);
   const [tempScores, setTempScores] = useState<Record<AbilityKey, number>>(() => ({
-    strength:     draft.abilityScores.strength.temp     ?? strTotal,
-    dexterity:    draft.abilityScores.dexterity.temp    ?? dexTotal,
-    constitution: draft.abilityScores.constitution.temp ?? conTotal,
-    intelligence: draft.abilityScores.intelligence.temp ?? intTotal,
-    wisdom:       draft.abilityScores.wisdom.temp       ?? wisTotal,
-    charisma:     draft.abilityScores.charisma.temp     ?? chaTotal,
+    strength:     draft.abilityScores.strength.temp     ?? abilityTotals.strength,
+    dexterity:    draft.abilityScores.dexterity.temp    ?? abilityTotals.dexterity,
+    constitution: draft.abilityScores.constitution.temp ?? abilityTotals.constitution,
+    intelligence: draft.abilityScores.intelligence.temp ?? abilityTotals.intelligence,
+    wisdom:       draft.abilityScores.wisdom.temp       ?? abilityTotals.wisdom,
+    charisma:     draft.abilityScores.charisma.temp     ?? abilityTotals.charisma,
   }));
   useEffect(() => {
     setTempScores((prev) => ({
-      strength:     draft.abilityScores.strength.temp     ?? (prev.strength     === strTotal ? strTotal : prev.strength),
-      dexterity:    draft.abilityScores.dexterity.temp    ?? (prev.dexterity    === dexTotal ? dexTotal : prev.dexterity),
-      constitution: draft.abilityScores.constitution.temp ?? (prev.constitution === conTotal ? conTotal : prev.constitution),
-      intelligence: draft.abilityScores.intelligence.temp ?? (prev.intelligence === intTotal ? intTotal : prev.intelligence),
-      wisdom:       draft.abilityScores.wisdom.temp       ?? (prev.wisdom       === wisTotal ? wisTotal : prev.wisdom),
-      charisma:     draft.abilityScores.charisma.temp     ?? (prev.charisma     === chaTotal ? chaTotal : prev.charisma),
+      strength:     draft.abilityScores.strength.temp     ?? (prev.strength     === abilityTotals.strength ? abilityTotals.strength : prev.strength),
+      dexterity:    draft.abilityScores.dexterity.temp    ?? (prev.dexterity    === abilityTotals.dexterity ? abilityTotals.dexterity : prev.dexterity),
+      constitution: draft.abilityScores.constitution.temp ?? (prev.constitution === abilityTotals.constitution ? abilityTotals.constitution : prev.constitution),
+      intelligence: draft.abilityScores.intelligence.temp ?? (prev.intelligence === abilityTotals.intelligence ? abilityTotals.intelligence : prev.intelligence),
+      wisdom:       draft.abilityScores.wisdom.temp       ?? (prev.wisdom       === abilityTotals.wisdom ? abilityTotals.wisdom : prev.wisdom),
+      charisma:     draft.abilityScores.charisma.temp     ?? (prev.charisma     === abilityTotals.charisma ? abilityTotals.charisma : prev.charisma),
     }));
-  }, [strTotal, dexTotal, conTotal, intTotal, wisTotal, chaTotal]);
+  }, [abilityTotals]);
 
-  const intelligenceMod = abilityModifier(totalScore(draft.abilityScores.intelligence));
+  const intelligenceMod = abilityModifier(abilityTotals.intelligence);
   const availableSkillPoints = totalSkillPointsAvailable(draft.classes, intelligenceMod, draft.race);
   const spentPoints = spentSkillPoints(draft.skills);
   const selectedClass = draft.classes[0];
   const calculatedCreateHitPoints = selectedClass
-    ? Math.max(1, selectedClass.hitDieType + abilityModifier(totalScore(draft.abilityScores.constitution)))
+    ? Math.max(1, selectedClass.hitDieType + abilityModifier(abilityTotals.constitution))
     : 0;
-  const combatDexMod = abilityModifier(totalScore(draft.abilityScores.dexterity));
-  const combatConMod = abilityModifier(totalScore(draft.abilityScores.constitution));
-  const combatWisMod = abilityModifier(totalScore(draft.abilityScores.wisdom));
-  const combatFortitudeBase = baseSaveBonusFromClasses(draft.classes, 'fortitude');
-  const combatReflexBase = baseSaveBonusFromClasses(draft.classes, 'reflex');
-  const combatWillBase = baseSaveBonusFromClasses(draft.classes, 'will');
-  const combatSizeMod = SIZE_MODIFIERS[draft.size] ?? 0;
-  const combatAC = 10
-    + safeCombatNumber(draft.combat.armorClass.armor)
-    + safeCombatNumber(draft.combat.armorClass.shield)
-    + combatDexMod
-    + combatSizeMod
-    + safeCombatNumber(draft.combat.armorClass.dodge)
-    + safeCombatNumber(draft.combat.armorClass.natural)
-    + safeCombatNumber(draft.combat.armorClass.deflection)
-    + safeCombatNumber(draft.combat.armorClass.misc);
-  const combatInitiative = combatDexMod + safeCombatNumber(draft.combat.initiative.miscBonus);
-  const combatFortitude = combatFortitudeBase + combatConMod + safeCombatNumber(draft.combat.saves.fortitude.magic) + safeCombatNumber(draft.combat.saves.fortitude.misc);
-  const combatReflex = combatReflexBase + combatDexMod + safeCombatNumber(draft.combat.saves.reflex.magic) + safeCombatNumber(draft.combat.saves.reflex.misc);
-  const combatWill = combatWillBase + combatWisMod + safeCombatNumber(draft.combat.saves.will.magic) + safeCombatNumber(draft.combat.saves.will.misc);
-  const combatSummary = `AC ${combatAC} · Init ${signed(combatInitiative)} · F/R/W ${signed(combatFortitude)}/${signed(combatReflex)}/${signed(combatWill)}`;
+  const combatStats = deriveCombatStats({
+    combat: draft.combat,
+    classes: draft.classes,
+    size: draft.size,
+    tempScores,
+  });
+  const combatSummary = `AC ${combatStats.totalAC} · Init ${signed(combatStats.initiativeTotal)} · F/R/W ${signed(combatStats.fortitudeTotal)}/${signed(combatStats.reflexTotal)}/${signed(combatStats.willTotal)}`;
   const hasUnselectedClass = draft.classes.some((c) => !c.name.trim());
   const hasRequiredFields = draft.name.trim().length > 0
     && draft.classes.length > 0
@@ -1404,9 +1484,11 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
               sourceLabel: typeof feat.notes === 'string' && feat.notes.trim().length > 0
                 ? feat.notes
                 : (source === 'Fighter Bonus Feat' ? 'Fighter Bonus Feat' : 'Character Feat'),
-              shortDescription: typeof feat.name === 'string' && feat.name
-                ? (FEAT_BY_NAME.get(feat.name as string)?.shortDescription ?? '')
-                : '',
+              shortDescription: typeof feat.shortDescription === 'string'
+                ? feat.shortDescription
+                : (typeof feat.name === 'string' && feat.name
+                  ? (FEAT_BY_NAME.get(feat.name as string)?.shortDescription ?? '')
+                  : ''),
             };
           });
 
@@ -1560,20 +1642,20 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
               },
             combat: {
               ...draft.combat,
-              baseAttackBonus: baseAttackBonusFromClasses(draft.classes),
+              baseAttackBonus: combatStats.bab,
               saves: {
                 ...draft.combat.saves,
                 fortitude: {
                   ...draft.combat.saves.fortitude,
-                  base: baseSaveBonusFromClasses(draft.classes, 'fortitude'),
+                  base: combatStats.fortitudeBase,
                 },
                 reflex: {
                   ...draft.combat.saves.reflex,
-                  base: baseSaveBonusFromClasses(draft.classes, 'reflex'),
+                  base: combatStats.reflexBase,
                 },
                 will: {
                   ...draft.combat.saves.will,
-                  base: baseSaveBonusFromClasses(draft.classes, 'will'),
+                  base: combatStats.willBase,
                 },
               },
             },
@@ -1582,12 +1664,14 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
                 name: feat.name,
                 type: feat.type,
                 source: feat.source,
+                shortDescription: feat.shortDescription,
                 notes: feat.shortDescription,
               })),
               ...draft.feats.filter((feat) => feat.name.trim()).map((feat) => ({
                 name: feat.name,
                 type: feat.type,
                 source: feat.source,
+                shortDescription: feat.shortDescription,
                 notes: feat.sourceLabel,
               })),
             ],
@@ -1849,26 +1933,21 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           title="Ability Scores"
           summary={(
             <>
-              <span style={{ marginRight: 10 }}><strong>Str</strong> {totalScore(draft.abilityScores.strength)}</span>
-              <span style={{ marginRight: 10 }}><strong>Dex</strong> {totalScore(draft.abilityScores.dexterity)}</span>
-              <span style={{ marginRight: 10 }}><strong>Con</strong> {totalScore(draft.abilityScores.constitution)}</span>
-              <span style={{ marginRight: 10 }}><strong>Int</strong> {totalScore(draft.abilityScores.intelligence)}</span>
-              <span style={{ marginRight: 10 }}><strong>Wis</strong> {totalScore(draft.abilityScores.wisdom)}</span>
-              <span><strong>Cha</strong> {totalScore(draft.abilityScores.charisma)}</span>
+              <span style={{ marginRight: 10 }}><strong>Str</strong> {abilityTotals.strength}</span>
+              <span style={{ marginRight: 10 }}><strong>Dex</strong> {abilityTotals.dexterity}</span>
+              <span style={{ marginRight: 10 }}><strong>Con</strong> {abilityTotals.constitution}</span>
+              <span style={{ marginRight: 10 }}><strong>Int</strong> {abilityTotals.intelligence}</span>
+              <span style={{ marginRight: 10 }}><strong>Wis</strong> {abilityTotals.wisdom}</span>
+              <span><strong>Cha</strong> {abilityTotals.charisma}</span>
             </>
           )}
         >
-          {isEdit
-            ? earnedLevelUpPoints > 0 && (
-                <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-                  Level-up points: {spentLevelUpPoints} / {earnedLevelUpPoints} assigned
-                </p>
-              )
-            : (
-                <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-                  {spentAbilityPoints} / {ABILITY_POINT_BUY_BUDGET} points spent · {remainingAbilityPoints} remaining
-                </p>
-              )}
+          <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+            {spentAbilityPoints} / {ABILITY_POINT_BUY_BUDGET} points spent · {remainingAbilityPoints} remaining
+            {isEdit && earnedLevelUpPoints > 0 && (
+              <> · Level-up: {spentLevelUpPoints} / {earnedLevelUpPoints} assigned</>
+            )}
+          </p>
           <div className="flex flex-col gap-2">
             {ABILITY_KEYS.map((key) => (
               <AbilityScoreRow
@@ -1884,7 +1963,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
                 onEnhancementChange={(val) => setEnhancement(key, val)}
                 tempScore={draft.abilityScores[key].temp}
                 onTempScoreChange={(val) => {
-                  setTempScores((prev) => ({ ...prev, [key]: val ?? totalScore(draft.abilityScores[key]) }));
+                  setTempScores((prev) => ({ ...prev, [key]: val ?? abilityTotals[key] }));
                   setAbilityTempScore(key, val);
                 }}
               />
@@ -1930,10 +2009,8 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
         >
           <CombatSection
             combat={draft.combat}
-            classes={draft.classes}
-            size={draft.size}
             onCombatChange={(value) => setField('combat', value)}
-            tempScores={tempScores}
+            derivedCombat={combatStats}
           />
         </Accordion>
 

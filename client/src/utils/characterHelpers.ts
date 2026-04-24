@@ -283,18 +283,25 @@ export function mergeSelectableFeats(
 ): FeatSlot[] {
   const derivedLabels = new Set(derived.map((f) => f.sourceLabel));
 
-  // Preserve existing name selections for each sourceLabel
-  const existingByLabel = new Map<string, string>();
+  // Preserve existing slot selections for each sourceLabel.
+  const existingByLabel = new Map<string, Pick<FeatSlot, 'name' | 'shortDescription'>>();
   existing.forEach((f) => {
     if (derivedLabels.has(f.sourceLabel) && !existingByLabel.has(f.sourceLabel)) {
-      existingByLabel.set(f.sourceLabel, f.name);
+      existingByLabel.set(f.sourceLabel, {
+        name: f.name,
+        shortDescription: f.shortDescription,
+      });
     }
   });
 
-  const merged = derived.map((slot) => ({
-    ...slot,
-    name: existingByLabel.get(slot.sourceLabel) ?? '',
-  }));
+  const merged = derived.map((slot) => {
+    const existingSlot = existingByLabel.get(slot.sourceLabel);
+    return {
+      ...slot,
+      name: existingSlot?.name ?? '',
+      shortDescription: existingSlot?.shortDescription ?? slot.shortDescription,
+    };
+  });
 
   // Keep user-added extras
   const extras = existing.filter((f) => f.source === 'Special');

@@ -78,8 +78,10 @@ const featSchema = new Schema(
      *   Character Feat : freely chosen (level feats, racial bonus feats)
      *   Special        : DM prerogative or exceptional circumstance
      */
-    source: { type: String, enum: FEAT_SOURCES, required: true, default: 'Character Feat' },
-    notes:  { type: String },
+    source:           { type: String, enum: FEAT_SOURCES, required: true, default: 'Character Feat' },
+    sourceLabel:      { type: String },
+    shortDescription: { type: String },
+    notes:            { type: String },
   },
   { _id: false },
 );
@@ -161,7 +163,7 @@ export interface ICharacter extends Document {
 
   // Skills, Feats, Equipment, Currency
   skills: { name: string; keyAbility: string; ranks: number; classSkill: boolean; miscBonus: number }[];
-  feats:  { name: string; category: string; source?: string; notes?: string }[];
+  feats:  { name: string; category: string; source?: string; sourceLabel?: string; shortDescription?: string; notes?: string }[];
   equipment: { name: string; type?: string; weight: number; equipped: boolean; notes?: string }[];
   currency: { pp: number; gp: number; sp: number; cp: number };
 }
