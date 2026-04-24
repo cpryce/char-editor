@@ -27,7 +27,26 @@ app.set('trust proxy', 1);
 app.use(cors({ origin: process.env.CLIENT_URL ?? 'http://localhost:5173', credentials: true }));
 app.use(express.json());
 
-// session middleware is applied inside start() after DB connects
+// MongoStore.create() is lazy — it connects using the same URI as mongoose.
+// Creating it at module level so the session middleware can be fully wired
+// before routes are registered.
+const store = MONGO_URI
+  ? MongoStore.create({ mongoUrl: MONGO_URI, collectionName: 'sessions', ttl: 14 * 24 * 60 * 60 })
+  : undefined;
+
+app.use(session({
+  name: SESSION_COOKIE_NAME,
+  secret: process.env.SESSION_SECRET ?? 'fallback_secret',
+  resave: false,
+  saveUninitialized: true,
+  store,
+  cookie: {
+    httpOnly: true,
+    sameSite: COOKIE_SAME_SITE,
+    secure: COOKIE_SAME_SITE === 'none' ? true : COOKIE_SECURE,
+    maxAge: 24 * 60 * 60 * 1000,
+  },
+}));
 
 function authDebugLog(event: string, req: express.Request, extra: Record<string, unknown> = {}) {
   if (!AUTH_DEBUG) return;
@@ -86,6 +105,9 @@ passport.deserializeUser(async (id: string, done) => {
     done(err as Error);
   }
 });
+
+app.use(passport.initialize());
+app.use(passport.session());
 
 // ── Routes ──────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
@@ -420,28 +442,6 @@ async function start() {
     await mongoose.connect(MONGO_URI);
     console.log('Connected to MongoDB');
   }
-
-  // Session middleware applied here so MongoStore is ready before any requests
-  const store = MONGO_URI
-    ? MongoStore.create({ mongoUrl: MONGO_URI, collectionName: 'sessions', ttl: 14 * 24 * 60 * 60 })
-    : undefined;
-
-  app.use(session({
-    name: SESSION_COOKIE_NAME,
-    secret: process.env.SESSION_SECRET ?? 'fallback_secret',
-    resave: false,
-    saveUninitialized: true,
-    store,
-    cookie: {
-      httpOnly: true,
-      sameSite: COOKIE_SAME_SITE,
-      secure: COOKIE_SAME_SITE === 'none' ? true : COOKIE_SECURE,
-      maxAge: 24 * 60 * 60 * 1000,
-    },
-  }));
-
-  app.use(passport.initialize());
-  app.use(passport.session());
 
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
