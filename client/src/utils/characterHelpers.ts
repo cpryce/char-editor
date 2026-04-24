@@ -1,4 +1,6 @@
 import type { CharacterDraft, AbilityScore, Skill, Race, Size, ClassName, FeatSlot } from '../types/character';
+import { getClassFeatures } from '../data/classFeatures';
+export type { DerivedClassFeature } from '../data/classFeatures';
 
 // ── Racial ability adjustments (mirrors server coreMechanics) ────────────────
 
@@ -174,6 +176,7 @@ const CLASS_PROFICIENCY_FEATS: Readonly<Record<ClassName, ReadonlyArray<ClassFea
 };
 
 const FIGHTER_BONUS_FEAT_LEVELS_LIST = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20] as const;
+const WIZARD_BONUS_FEAT_LEVELS_LIST = [5, 10, 15, 20] as const;
 
 const STANDARD_FEAT_LEVELS: readonly number[] = [1, 3, 6, 9, 12, 15, 18];
 
@@ -193,6 +196,24 @@ export function deriveAutoFeats(classes: CharacterDraft['classes']): ClassFeatEn
   });
 
   return Array.from(classFeatMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Returns all class features for the character's current classes and levels,
+ * sorted by class name then minLevel.
+ */
+export function deriveClassFeatures(classes: CharacterDraft['classes']) {
+  return classes
+    .flatMap((entry) => {
+      const className = entry.name as ClassName;
+      const level = Math.max(0, Math.trunc(entry.level || 0));
+      if (!className || level === 0) return [];
+      return getClassFeatures(className, level);
+    })
+    .sort((a, b) => {
+      const cmp = a.className.localeCompare(b.className);
+      return cmp !== 0 ? cmp : a.minLevel - b.minLevel;
+    });
 }
 
 /**
@@ -230,6 +251,20 @@ export function deriveSelectableFeats(
         type: 'Fighter Bonus Feat',
         source: 'Fighter Bonus Feat',
         sourceLabel: `Fighter Level ${slotLevel}`,
+      });
+    });
+  });
+
+  // 4. Wizard bonus feats (metamagic, item creation, or Spell Mastery at 5, 10, 15, 20)
+  classes.forEach((entry) => {
+    if (entry.name !== 'Wizard') return;
+    const level = Math.max(0, Math.trunc(entry.level || 0));
+    WIZARD_BONUS_FEAT_LEVELS_LIST.filter((l) => l <= level).forEach((slotLevel) => {
+      slots.push({
+        name: '',
+        type: 'General',
+        source: 'Bonus Feat',
+        sourceLabel: `Wizard Level ${slotLevel}`,
       });
     });
   });
@@ -363,7 +398,7 @@ const SKILL_DEFS: { name: string; keyAbility: string | null; trainedOnly: boolea
   { name: 'Use Rope',                              keyAbility: 'dexterity',   trainedOnly: false, armorCheckPenalty: false },
 ];
 
-const BLANK_SCORE: AbilityScore = { base: 8, racial: 0, enhancement: 0, misc: 0, temp: 0 };
+const BLANK_SCORE: AbilityScore = { base: 8, racial: 0, enhancement: 0, misc: 0, temp: 0, levelUp: 0 };
 
 export function clampAbilityBaseScore(score: number) {
   if (Number.isNaN(score)) return 8;
@@ -400,7 +435,7 @@ export function abilityModifier(score: number) {
 }
 
 export function totalScore(s: AbilityScore) {
-  return s.base + s.racial + s.enhancement + s.misc + s.temp;
+  return s.base + s.racial + s.enhancement + s.misc + s.temp + s.levelUp;
 }
 
 export function computeSkillBonus(

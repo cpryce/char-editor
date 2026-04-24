@@ -11,6 +11,7 @@ const abilityScoreSchema = new Schema(
     enhancement: { type: Number, default: 0 },
     misc:        { type: Number, default: 0 },
     temp:        { type: Number, default: 0 },
+    levelUp:     { type: Number, default: 0 },
   },
   { _id: false },
 );
@@ -128,12 +129,12 @@ export interface ICharacter extends Document {
 
   // Ability Scores
   abilityScores: {
-    strength:     { base: number; racial: number; enhancement: number; misc: number; temp: number };
-    dexterity:    { base: number; racial: number; enhancement: number; misc: number; temp: number };
-    constitution: { base: number; racial: number; enhancement: number; misc: number; temp: number };
-    intelligence: { base: number; racial: number; enhancement: number; misc: number; temp: number };
-    wisdom:       { base: number; racial: number; enhancement: number; misc: number; temp: number };
-    charisma:     { base: number; racial: number; enhancement: number; misc: number; temp: number };
+    strength:     { base: number; racial: number; enhancement: number; misc: number; temp: number; levelUp: number };
+    dexterity:    { base: number; racial: number; enhancement: number; misc: number; temp: number; levelUp: number };
+    constitution: { base: number; racial: number; enhancement: number; misc: number; temp: number; levelUp: number };
+    intelligence: { base: number; racial: number; enhancement: number; misc: number; temp: number; levelUp: number };
+    wisdom:       { base: number; racial: number; enhancement: number; misc: number; temp: number; levelUp: number };
+    charisma:     { base: number; racial: number; enhancement: number; misc: number; temp: number; levelUp: number };
   };
 
   // Hit Points

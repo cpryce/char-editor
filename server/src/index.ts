@@ -7,6 +7,7 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import mongoose from 'mongoose';
 import { User } from './models/User';
 import { Character } from './models/Character';
+import { CustomFeat } from './models/CustomFeat';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -154,7 +155,7 @@ app.put('/api/characters/:id', async (req, res) => {
     const character = await Character.findOneAndUpdate(
       { _id: req.params.id, owner: u._id },
       { $set: req.body },
-      { new: true, runValidators: true },
+      { returnDocument: 'after', runValidators: true },
     );
     if (!character) { res.status(404).json({ error: 'Not found' }); return; }
     res.json(character);
@@ -172,6 +173,70 @@ app.delete('/api/characters/:id', async (req, res) => {
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const character = await Character.findOneAndDelete({ _id: req.params.id, owner: u._id });
   if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+  res.status(204).end();
+});
+
+// ── Custom Feat routes ──────────────────────────────────────────
+
+app.get('/api/custom-feats', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const feats = await CustomFeat.find({ owner: u._id }).sort({ name: 1 });
+  res.json(feats);
+});
+
+app.post('/api/custom-feats', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  try {
+    const feat = await CustomFeat.create({ ...req.body, owner: u._id });
+    res.status(201).json(feat);
+  } catch (err: unknown) {
+    if (err instanceof mongoose.Error.ValidationError) {
+      res.status(400).json({ error: err.message });
+    } else if ((err as { code?: number }).code === 11000) {
+      res.status(409).json({ error: 'A custom feat with this name already exists.' });
+    } else {
+      throw err;
+    }
+  }
+});
+
+app.get('/api/custom-feats/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const feat = await CustomFeat.findOne({ _id: req.params.id, owner: u._id });
+  if (!feat) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json(feat);
+});
+
+app.put('/api/custom-feats/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  try {
+    const feat = await CustomFeat.findOneAndUpdate(
+      { _id: req.params.id, owner: u._id },
+      { $set: req.body },
+      { returnDocument: 'after', runValidators: true },
+    );
+    if (!feat) { res.status(404).json({ error: 'Not found' }); return; }
+    res.json(feat);
+  } catch (err: unknown) {
+    if (err instanceof mongoose.Error.ValidationError) {
+      res.status(400).json({ error: err.message });
+    } else if ((err as { code?: number }).code === 11000) {
+      res.status(409).json({ error: 'A custom feat with this name already exists.' });
+    } else {
+      throw err;
+    }
+  }
+});
+
+app.delete('/api/custom-feats/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const feat = await CustomFeat.findOneAndDelete({ _id: req.params.id, owner: u._id });
+  if (!feat) { res.status(404).json({ error: 'Not found' }); return; }
   res.status(204).end();
 });
 

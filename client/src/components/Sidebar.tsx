@@ -7,7 +7,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'characters', label: 'Characters' },
   { id: 'custom-skills', label: 'Custom Skills', placeholder: true },
-  { id: 'custom-feats', label: 'Custom Feats', placeholder: true },
+  { id: 'custom-feats', label: 'Custom Feats' },
 ];
 
 interface SidebarProps {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { CharactersPage } from './pages/CharactersPage';
 import { CharacterEditor } from './pages/CharacterEditor';
+import { CustomFeatsPage } from './pages/CustomFeatsPage';
 
 interface User {
   id: string;
@@ -10,7 +11,7 @@ interface User {
   avatar?: string;
 }
 
-type Section = 'characters';
+type Section = 'characters' | 'custom-feats';
 type View = 'list' | 'new' | 'edit';
 type Theme = 'light' | 'dark';
 
@@ -330,6 +331,9 @@ function App() {
       <div className="flex flex-1 overflow-hidden">
         <Sidebar active={section} onNavigate={(id) => { setSection(id as Section); setView('list'); }} />
         <main className="flex-1 overflow-y-auto">
+          {section === 'custom-feats' && (
+            <CustomFeatsPage />
+          )}
           {section === 'characters' && view === 'list' && (
             <CharactersPage
               onNewCharacter={() => {

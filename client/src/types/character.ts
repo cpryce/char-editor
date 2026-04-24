@@ -35,6 +35,7 @@ export interface AbilityScore {
   enhancement: number;
   misc: number;
   temp: number;
+  levelUp: number;
 }
 
 export interface Skill {
@@ -62,6 +63,7 @@ export interface FeatSlot {
   type: 'General' | 'Fighter Bonus Feat';
   source: 'Character Feat' | 'Bonus Feat' | 'Fighter Bonus Feat' | 'Special';
   sourceLabel: string; // display label, e.g. "Character Level 1", "Fighter Level 1"
+  shortDescription?: string; // from SRD catalog; undefined for custom/free-text feats
 }
 
 // ── Full character form state ─────────────────────────────────────────────────
