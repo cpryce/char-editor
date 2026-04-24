@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { CharactersPage } from './pages/CharactersPage';
 import { CharacterEditor } from './pages/CharacterEditor';
 import { CustomFeatsPage } from './pages/CustomFeatsPage';
+import { InitiativeTrackerPage } from './pages/InitiativeTrackerPage';
 
 interface User {
   id: string;
@@ -11,7 +12,7 @@ interface User {
   avatar?: string;
 }
 
-type Section = 'characters' | 'custom-feats';
+type Section = 'characters' | 'custom-feats' | 'initiative-tracker';
 type View = 'list' | 'new' | 'edit';
 type Theme = 'light' | 'dark';
 
@@ -329,10 +330,22 @@ function App() {
 
       {/* Body: sidebar + content */}
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar active={section} onNavigate={(id) => { setSection(id as Section); setView('list'); }} />
+        <Sidebar active={section === 'characters' && view === 'new' ? 'characters-new' : section} onNavigate={(id) => {
+            if (id === 'characters-new') {
+              setSection('characters');
+              setSelectedCharacterId(null);
+              setView('new');
+            } else {
+              setSection(id as Section);
+              setView('list');
+            }
+          }} />
         <main className="flex-1 overflow-y-auto pb-6">
           {section === 'custom-feats' && (
             <CustomFeatsPage />
+          )}
+          {section === 'initiative-tracker' && (
+            <InitiativeTrackerPage />
           )}
           {section === 'characters' && view === 'list' && (
             <CharactersPage

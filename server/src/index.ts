@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 import { User } from './models/User';
 import { Character } from './models/Character';
 import { CustomFeat } from './models/CustomFeat';
+import { EncounterSession } from './models/EncounterSession';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -117,7 +118,7 @@ app.get('/api/characters', async (req, res) => {
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const characters = await Character.find(
     { owner: u._id },
-    { name: 1, classes: 1, updatedAt: 1 },
+    { name: 1, classes: 1, updatedAt: 1, 'abilityScores.dexterity': 1, 'combat.initiative.miscBonus': 1 },
   ).sort({ updatedAt: -1 });
   res.json(characters);
 });
@@ -237,6 +238,64 @@ app.delete('/api/custom-feats/:id', async (req, res) => {
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const feat = await CustomFeat.findOneAndDelete({ _id: req.params.id, owner: u._id });
   if (!feat) { res.status(404).json({ error: 'Not found' }); return; }
+  res.status(204).end();
+});
+
+// ── Encounter Sessions ──────────────────────────────────────────
+
+const MAX_SESSIONS = 5;
+
+app.get('/api/sessions', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const sessions = await EncounterSession.find({ userId: u._id }).sort({ lastAccessed: -1 }).lean();
+  res.json(sessions.map((s) => ({ ...s, id: s._id.toString() })));
+});
+
+app.post('/api/sessions', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const count = await EncounterSession.countDocuments({ userId: u._id });
+  if (count >= MAX_SESSIONS) {
+    res.status(400).json({ error: `Maximum of ${MAX_SESSIONS} sessions reached.` });
+    return;
+  }
+  const { name } = req.body as { name?: string };
+  if (!name?.trim()) { res.status(400).json({ error: 'Name is required.' }); return; }
+  const session = await EncounterSession.create({ userId: u._id, name: name.trim() });
+  res.status(201).json({ ...session.toObject(), id: session._id.toString() });
+});
+
+app.get('/api/sessions/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const session = await EncounterSession.findOne({ _id: req.params.id, userId: u._id }).lean();
+  if (!session) { res.status(404).json({ error: 'Not found' }); return; }
+  await EncounterSession.updateOne({ _id: session._id }, { lastAccessed: new Date() });
+  res.json({ ...session, id: session._id.toString() });
+});
+
+app.put('/api/sessions/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const { name, players } = req.body as { name?: string; players?: unknown };
+  const update: Record<string, unknown> = { lastAccessed: new Date() };
+  if (name !== undefined) update.name = name.trim();
+  if (players !== undefined) update.players = players;
+  const encSession = await EncounterSession.findOneAndUpdate(
+    { _id: req.params.id, userId: u._id },
+    update,
+    { returnDocument: 'after', runValidators: true }
+  ).lean();
+  if (!encSession) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json({ ...encSession, id: encSession._id.toString() });
+});
+
+app.delete('/api/sessions/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const encSession = await EncounterSession.findOneAndDelete({ _id: req.params.id, userId: u._id });
+  if (!encSession) { res.status(404).json({ error: 'Not found' }); return; }
   res.status(204).end();
 });
 
