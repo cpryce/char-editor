@@ -17,10 +17,12 @@ const PORT = process.env.PORT ?? 3001;
 const MONGO_URI = process.env.MONGO_URI ?? '';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
+const COOKIE_SAME_SITE = (process.env.COOKIE_SAME_SITE ?? 'lax') as 'lax' | 'strict' | 'none';
+const COOKIE_SECURE = process.env.COOKIE_SECURE === 'false' ? false : IS_PRODUCTION;
 
 // ── Middleware ──────────────────────────────────────────────────
 if (IS_PRODUCTION) {
-  app.set('trust proxy', 1);
+  app.set('trust proxy', true);
 }
 
 app.use(cors({ origin: process.env.CLIENT_URL ?? 'http://localhost:5173', credentials: true }));
@@ -30,11 +32,12 @@ const sessionConfig: session.SessionOptions = {
   secret: process.env.SESSION_SECRET ?? 'fallback_secret',
   resave: false,
   saveUninitialized: false,
+  proxy: IS_PRODUCTION,
   cookie: {
     maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
-    sameSite: 'lax',
-    secure: IS_PRODUCTION,
+    sameSite: COOKIE_SAME_SITE,
+    secure: COOKIE_SAME_SITE === 'none' ? true : COOKIE_SECURE,
     ...(COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {}),
   },
 };
