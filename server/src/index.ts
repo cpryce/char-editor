@@ -16,42 +16,18 @@ const app = express();
 const PORT = process.env.PORT ?? 3001;
 const MONGO_URI = process.env.MONGO_URI ?? '';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
+const SESSION_COOKIE_NAME = 'connect.sid';
 const COOKIE_SAME_SITE = (process.env.COOKIE_SAME_SITE ?? (IS_PRODUCTION ? 'none' : 'lax')) as 'lax' | 'strict' | 'none';
 const COOKIE_SECURE = process.env.COOKIE_SECURE === 'false' ? false : IS_PRODUCTION;
 const AUTH_DEBUG = process.env.AUTH_DEBUG === 'true';
 
 // ── Middleware ──────────────────────────────────────────────────
-if (IS_PRODUCTION) {
-  app.set('trust proxy', true);
-}
+app.set('trust proxy', 1);
 
 app.use(cors({ origin: process.env.CLIENT_URL ?? 'http://localhost:5173', credentials: true }));
 app.use(express.json());
 
-const sessionConfig: session.SessionOptions = {
-  secret: process.env.SESSION_SECRET ?? 'fallback_secret',
-  resave: false,
-  saveUninitialized: false,
-  proxy: IS_PRODUCTION,
-  cookie: {
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: COOKIE_SAME_SITE,
-    secure: COOKIE_SAME_SITE === 'none' ? true : COOKIE_SECURE,
-    ...(COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {}),
-  },
-};
-
-if (MONGO_URI) {
-  sessionConfig.store = MongoStore.create({
-    mongoUrl: MONGO_URI,
-    collectionName: 'sessions',
-    ttl: 14 * 24 * 60 * 60,
-  });
-}
-
-app.use(session(sessionConfig));
+// session middleware is applied inside start() after DB connects
 
 function authDebugLog(event: string, req: express.Request, extra: Record<string, unknown> = {}) {
   if (!AUTH_DEBUG) return;
@@ -111,9 +87,6 @@ passport.deserializeUser(async (id: string, done) => {
   }
 });
 
-app.use(passport.initialize());
-app.use(passport.session());
-
 // ── Routes ──────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
@@ -140,22 +113,43 @@ app.get(
     });
     next();
   },
-  passport.authenticate('google', {
-    failureRedirect: `${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=auth_failed`,
-  }),
-  (req, res) => {
-    authDebugLog('oauth_callback_authenticated', req, {
-      userId: (req.user as { _id?: mongoose.Types.ObjectId } | undefined)?._id?.toString() ?? null,
-      sessionPassport: Boolean((req.session as { passport?: unknown })?.passport),
-    });
-    req.session.save((err) => {
+  (req, res, next) => {
+    passport.authenticate('google', (err: unknown, user: Express.User | false, info: unknown) => {
       if (err) {
-        console.error('Session save error:', err);
-        return res.redirect(`${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=session_failed`);
+        console.error('OAuth callback error:', err);
+        authDebugLog('oauth_callback_error', req, { err: String(err) });
+        return res.redirect(`${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=auth_error`);
       }
-      authDebugLog('oauth_callback_session_saved', req);
-      res.redirect(process.env.CLIENT_URL ?? 'http://localhost:5173');
-    });
+
+      if (!user) {
+        authDebugLog('oauth_callback_no_user', req, { info: JSON.stringify(info ?? null) });
+        return res.redirect(`${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=auth_failed`);
+      }
+
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error('OAuth login session error:', loginErr);
+          authDebugLog('oauth_callback_login_error', req, { err: String(loginErr) });
+          return res.redirect(`${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=login_failed`);
+        }
+
+        authDebugLog('oauth_callback_authenticated', req, {
+          userId: (req.user as { _id?: mongoose.Types.ObjectId } | undefined)?._id?.toString() ?? null,
+          sessionPassport: Boolean((req.session as { passport?: unknown })?.passport),
+        });
+
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error('Session save error:', saveErr);
+            authDebugLog('oauth_callback_session_save_error', req, { err: String(saveErr) });
+            return res.redirect(`${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=session_failed`);
+          }
+
+          authDebugLog('oauth_callback_session_saved', req);
+          return res.redirect(process.env.CLIENT_URL ?? 'http://localhost:5173');
+        });
+      });
+    })(req, res, next);
   },
 );
 
@@ -184,9 +178,9 @@ app.get('/api/auth/debug', (req, res) => {
       callbackUri: process.env.CALLBACK_URI ?? null,
       trustProxy: app.get('trust proxy'),
       cookie: {
+        name: SESSION_COOKIE_NAME,
         sameSite: COOKIE_SAME_SITE,
         secure: COOKIE_SAME_SITE === 'none' ? true : COOKIE_SECURE,
-        domain: COOKIE_DOMAIN ?? null,
       },
     },
     request: {
@@ -214,7 +208,7 @@ app.post('/auth/logout', (req, res, next) => {
     if (err) return next(err);
     req.session.destroy((sessionErr) => {
       if (sessionErr) return next(sessionErr);
-      res.clearCookie('connect.sid');
+      res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
       res.json({ ok: true });
     });
   });
@@ -426,6 +420,28 @@ async function start() {
     await mongoose.connect(MONGO_URI);
     console.log('Connected to MongoDB');
   }
+
+  // Session middleware applied here so MongoStore is ready before any requests
+  const store = MONGO_URI
+    ? MongoStore.create({ mongoUrl: MONGO_URI, collectionName: 'sessions', ttl: 14 * 24 * 60 * 60 })
+    : undefined;
+
+  app.use(session({
+    name: SESSION_COOKIE_NAME,
+    secret: process.env.SESSION_SECRET ?? 'fallback_secret',
+    resave: false,
+    saveUninitialized: true,
+    store,
+    cookie: {
+      httpOnly: true,
+      sameSite: COOKIE_SAME_SITE,
+      secure: COOKIE_SAME_SITE === 'none' ? true : COOKIE_SECURE,
+      maxAge: 24 * 60 * 60 * 1000,
+    },
+  }));
+
+  app.use(passport.initialize());
+  app.use(passport.session());
 
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
