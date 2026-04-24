@@ -19,7 +19,6 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const SESSION_COOKIE_NAME = 'connect.sid';
 const COOKIE_SAME_SITE = (process.env.COOKIE_SAME_SITE ?? (IS_PRODUCTION ? 'none' : 'lax')) as 'lax' | 'strict' | 'none';
 const COOKIE_SECURE = process.env.COOKIE_SECURE === 'false' ? false : IS_PRODUCTION;
-const AUTH_DEBUG = process.env.AUTH_DEBUG === 'true';
 
 // ── Middleware ──────────────────────────────────────────────────
 app.set('trust proxy', 1);
@@ -47,24 +46,6 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000,
   },
 }));
-
-function authDebugLog(event: string, req: express.Request, extra: Record<string, unknown> = {}) {
-  if (!AUTH_DEBUG) return;
-  console.log('[auth-debug]', {
-    event,
-    method: req.method,
-    path: req.path,
-    sid: req.sessionID ?? null,
-    hasCookieHeader: Boolean(req.headers.cookie),
-    forwardedProto: req.headers['x-forwarded-proto'] ?? null,
-    forwardedHost: req.headers['x-forwarded-host'] ?? null,
-    host: req.headers.host ?? null,
-    origin: req.headers.origin ?? null,
-    referer: req.headers.referer ?? null,
-    isAuthenticated: typeof req.isAuthenticated === 'function' ? req.isAuthenticated() : false,
-    ...extra,
-  });
-}
 
 // ── Passport ────────────────────────────────────────────────────
 passport.use(new GoogleStrategy(
@@ -116,10 +97,6 @@ app.get('/api/health', (_req, res) => {
 
 app.get(
   '/auth/google',
-  (req, _res, next) => {
-    authDebugLog('oauth_start', req);
-    next();
-  },
   passport.authenticate('google', {
     scope: ['profile', 'email'],
     prompt: 'select_account',
@@ -128,101 +105,24 @@ app.get(
 
 app.get(
   '/auth/google/callback',
-  (req, _res, next) => {
-    authDebugLog('oauth_callback_entry', req, {
-      codePresent: typeof req.query.code === 'string',
-      statePresent: typeof req.query.state === 'string',
+  passport.authenticate('google', {
+    failureRedirect: `${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=auth_failed`,
+  }),
+  (req, res) => {
+    req.session.save((err) => {
+      if (err) return res.redirect(`${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=session_failed`);
+      res.redirect(process.env.CLIENT_URL ?? 'http://localhost:5173');
     });
-    next();
-  },
-  (req, res, next) => {
-    passport.authenticate('google', (err: unknown, user: Express.User | false, info: unknown) => {
-      if (err) {
-        console.error('OAuth callback error:', err);
-        authDebugLog('oauth_callback_error', req, { err: String(err) });
-        return res.redirect(`${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=auth_error`);
-      }
-
-      if (!user) {
-        authDebugLog('oauth_callback_no_user', req, { info: JSON.stringify(info ?? null) });
-        return res.redirect(`${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=auth_failed`);
-      }
-
-      req.logIn(user, (loginErr) => {
-        if (loginErr) {
-          console.error('OAuth login session error:', loginErr);
-          authDebugLog('oauth_callback_login_error', req, { err: String(loginErr) });
-          return res.redirect(`${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=login_failed`);
-        }
-
-        authDebugLog('oauth_callback_authenticated', req, {
-          userId: (req.user as { _id?: mongoose.Types.ObjectId } | undefined)?._id?.toString() ?? null,
-          sessionPassport: Boolean((req.session as { passport?: unknown })?.passport),
-        });
-
-        req.session.save((saveErr) => {
-          if (saveErr) {
-            console.error('Session save error:', saveErr);
-            authDebugLog('oauth_callback_session_save_error', req, { err: String(saveErr) });
-            return res.redirect(`${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=session_failed`);
-          }
-
-          authDebugLog('oauth_callback_session_saved', req);
-          return res.redirect(process.env.CLIENT_URL ?? 'http://localhost:5173');
-        });
-      });
-    })(req, res, next);
   },
 );
 
 app.get('/auth/me', (req, res) => {
-  authDebugLog('auth_me', req, {
-    sessionPassport: Boolean((req.session as { passport?: unknown })?.passport),
-  });
   if (req.isAuthenticated()) {
     const u = req.user as { _id: mongoose.Types.ObjectId; name?: string; email: string; avatar?: string };
     res.json({ id: u._id, name: u.name, email: u.email, avatar: u.avatar });
   } else {
     res.status(401).json({ error: 'Not authenticated' });
   }
-});
-
-app.get('/api/auth/debug', (req, res) => {
-  if (!AUTH_DEBUG) {
-    res.status(404).json({ error: 'Not found' });
-    return;
-  }
-
-  res.json({
-    env: {
-      nodeEnv: process.env.NODE_ENV ?? null,
-      clientUrl: process.env.CLIENT_URL ?? null,
-      callbackUri: process.env.CALLBACK_URI ?? null,
-      trustProxy: app.get('trust proxy'),
-      cookie: {
-        name: SESSION_COOKIE_NAME,
-        sameSite: COOKIE_SAME_SITE,
-        secure: COOKIE_SAME_SITE === 'none' ? true : COOKIE_SECURE,
-      },
-    },
-    request: {
-      host: req.headers.host ?? null,
-      forwardedHost: req.headers['x-forwarded-host'] ?? null,
-      forwardedProto: req.headers['x-forwarded-proto'] ?? null,
-      origin: req.headers.origin ?? null,
-      referer: req.headers.referer ?? null,
-      hasCookieHeader: Boolean(req.headers.cookie),
-    },
-    session: {
-      sid: req.sessionID ?? null,
-      hasSession: Boolean(req.session),
-      sessionPassport: Boolean((req.session as { passport?: unknown })?.passport),
-    },
-    auth: {
-      isAuthenticated: req.isAuthenticated(),
-      userId: (req.user as { _id?: mongoose.Types.ObjectId } | undefined)?._id?.toString() ?? null,
-    },
-  });
 });
 
 app.post('/auth/logout', (req, res, next) => {
