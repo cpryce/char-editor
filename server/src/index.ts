@@ -32,8 +32,9 @@ const sessionConfig: session.SessionOptions = {
   cookie: {
     maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'none',
     secure: IS_PRODUCTION,
+    domain: IS_PRODUCTION ? '.up.railway.app' : undefined,
   },
 };
 
@@ -108,8 +109,14 @@ app.get(
   passport.authenticate('google', {
     failureRedirect: `${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=auth_failed`,
   }),
-  (_req, res) => {
-    res.redirect(process.env.CLIENT_URL ?? 'http://localhost:5173');
+  (req, res) => {
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.redirect(`${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=session_failed`);
+      }
+      res.redirect(process.env.CLIENT_URL ?? 'http://localhost:5173');
+    });
   },
 );
 
