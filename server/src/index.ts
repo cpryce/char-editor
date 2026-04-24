@@ -16,6 +16,7 @@ const app = express();
 const PORT = process.env.PORT ?? 3001;
 const MONGO_URI = process.env.MONGO_URI ?? '';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
 
 // ── Middleware ──────────────────────────────────────────────────
 if (IS_PRODUCTION) {
@@ -32,9 +33,9 @@ const sessionConfig: session.SessionOptions = {
   cookie: {
     maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
-    sameSite: 'none',
+    sameSite: 'lax',
     secure: IS_PRODUCTION,
-    domain: IS_PRODUCTION ? '.up.railway.app' : undefined,
+    ...(COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {}),
   },
 };
 
