@@ -2,9 +2,11 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
+import MongoStore from 'connect-mongo';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import mongoose from 'mongoose';
+import path from 'path';
 import { User } from './models/User';
 import { Character } from './models/Character';
 import { CustomFeat } from './models/CustomFeat';
@@ -13,16 +15,37 @@ import { EncounterSession } from './models/EncounterSession';
 const app = express();
 const PORT = process.env.PORT ?? 3001;
 const MONGO_URI = process.env.MONGO_URI ?? '';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 // ── Middleware ──────────────────────────────────────────────────
+if (IS_PRODUCTION) {
+  app.set('trust proxy', 1);
+}
+
 app.use(cors({ origin: process.env.CLIENT_URL ?? 'http://localhost:5173', credentials: true }));
 app.use(express.json());
-app.use(session({
+
+const sessionConfig: session.SessionOptions = {
   secret: process.env.SESSION_SECRET ?? 'fallback_secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 },
-}));
+  cookie: {
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: IS_PRODUCTION,
+  },
+};
+
+if (MONGO_URI) {
+  sessionConfig.store = MongoStore.create({
+    mongoUrl: MONGO_URI,
+    collectionName: 'sessions',
+    ttl: 14 * 24 * 60 * 60,
+  });
+}
+
+app.use(session(sessionConfig));
 
 // ── Passport ────────────────────────────────────────────────────
 passport.use(new GoogleStrategy(
@@ -35,11 +58,12 @@ passport.use(new GoogleStrategy(
     try {
       let user = await User.findOne({ googleId: profile.id });
       if (!user) {
+        const avatar = profile.photos?.[0]?.value;
         user = await User.create({
           googleId: profile.id,
           email: profile.emails?.[0]?.value ?? '',
           name: profile.displayName,
-          avatar: profile.photos?.[0]?.value,
+          ...(avatar ? { avatar } : {}),
         });
       }
       done(null, user);
@@ -298,6 +322,14 @@ app.delete('/api/sessions/:id', async (req, res) => {
   if (!encSession) { res.status(404).json({ error: 'Not found' }); return; }
   res.status(204).end();
 });
+
+if (IS_PRODUCTION) {
+  const clientDist = path.resolve(__dirname, '../../client/dist');
+  app.use(express.static(clientDist));
+  app.get(/^\/(?!api|auth).*/, (_req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
 
 // ── Database & boot ─────────────────────────────────────────────
 async function start() {

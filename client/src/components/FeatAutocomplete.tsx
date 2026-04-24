@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ALL_FEATS, FEAT_BY_NAME } from '../data/feats';
 import type { FeatCategory, FeatCatalogEntry } from '../data/feats';
 
-export type { FeatCategory };
+export type { FeatCategory, FeatCatalogEntry };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
