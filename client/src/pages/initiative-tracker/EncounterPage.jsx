@@ -336,6 +336,7 @@ export function EncounterPage({ sessionId, onBack }) {
       >
         <button
           onClick={onBack}
+          aria-label="All encounters"
           style={{
             color: 'var(--color-fg-muted)',
             backgroundColor: 'transparent',
@@ -375,6 +376,12 @@ export function EncounterPage({ sessionId, onBack }) {
           onBlurCapture={(e) => { e.target.style.borderColor = 'transparent'; }}
         />
         {saving && <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>Saving…</span>}
+        <svg width="24" height="24" viewBox="0 0 512 512" fill="none" aria-hidden="true" style={{ display: 'block', flexShrink: 0, marginLeft: 'auto' }}>
+          <path
+            fill="var(--color-fg-default)"
+            d="M66.54 18.002c-.327-.007-.655-.005-.98.006-4.064.136-8.105 1.634-11.39 4.535-7.508 6.632-8.218 18.094-1.586 25.602 4.394 4.974 10.906 6.945 16.986 5.792l57.838 65.475-50.373 44.498 24.188 27.38c9.69-21.368 22.255-39.484 37.427-54.65l6.91 36.188c25.092-6.29 49.834-10.563 74.366-12.873l-23.912-27.07-38.66-12.483c17.117-12.9 36.734-22.97 58.62-30.474l-24.19-27.385-50.37 44.496-57.92-65.57c1.79-5.835.617-12.43-3.72-17.34-3.498-3.96-8.34-6.03-13.235-6.128zm384.397 0c-4.895.1-9.735 2.168-13.232 6.127-4.338 4.91-5.514 11.506-3.723 17.343l-57.92 65.568-50.37-44.497-24.188 27.385c21.884 7.504 41.5 17.573 58.62 30.472l-38.66 12.485-23.255 26.324c24.71 1.863 49.367 5.706 74.118 11.46l6.498-34.03c15.173 15.166 27.74 33.282 37.43 54.65l24.185-27.38-50.372-44.498 57.838-65.475c6.08 1.153 12.593-.818 16.987-5.792 6.63-7.508 5.92-18.97-1.586-25.602-3.285-2.9-7.326-4.4-11.39-4.535-.326-.01-.653-.013-.98-.006zm-186.425 158.51c-39.56-.098-79.467 5.226-120.633 16.095-2.046 90.448 34.484 209.35 118.47 259.905 81.295-49.13 122.402-169.902 120.552-259.914-39.75-10.496-78.91-15.988-118.39-16.086zm-117.176 153.5L60.47 428.35l-12.2 63.894 61.9-19.994 68.49-77.535c-12.86-20.108-23.246-42.03-31.324-64.703zm228.203 6.11c-8.69 22.238-19.577 43.634-32.706 63.142l64.473 72.986 61.898 19.994-12.2-63.894-81.466-92.23z"
+          />
+        </svg>
       </div>
 
       <div className="px-6 py-6">
@@ -384,27 +391,35 @@ export function EncounterPage({ sessionId, onBack }) {
           <div className="flex gap-2">
             <button
               onClick={() => addCombatant('player')}
+              aria-label="Add Player"
               title="Add Player"
               style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-canvas-default)', cursor: 'pointer' }}
             >
               <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-fg-muted)', lineHeight: 1 }}>+</span>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--color-fg-default)" aria-label="Player" style={{ display: 'block' }}>
-                <circle cx="12" cy="7" r="4" />
-                <path d="M4 21 C4 16 8 13 12 13 C16 13 20 16 20 21" strokeLinecap="round" />
+              <svg width="24" height="24" viewBox="0 0 512 512" fill="none" aria-hidden="true" style={{ display: 'block' }}>
+                <path
+                  fill="var(--color-fg-default)"
+                  d="M255.406 17.75C189.313 39.42 124.536 85.124 79.03 150.344c21.238 57.44 32.72 94.314 32.72 131.375 0 36.493-11.52 73.723-32.125 129.655 49.72 36.73 100.08 58.95 150.313 64.938-5.052-60.378-9.83-120.748 1.593-181.125-30.644-3.28-61.384-13.286-92.03-30.72v-71.312c80.67 42.255 158.908 41.547 242.063 0v71.313c-30.06 14.376-60.192 24.722-90.25 29.28 8.684 60.46 7.723 120.915 2.03 181.375 46.386-7.335 92.89-28.824 139.032-64.312-33.966-112.954-34.03-145.933.594-260.47C391.162 84.844 317.924 39.89 255.405 17.75zm-75.125 212c-11.16-.13-19.646 3.174-21.25 9.156-2.33 8.7 10.778 19.76 29.282 24.72 18.505 4.957 35.388 1.92 37.72-6.782 2.33-8.7-10.775-19.76-29.282-24.72-5.783-1.55-11.396-2.315-16.47-2.374zm160.69 0c-5.074.06-10.687.825-16.47 2.375-18.507 4.96-31.613 16.018-29.28 24.72 2.33 8.7 19.213 11.738 37.717 6.78 18.505-4.958 31.613-16.018 29.282-24.72-1.604-5.98-10.09-9.286-21.25-9.155z"
+                />
               </svg>
             </button>
             <button
               onClick={openCharPicker}
-              title="Import from Character List"
+              aria-label="Import from characters"
+              title="Import from characters"
               style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-canvas-default)', cursor: 'pointer' }}
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-fg-default)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-label="Import from characters" style={{ display: 'block' }}>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-fg-muted)', lineHeight: 1 }}>+</span>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-fg-default)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: 'block' }}>
                 <rect x="4" y="3" width="16" height="18" rx="2" />
                 <path d="M8 7h8M8 11h8M8 15h5" />
+                <path d="M17 14v6" />
+                <path d="M14 17h6" />
               </svg>
             </button>
             <button
               onClick={() => addCombatant('npc')}
+              aria-label="Add NPC"
               title="Add NPC"
               style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-canvas-default)', cursor: 'pointer' }}
             >
@@ -413,7 +428,7 @@ export function EncounterPage({ sessionId, onBack }) {
                 width="24"
                 height="24"
                 viewBox="0 0 33.866668 33.866668"
-                aria-label="NPC Dragon"
+                aria-hidden="true"
                 style={{ display: 'block' }}
                 fill="var(--color-fg-default)"
               >
@@ -442,6 +457,7 @@ export function EncounterPage({ sessionId, onBack }) {
             {!started && (
               <button
                 onClick={() => setStarted(true)}
+                aria-label="Start combat"
                 style={{
                   ...iconBtnStyle('primary'),
                   padding: '4px 12px',
@@ -456,10 +472,10 @@ export function EncounterPage({ sessionId, onBack }) {
                 ▶
               </button>
             )}
-            <button onClick={prevTurn} style={{ ...iconBtnStyle('secondary'), opacity: started ? 1 : 0.35, cursor: started ? 'pointer' : 'default' }} title="Previous turn">←</button>
-            <button onClick={nextTurn} style={{ ...iconBtnStyle('primary'), opacity: started ? 1 : 0.35, cursor: started ? 'pointer' : 'default' }} title="Next turn">→</button>
-            <button onClick={sortByInitiative} style={iconBtnStyle('secondary')} title="Sort by initiative">⇅</button>
-            <button onClick={resetRound} style={iconBtnStyle('danger')} title="Reset round">↺</button>
+            <button onClick={prevTurn} aria-label="Previous turn" style={{ ...iconBtnStyle('secondary'), opacity: started ? 1 : 0.35, cursor: started ? 'pointer' : 'default' }} title="Previous turn">←</button>
+            <button onClick={nextTurn} aria-label="Next turn" style={{ ...iconBtnStyle('primary'), opacity: started ? 1 : 0.35, cursor: started ? 'pointer' : 'default' }} title="Next turn">→</button>
+            <button onClick={sortByInitiative} aria-label="Sort by initiative" style={iconBtnStyle('secondary')} title="Sort by initiative">⇅</button>
+            <button onClick={resetRound} aria-label="Reset round" style={iconBtnStyle('danger')} title="Reset round">↺</button>
           </div>
         </div>
 
@@ -531,6 +547,8 @@ export function EncounterPage({ sessionId, onBack }) {
               </h3>
               <button
                 onClick={() => setShowCharPicker(false)}
+                aria-label="Close import from characters"
+                title="Close import from characters"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: 'var(--color-fg-muted)', lineHeight: 1, padding: '2px 4px' }}
               >✕</button>
             </div>
@@ -621,6 +639,8 @@ export function EncounterPage({ sessionId, onBack }) {
                 <button
                   onClick={importSelected}
                   disabled={pickerSelection.size === 0}
+                  aria-label={pickerSelection.size === 0 ? 'Add selected' : `Add ${pickerSelection.size} selected`}
+                  title={pickerSelection.size === 0 ? 'Add selected' : `Add ${pickerSelection.size} selected`}
                   style={{
                     padding: '6px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600,
                     border: 'none', cursor: pickerSelection.size === 0 ? 'not-allowed' : 'pointer',
