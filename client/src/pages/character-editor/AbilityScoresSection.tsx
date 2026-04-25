@@ -4,6 +4,7 @@ import {
   abilityModifier,
   totalScore,
 } from '../../utils/characterHelpers';
+import './AbilityScoresSection.css';
 
 export const ABILITY_KEYS = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'] as const;
 export type AbilityKey = (typeof ABILITY_KEYS)[number];
@@ -20,7 +21,6 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
 function AbilityScoreRow({
   label,
   score,
-  inputStyle,
   onBaseChange,
   isEdit = false,
   levelUp = 0,
@@ -33,7 +33,6 @@ function AbilityScoreRow({
 }: {
   label: string;
   score: AbilityScore;
-  inputStyle: React.CSSProperties;
   onBaseChange: (base: number) => void;
   isEdit?: boolean;
   levelUp?: number;
@@ -54,16 +53,13 @@ function AbilityScoreRow({
   const tempModStr = tempMod >= 0 ? `+${tempMod}` : `${tempMod}`;
 
   return (
-    <div
-      className="flex items-center gap-3 py-1"
-      style={{ borderBottom: '1px solid var(--color-border-muted)' }}
-    >
-      <span className="w-8 text-xs font-semibold" style={{ color: 'var(--color-fg-default)' }}>
+    <div className="flex items-center gap-3 py-1 ability-score-row">
+      <span className="w-8 text-xs font-semibold ability-fg-default">
         {label}
       </span>
 
       <div className="flex flex-col items-center gap-0.5">
-        <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>base</span>
+        <span className="text-xs ability-fg-subtle">base</span>
         <input
           type="number"
           aria-label={`${label} base score`}
@@ -71,20 +67,21 @@ function AbilityScoreRow({
           min={8}
           max={18}
           onChange={(e) => onBaseChange(e.target.valueAsNumber)}
-          style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px' }}
+          className="ability-number-input"
         />
       </div>
 
-      <div className="flex flex-col items-center gap-0.5" style={{ minWidth: 44 }}>
-        <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>racial</span>
+      <div className="flex flex-col items-center gap-0.5 ability-racial-wrap">
+        <span className="text-xs ability-fg-subtle">racial</span>
         <span
-          className="text-sm font-medium"
-          style={{
-            color: score.racial === 0 ? 'var(--color-fg-subtle)' : score.racial > 0 ? 'var(--color-success-fg)' : 'var(--color-danger-fg)',
-            minWidth: 28,
-            textAlign: 'center',
-            lineHeight: '1.6rem',
-          }}
+          className={[
+            'text-sm font-medium ability-value ability-value--line',
+            score.racial === 0
+              ? 'ability-value--neutral'
+              : score.racial > 0
+                ? 'ability-value--positive'
+                : 'ability-value--negative',
+          ].join(' ')}
         >
           {score.racial === 0 ? '0' : score.racial > 0 ? `+${score.racial}` : `${score.racial}`}
         </span>
@@ -92,20 +89,20 @@ function AbilityScoreRow({
 
       {isEdit && (
         <div className="flex flex-col items-center gap-0.5">
-          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>enh</span>
+          <span className="text-xs ability-fg-subtle">enh</span>
           <input
             type="number"
             aria-label={`${label} enhancement bonus`}
             value={score.enhancement}
             onChange={(e) => onEnhancementChange?.(e.target.valueAsNumber || 0)}
-            style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px' }}
+            className="ability-number-input"
           />
         </div>
       )}
 
       {showLevelUp && (
         <div className="flex flex-col items-center gap-0.5">
-          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>lvl up</span>
+          <span className="text-xs ability-fg-subtle">lvl up</span>
           <input
             type="number"
             aria-label={`${label} level-up bonus`}
@@ -116,31 +113,33 @@ function AbilityScoreRow({
               const next = Math.max(0, Math.min(levelUp + availableToAdd, e.target.valueAsNumber || 0));
               onLevelUpChange?.(next);
             }}
-            style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px' }}
+            className="ability-number-input"
           />
         </div>
       )}
 
       <div className="flex flex-col items-center ml-1">
-        <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>total</span>
-        <span className="text-sm font-semibold" style={{ color: 'var(--color-fg-default)', minWidth: 28, textAlign: 'center' }}>
+        <span className="text-xs ability-fg-subtle">total</span>
+        <span className="text-sm font-semibold ability-fg-default ability-value">
           {total}
         </span>
       </div>
 
       <div className="flex flex-col items-center ml-1">
-        <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>mod</span>
+        <span className="text-xs ability-fg-subtle">mod</span>
         <span
-          className="text-sm font-semibold"
-          style={{ color: mod >= 0 ? 'var(--color-success-fg)' : 'var(--color-danger-fg)', minWidth: 28, textAlign: 'center' }}
+          className={[
+            'text-sm font-semibold ability-value',
+            mod >= 0 ? 'ability-value--positive' : 'ability-value--negative',
+          ].join(' ')}
         >
           {modStr}
         </span>
       </div>
 
-      <div className="flex items-center gap-3 ml-4 pl-4" style={{ borderLeft: '1px solid var(--color-border-muted)' }}>
+      <div className="flex items-center gap-3 ml-4 pl-4 ability-temp-divider">
         <div className="flex flex-col items-center gap-0.5">
-          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>temp</span>
+          <span className="text-xs ability-fg-subtle">temp</span>
           <input
             type="number"
             aria-label={`${label} temporary score`}
@@ -149,19 +148,16 @@ function AbilityScoreRow({
               const raw = e.target.value;
               onTempScoreChange(raw === '' ? null : e.target.valueAsNumber);
             }}
-            style={{ ...inputStyle, width: 56, textAlign: 'center', padding: '2px 4px' }}
+            className="ability-number-input"
           />
         </div>
         <div className="flex flex-col items-center gap-0.5">
-          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>temp mod</span>
+          <span className="text-xs ability-fg-subtle">temp mod</span>
           <span
-            className="text-sm font-semibold"
-            style={{
-              color: tempMod >= 0 ? 'var(--color-success-fg)' : 'var(--color-danger-fg)',
-              minWidth: 28,
-              textAlign: 'center',
-              lineHeight: '1.6rem',
-            }}
+            className={[
+              'text-sm font-semibold ability-value ability-value--line',
+              tempMod >= 0 ? 'ability-value--positive' : 'ability-value--negative',
+            ].join(' ')}
           >
             {tempModStr}
           </span>
@@ -178,7 +174,6 @@ export function AbilityScoresSection({
   remainingAbilityPoints,
   earnedLevelUpPoints,
   spentLevelUpPoints,
-  inputStyle,
   onBaseChange,
   onLevelUpChange,
   onEnhancementChange,
@@ -190,7 +185,6 @@ export function AbilityScoresSection({
   remainingAbilityPoints: number;
   earnedLevelUpPoints: number;
   spentLevelUpPoints: number;
-  inputStyle: React.CSSProperties;
   onBaseChange: (key: AbilityKey, base: number) => void;
   onLevelUpChange: (key: AbilityKey, value: number) => void;
   onEnhancementChange: (key: AbilityKey, value: number) => void;
@@ -198,7 +192,7 @@ export function AbilityScoresSection({
 }) {
   return (
     <>
-      <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+      <p className="text-sm ability-fg-muted">
         {spentAbilityPoints} / {ABILITY_POINT_BUY_BUDGET} points spent · {remainingAbilityPoints} remaining
         {isEdit && earnedLevelUpPoints > 0 && (
           <> · Level-up: {spentLevelUpPoints} / {earnedLevelUpPoints} assigned</>
@@ -210,7 +204,6 @@ export function AbilityScoresSection({
             key={key}
             label={ABILITY_LABELS[key]}
             score={abilityScores[key]}
-            inputStyle={inputStyle}
             onBaseChange={(base) => onBaseChange(key, base)}
             isEdit={isEdit}
             levelUp={abilityScores[key].levelUp ?? 0}
@@ -224,7 +217,7 @@ export function AbilityScoresSection({
         ))}
       </div>
       {isEdit && (
-        <p className="text-xs mt-2" style={{ color: 'var(--color-fg-subtle)' }}>
+          <p className="text-xs mt-2 ability-fg-subtle">
           enh = permanent stat enhancement
         </p>
       )}

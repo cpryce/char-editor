@@ -1,0 +1,68 @@
+.character-editor-accordion-trigger {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--color-border-muted);
+  cursor: pointer;
+  padding: 0 0 4px 0;
+  text-align: left;
+}
+
+.character-editor-accordion-chevron {
+  transition: transform 0.15s;
+  flex-shrink: 0;
+  color: var(--color-fg-muted);
+  transform: rotate(0deg);
+}
+
+.character-editor-accordion-chevron--open {
+  transform: rotate(90deg);
+}
+
+.character-editor-accordion-title {
+  color: var(--color-fg-default);
+}
+
+.character-editor-accordion-summary {
+  color: var(--color-fg-muted);
+}
+
+.character-editor-accordion-body {
+  padding: 6px;
+  padding-bottom: 24px;
+}
+
+.character-editor-back-button {
+  width: 30px;
+  height: 30px;
+  border: none;
+  color: var(--color-fg-muted);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.character-editor-crumb-dots {
+  width: 10px;
+  color: var(--color-fg-muted);
+}
+
+.character-editor-title {
+  color: var(--color-fg-default);
+}
+
+.character-editor-muted {
+  color: var(--color-fg-muted);
+}
+
+.character-editor-danger {
+  color: var(--color-danger-fg);
+}
+
+.character-editor-required-star {
+  color: var(--color-danger-fg);
+  font-size: 0.75rem;
+}
+
+.character-editor-summary-item {
+  margin-right: 10px;
+}

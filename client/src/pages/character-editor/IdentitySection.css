@@ -1,0 +1,31 @@
+.identity-label-text {
+  color: var(--color-fg-muted);
+}
+
+.identity-required-marker {
+  color: var(--color-danger-fg);
+  margin-left: 2px;
+}
+
+.identity-input {
+  background: var(--color-canvas-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  color: var(--color-fg-default);
+  padding: 4px 8px;
+  font-size: 14px;
+  width: 100%;
+}
+
+.identity-input--error {
+  border-color: var(--color-danger-fg);
+}
+
+.identity-input--readonly {
+  color: var(--color-fg-muted);
+  cursor: default;
+}
+
+.identity-error {
+  color: var(--color-danger-fg);
+}

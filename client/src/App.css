@@ -1,0 +1,170 @@
+.app-user-menu-root {
+  position: relative;
+}
+
+.app-user-menu-trigger {
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.app-user-menu-trigger--open {
+  border-color: var(--color-border-default);
+}
+
+.app-user-menu-user-text {
+  color: var(--color-fg-muted);
+}
+
+.app-user-menu-caret {
+  color: var(--color-fg-subtle);
+}
+
+.app-user-menu-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  min-width: 180px;
+  background: var(--color-canvas-overlay);
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.app-user-menu-email {
+  color: var(--color-fg-subtle);
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.app-user-menu-action {
+  color: var(--color-fg-default);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+
+.app-user-menu-action:hover {
+  background: var(--color-canvas-subtle);
+}
+
+.app-user-menu-divider {
+  border-top: 1px solid var(--color-border-muted);
+}
+
+.app-user-menu-action--danger {
+  color: var(--color-danger-fg);
+}
+
+.app-user-menu-action--danger:hover {
+  background: var(--color-danger-subtle);
+}
+
+.app-settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.38);
+  border: none;
+  z-index: 120;
+  cursor: pointer;
+}
+
+.app-settings-flyout--open {
+  transform: translateX(0);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.app-settings-flyout--closed {
+  transform: translateX(102%);
+  box-shadow: none;
+}
+
+.app-settings-header {
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.app-settings-title {
+  color: var(--color-fg-default);
+}
+
+.settings-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+
+.settings-theme-label {
+  color: var(--color-fg-default);
+}
+
+.theme-toggle-btn {
+  width: 108px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-default);
+  background: transparent;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.app-theme-toggle-knob {
+  position: absolute;
+  top: 2px;
+  width: 52px;
+  height: 24px;
+  border-radius: 999px;
+  background: #000000;
+  transition: left 140ms ease;
+}
+
+.app-theme-toggle-knob--light {
+  left: 2px;
+}
+
+.app-theme-toggle-knob--dark {
+  left: 54px;
+}
+
+.app-theme-toggle-labels {
+  color: var(--color-fg-default);
+}
+
+.app-theme-toggle-option {
+  width: 52px;
+}
+
+.app-theme-toggle-option--active {
+  color: var(--color-fg-on-emphasis);
+}
+
+.app-theme-toggle-option--inactive {
+  color: var(--color-fg-muted);
+}
+
+.app-loading-main {
+  background: var(--color-canvas-default);
+}
+
+.app-loading-title {
+  color: var(--color-fg-default);
+}
+
+.app-google-signin {
+  background: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-text);
+}
+
+.app-root {
+  background: var(--color-canvas-default);
+}
+
+.app-topbar {
+  border-bottom: 1px solid var(--color-border-default);
+  background: var(--color-canvas-subtle);
+}
+
+.app-topbar-title {
+  color: var(--color-fg-default);
+}

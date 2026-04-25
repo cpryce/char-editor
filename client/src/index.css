@@ -208,3 +208,25 @@ body {
   border-color: var(--color-border-default);
   cursor: not-allowed;
 }
+
+/* ── Settings flyout ────────────────────────────────────────── */
+.settings-flyout {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(420px, 92vw);
+  height: 100svh;
+  z-index: 130;
+  background: var(--color-canvas-overlay);
+  border-left: 1px solid var(--color-border-default);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  will-change: transform;
+}
+
+.settings-flyout[aria-hidden='true'] {
+  pointer-events: none;
+}
+
+.settings-flyout[aria-hidden='false'] {
+  pointer-events: auto;
+}

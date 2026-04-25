@@ -1,0 +1,81 @@
+/* ── SkillsSection ───────────────────────────────────────────── */
+
+.skills-table-wrapper {
+  border: 1px solid var(--color-border-default);
+}
+
+.skills-toolbar {
+  color: var(--color-fg-muted);
+  border-bottom: 1px solid var(--color-border-default);
+  background: var(--color-canvas-subtle);
+}
+
+.skills-toolbar--overspent {
+  color: var(--color-danger-fg);
+}
+
+.skills-reset-btn {
+  border: 1px solid var(--color-border-default);
+  border-radius: 4px;
+  color: var(--color-fg-muted);
+  background: var(--color-canvas-default);
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.skills-thead-row {
+  background: var(--color-canvas-subtle);
+}
+
+.skills-th {
+  color: var(--color-fg-muted);
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.skills-row-even {
+  background: var(--color-canvas-default);
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.skills-row-odd {
+  background: var(--color-canvas-subtle);
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.skills-td-muted {
+  color: var(--color-fg-muted);
+}
+
+.skills-td-default {
+  color: var(--color-fg-default);
+}
+
+.skills-checkbox {
+  accent-color: black;
+  width: 14px;
+  height: 14px;
+}
+
+.skills-number-input {
+  background: var(--color-canvas-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  color: var(--color-fg-default);
+  padding: 2px 4px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.skills-number-input--ranks {
+  width: 52px;
+}
+
+.skills-number-input--misc {
+  width: 62px;
+}
+
+.skills-number-input--over-max {
+  color: var(--color-danger-fg);
+  border-color: var(--color-danger-fg);
+}

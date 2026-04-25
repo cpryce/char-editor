@@ -1,0 +1,55 @@
+.combat-stat-card {
+  border: 1px solid var(--color-border-default);
+  background: var(--color-canvas-subtle);
+}
+
+.combat-stat-label {
+  color: var(--color-fg-muted);
+}
+
+.combat-stat-total {
+  color: var(--color-fg-default);
+}
+
+.combat-mod-label {
+  color: var(--color-fg-muted);
+}
+
+.combat-mod-input {
+  width: 56px;
+  text-align: center;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 14px;
+}
+
+.combat-mod-input--editable {
+  color: var(--color-fg-default);
+  background: var(--color-canvas-default);
+  cursor: text;
+}
+
+.combat-mod-input--readonly {
+  color: var(--color-fg-muted);
+  background: var(--color-canvas-subtle);
+  cursor: default;
+}
+
+.combat-subsection {
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.combat-subsection--no-border {
+  border-bottom: none;
+}
+
+.combat-subsection-title {
+  color: var(--color-fg-muted);
+}
+
+.combat-muted-text {
+  color: var(--color-fg-muted);
+}

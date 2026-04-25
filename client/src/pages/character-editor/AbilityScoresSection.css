@@ -1,0 +1,55 @@
+.ability-score-row {
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.ability-fg-default {
+  color: var(--color-fg-default);
+}
+
+.ability-fg-muted {
+  color: var(--color-fg-muted);
+}
+
+.ability-fg-subtle {
+  color: var(--color-fg-subtle);
+}
+
+.ability-number-input {
+  width: 56px;
+  text-align: center;
+  padding: 2px 4px;
+  background: var(--color-canvas-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  color: var(--color-fg-default);
+  font-size: 14px;
+}
+
+.ability-racial-wrap {
+  min-width: 44px;
+}
+
+.ability-value {
+  min-width: 28px;
+  text-align: center;
+}
+
+.ability-value--line {
+  line-height: 1.6rem;
+}
+
+.ability-value--positive {
+  color: var(--color-success-fg);
+}
+
+.ability-value--negative {
+  color: var(--color-danger-fg);
+}
+
+.ability-value--neutral {
+  color: var(--color-fg-subtle);
+}
+
+.ability-temp-divider {
+  border-left: 1px solid var(--color-border-muted);
+}

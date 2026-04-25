@@ -13,8 +13,6 @@ import {
   affordableAbilityBaseScore,
   applyClassAndRacialSkillRules,
   totalCharacterLevel,
-  maxClassSkillRanks,
-  maxCrossClassSkillRanks,
   spentSkillPoints,
   totalSkillPointsAvailable,
   baseAttackBonusFromClasses,
@@ -32,7 +30,11 @@ import { BackgroundSection } from './character-editor/BackgroundSection';
 import { ClassLevelSection } from './character-editor/ClassLevelSection';
 import { AbilityScoresSection, ABILITY_KEYS } from './character-editor/AbilityScoresSection';
 import { FeatsSection } from './character-editor/FeatsSection';
+import { CombatSection } from './character-editor/CombatSection';
+import type { CombatDerivedStats } from './character-editor/CombatSection';
+import { SkillsSection } from './character-editor/SkillsSection';
 import type { AbilityKey } from './character-editor/AbilityScoresSection';
+import './CharacterEditor.css';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -55,52 +57,59 @@ function Accordion({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const buttonClasses = 'w-full flex items-center gap-2 pb-1 mb-3 character-editor-accordion-trigger';
+  const chevronClasses = [
+    'character-editor-accordion-chevron',
+    open ? 'character-editor-accordion-chevron--open' : '',
+  ].join(' ');
+
+  const accordionHeader = (
+    <>
+      <svg
+        width="10"
+        height="10"
+        viewBox="0 0 10 10"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className={chevronClasses}
+        aria-hidden="true"
+      >
+        <path d="M3 1.5l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span className="text-sm font-semibold uppercase tracking-wider character-editor-accordion-title">
+        {title}
+      </span>
+      {!open && summary && (
+        <span className="text-xs font-normal normal-case tracking-normal ml-2 character-editor-accordion-summary">
+          {summary}
+        </span>
+      )}
+    </>
+  );
+
   return (
     <div>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2 pb-1 mb-3"
-        style={{
-          background: 'none',
-          border: 'none',
-          borderBottom: '1px solid var(--color-border-muted)',
-          cursor: 'pointer',
-          padding: '0 0 4px 0',
-          textAlign: 'left',
-        }}
-      >
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 10 10"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          style={{
-            transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
-            transition: 'transform 0.15s',
-            flexShrink: 0,
-            color: 'var(--color-fg-muted)',
-          }}
-          aria-hidden="true"
+      {open ? (
+        <button
+          type="button"
+          aria-expanded="true"
+          onClick={() => setOpen(false)}
+          className={buttonClasses}
         >
-          <path d="M3 1.5l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--color-fg-default)' }}>
-          {title}
-        </span>
-        {!open && summary && (
-          <span className="text-xs font-normal normal-case tracking-normal ml-2" style={{ color: 'var(--color-fg-muted)' }}>
-            {summary}
-          </span>
-        )}
-      </button>
+          {accordionHeader}
+        </button>
+      ) : (
+        <button
+          type="button"
+          aria-expanded="false"
+          onClick={() => setOpen(true)}
+          className={buttonClasses}
+        >
+          {accordionHeader}
+        </button>
+      )}
       {open && (
-        <div
-          className="flex flex-col gap-4"
-          style={{ padding: '6px', paddingBottom: '24px' }}
-        >
+        <div className="flex flex-col gap-4 character-editor-accordion-body">
           {children}
         </div>
       )}
@@ -140,39 +149,6 @@ function deriveAbilityTotals(scores: CharacterDraft['abilityScores']): Record<Ab
     charisma: totalScore(scores.charisma),
   };
 }
-
-type CombatDerivedStats = {
-  dexMod: number;
-  conMod: number;
-  wisMod: number;
-  strMod: number;
-  sizeMod: number;
-  acArmor: number;
-  acShield: number;
-  acDodge: number;
-  acNatural: number;
-  acDeflection: number;
-  acMisc: number;
-  initMisc: number;
-  speedBase: number;
-  speedArmorAdjust: number;
-  speedFly: number;
-  speedSwim: number;
-  bab: number;
-  fortitudeBase: number;
-  reflexBase: number;
-  willBase: number;
-  totalAC: number;
-  touchAC: number;
-  flatFootedAC: number;
-  initiativeTotal: number;
-  fortitudeTotal: number;
-  reflexTotal: number;
-  willTotal: number;
-  meleeAttack: number;
-  rangedAttack: number;
-  speedFeet: number;
-};
 
 function deriveCombatStats({
   combat,
@@ -250,469 +226,6 @@ function deriveCombatStats({
     speedFeet,
   };
 }
-
-// ── Skills section ────────────────────────────────────────────────────────────
-
-function SkillsSection({
-  skills, abilityScores, onChange, totalSkillPoints, spentPoints, totalLevel,
-}: {
-  skills: CharacterDraft['skills'];
-  abilityScores: CharacterDraft['abilityScores'];
-  onChange: (s: CharacterDraft['skills']) => void;
-  totalSkillPoints: number;
-  spentPoints: number;
-  totalLevel: number;
-}) {
-  const maxClassRanks = maxClassSkillRanks(totalLevel);
-  const maxCrossRanks = maxCrossClassSkillRanks(totalLevel);
-  const isOverspent = spentPoints > totalSkillPoints;
-
-  function updateRanks(i: number, ranks: number) {
-    const target = skills[i];
-    if (!target) return;
-
-    const rankCap = target.classSkill ? maxClassRanks : maxCrossRanks;
-    const normalizedRequested = Number.isFinite(ranks)
-      ? Math.max(0, target.classSkill ? Math.floor(ranks) : Math.floor(ranks * 2) / 2)
-      : 0;
-    const finalRanks = Math.min(rankCap, normalizedRequested);
-
-    const updated = skills.map((sk, idx) => {
-      if (idx !== i) return sk;
-      const updated = {
-        ...sk,
-        ranks: sk.classSkill ? Math.floor(finalRanks) : Math.floor(finalRanks * 2) / 2,
-      };
-      return { ...updated, bonus: computeSkillBonus(updated, abilityScores) };
-    });
-    onChange(updated);
-  }
-
-  function updateMiscBonus(i: number, miscBonus: number) {
-    const updated = skills.map((sk, idx) => {
-      if (idx !== i) return sk;
-      const next = { ...sk, miscBonus: Number.isFinite(miscBonus) ? Math.trunc(miscBonus) : 0 };
-      return { ...next, bonus: computeSkillBonus(next, abilityScores) };
-    });
-    onChange(updated);
-  }
-
-  function resetRanks() {
-    const updated = skills.map((sk) => {
-      const next = { ...sk, ranks: 0 };
-      return { ...next, bonus: computeSkillBonus(next, abilityScores) };
-    });
-    onChange(updated);
-  }
-
-  return (
-    <div
-      className="rounded overflow-hidden"
-      style={{ border: '1px solid var(--color-border-default)' }}
-    >
-      <div
-        className="px-3 py-2 text-xs flex items-center justify-end gap-2"
-        style={{
-          color: isOverspent ? 'var(--color-danger-fg)' : 'var(--color-fg-muted)',
-          borderBottom: '1px solid var(--color-border-default)',
-          background: 'var(--color-canvas-subtle)',
-        }}
-      >
-        <span>
-          {spentPoints} / {totalSkillPoints} points spent · {Math.max(0, totalSkillPoints - spentPoints)} remaining · max ranks: class {maxClassRanks}, cross-class {maxCrossRanks}
-        </span>
-        <button
-          type="button"
-          onClick={resetRanks}
-          title="Reset all ranks to 0"
-          aria-label="Reset all ranks to 0"
-          className="inline-flex items-center justify-center"
-          style={{
-            border: '1px solid var(--color-border-default)',
-            borderRadius: 4,
-            color: 'var(--color-fg-muted)',
-            background: 'var(--color-canvas-default)',
-            width: 22,
-            height: 22,
-            cursor: 'pointer',
-          }}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <path
-              d="M20 11a8 8 0 1 0-2.34 5.66"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M20 4v7h-7"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      </div>
-      <table aria-label="Skills" className="w-full text-xs border-collapse">
-        <thead>
-          <tr style={{ background: 'var(--color-canvas-subtle)' }}>
-            {['', 'Skill', 'Key Ability', 'Class', 'Score', 'Bonus', 'Ranks', 'Misc Bonus'].map((h) => (
-              <th
-                key={h}
-                aria-label={h === '' ? 'Trained only' : undefined}
-                className={`px-3 py-2 font-medium ${h === 'Score' || h === 'Bonus' ? 'text-right' : 'text-left'}`}
-                style={{ color: 'var(--color-fg-muted)', borderBottom: '1px solid var(--color-border-default)' }}
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {skills.map((sk, i) => {
-            const bonus = computeSkillBonus(sk, abilityScores);
-            const abilityBonus = sk.keyAbility
-              ? abilityModifier(totalScore(abilityScores[sk.keyAbility as keyof CharacterDraft['abilityScores']]))
-              : 0;
-            const bonusStr = `${bonus}`;
-            const abilityBonusStr = abilityBonus >= 0 ? `+${abilityBonus}` : `${abilityBonus}`;
-            const rankCap = sk.classSkill ? maxClassRanks : maxCrossRanks;
-            const isRankOverMax = sk.ranks > rankCap;
-            return (
-              <tr
-                key={sk.name}
-                style={{
-                  background: i % 2 === 0 ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)',
-                  borderBottom: '1px solid var(--color-border-muted)',
-                }}
-              >
-                <td className="px-3 py-1 text-center" style={{ color: 'var(--color-fg-muted)' }}>
-                  {sk.trainedOnly ? 'T' : ''}
-                </td>
-                <td className="px-3 py-1" style={{ color: 'var(--color-fg-default)' }}>{sk.name}</td>
-                <td className="px-3 py-1" style={{ color: 'var(--color-fg-muted)' }}>
-                  {sk.keyAbility ? sk.keyAbility.slice(0, 3).toUpperCase() : '0'}
-                </td>
-                <td className="px-3 py-1 text-center" style={{ color: 'var(--color-fg-muted)' }}>
-                  <input
-                    type="checkbox"
-                    aria-label={`${sk.name} is class skill`}
-                    checked={sk.classSkill}
-                    readOnly
-                    style={{ accentColor: 'black', width: 14, height: 14 }}
-                  />
-                </td>
-                <td className="px-3 py-1 text-right font-semibold" style={{ color: 'var(--color-fg-default)' }}>
-                  {bonusStr}
-                </td>
-                <td className="px-3 py-1 text-right" style={{ color: 'var(--color-fg-default)' }}>
-                  {abilityBonusStr}
-                </td>
-                <td className="px-3 py-1">
-                  <input
-                    type="number"
-                    aria-label={`${sk.name} ranks`}
-                    value={sk.ranks}
-                    min={0}
-                    step={sk.classSkill ? 1 : 0.5}
-                    onChange={(e) => updateRanks(i, Number(e.target.value))}
-                    style={{
-                      ...inputStyle,
-                      width: 52,
-                      padding: '2px 4px',
-                      textAlign: 'center',
-                      color: isRankOverMax ? 'var(--color-danger-fg)' : inputStyle.color,
-                      border: isRankOverMax ? '1px solid var(--color-danger-fg)' : inputStyle.border,
-                    }}
-                  />
-                </td>
-                <td className="px-3 py-1">
-                  <input
-                    type="number"
-                    aria-label={`${sk.name} misc bonus`}
-                    value={sk.miscBonus}
-                    onChange={(e) => updateMiscBonus(i, Number(e.target.value))}
-                    style={{ ...inputStyle, width: 62, padding: '2px 4px', textAlign: 'center' }}
-                  />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ── Main editor ───────────────────────────────────────────────────────────────
-
-function CombatSection({
-  combat,
-  onCombatChange,
-  derivedCombat,
-}: {
-  combat: CharacterDraft['combat'];
-  onCombatChange: (value: CharacterDraft['combat']) => void;
-  derivedCombat: CombatDerivedStats;
-}) {
-  const {
-    dexMod,
-    conMod,
-    wisMod,
-    strMod,
-    sizeMod,
-    acArmor,
-    acShield,
-    acDodge,
-    acNatural,
-    acDeflection,
-    acMisc,
-    initMisc,
-    speedBase,
-    speedArmorAdjust,
-    speedFly,
-    speedSwim,
-    bab,
-    fortitudeBase,
-    reflexBase,
-    willBase,
-    totalAC,
-    touchAC,
-    flatFootedAC,
-    initiativeTotal,
-    fortitudeTotal,
-    reflexTotal,
-    willTotal,
-    meleeAttack,
-    rangedAttack,
-    speedFeet,
-  } = derivedCombat;
-
-  function updateNumeric(path: string, value: number) {
-    const safe = Number.isFinite(value) ? Math.trunc(value) : 0;
-    const parts = path.split('.');
-    onCombatChange((() => {
-      if (parts.length === 1) {
-        const [k1] = parts as [keyof CharacterDraft['combat']];
-        return {
-          ...combat,
-          [k1]: safe,
-        } as CharacterDraft['combat'];
-      }
-      if (parts.length === 2) {
-        const [k1, k2] = parts as [keyof CharacterDraft['combat'], string];
-        return {
-          ...combat,
-          [k1]: {
-            ...(combat[k1] as Record<string, unknown>),
-            [k2]: safe,
-          },
-        } as CharacterDraft['combat'];
-      }
-      const [k1, k2, k3] = parts as [keyof CharacterDraft['combat'], string, string];
-      return {
-        ...combat,
-        [k1]: {
-          ...(combat[k1] as Record<string, unknown>),
-          [k2]: {
-            ...((combat[k1] as Record<string, Record<string, number>>)[k2]),
-            [k3]: safe,
-          },
-        },
-      } as CharacterDraft['combat'];
-    })());
-  }
-
-  function statRow(label: string, total: string | number, parts: React.ReactNode) {
-    return (
-      <div className="flex items-stretch gap-3">
-        <div
-          className="shrink-0 rounded px-2 py-1 min-w-[92px]"
-          style={{ border: '1px solid var(--color-border-default)', background: 'var(--color-canvas-subtle)' }}
-        >
-          <div className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>{label}</div>
-          <div className="text-lg font-semibold leading-none mt-0.5" style={{ color: 'var(--color-fg-default)' }}>{total}</div>
-        </div>
-        <div className="flex items-end gap-2 flex-wrap">
-          {parts}
-        </div>
-      </div>
-    );
-  }
-
-  function modInput(label: string, value: number, onChange?: (v: number) => void, min = -20) {
-    return (
-      <label className="flex items-center gap-1">
-        <span className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>{label}</span>
-        <input
-          type="number"
-          value={value}
-          min={min}
-          readOnly={!onChange}
-          onChange={onChange ? (e) => onChange(Number(e.target.value)) : undefined}
-          style={{
-            ...inputStyle,
-            width: 56,
-            textAlign: 'center',
-            color: onChange ? 'var(--color-fg-default)' : 'var(--color-fg-muted)',
-            background: onChange ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)',
-            cursor: onChange ? 'text' : 'default',
-          }}
-        />
-      </label>
-    );
-  }
-
-  function subsection(title: string, content: React.ReactNode, withBorder = true) {
-    return (
-      <section
-        className="flex flex-col gap-3"
-        style={{
-          paddingBottom: 8,
-          marginBottom: 2,
-          borderBottom: withBorder ? '1px solid var(--color-border-muted)' : 'none',
-        }}
-      >
-        <h4
-          className="text-[11px] font-semibold uppercase tracking-wider"
-          style={{ color: 'var(--color-fg-muted)' }}
-        >
-          {title}
-        </h4>
-        {content}
-      </section>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      {subsection(
-        'Armor Class',
-        statRow(
-          'AC',
-          totalAC,
-          <>
-            {modInput('Armor', acArmor, (v) => updateNumeric('armorClass.armor', v))}
-            {modInput('Shield', acShield, (v) => updateNumeric('armorClass.shield', v))}
-            {modInput('Dex', dexMod)}
-            {modInput('Dodge', acDodge, (v) => updateNumeric('armorClass.dodge', v))}
-            {modInput('Deflection', acDeflection, (v) => updateNumeric('armorClass.deflection', v))}
-            {modInput('Natural', acNatural, (v) => updateNumeric('armorClass.natural', v))}
-            {modInput('Misc', acMisc, (v) => updateNumeric('armorClass.misc', v))}
-            <div className="basis-full text-xs" style={{ color: 'var(--color-fg-muted)' }}>
-              Touch {touchAC} / Flat {flatFootedAC}
-            </div>
-          </>,
-        ),
-      )}
-
-      {subsection(
-        'Saving Throws',
-        <>
-          {statRow(
-            'Fortitude',
-            signed(fortitudeTotal),
-            <>
-              {modInput('Base', fortitudeBase)}
-              {modInput('Con', conMod)}
-              {modInput('Magic', combat.saves.fortitude.magic, (v) => updateNumeric('saves.fortitude.magic', v))}
-              {modInput('Misc', combat.saves.fortitude.misc, (v) => updateNumeric('saves.fortitude.misc', v))}
-            </>,
-          )}
-
-          {statRow(
-            'Reflex',
-            signed(reflexTotal),
-            <>
-              {modInput('Base', reflexBase)}
-              {modInput('Dex', dexMod)}
-              {modInput('Magic', combat.saves.reflex.magic, (v) => updateNumeric('saves.reflex.magic', v))}
-              {modInput('Misc', combat.saves.reflex.misc, (v) => updateNumeric('saves.reflex.misc', v))}
-            </>,
-          )}
-
-          {statRow(
-            'Will',
-            signed(willTotal),
-            <>
-              {modInput('Base', willBase)}
-              {modInput('Wis', wisMod)}
-              {modInput('Magic', combat.saves.will.magic, (v) => updateNumeric('saves.will.magic', v))}
-              {modInput('Misc', combat.saves.will.misc, (v) => updateNumeric('saves.will.misc', v))}
-            </>,
-          )}
-        </>,
-      )}
-
-      {subsection(
-        'Attacks',
-        <>
-          {statRow(
-            'Melee Atk',
-            signed(meleeAttack),
-            <>
-              {modInput('BAB', bab)}
-              {modInput('Str', strMod)}
-              {modInput('Size', sizeMod)}
-            </>,
-          )}
-
-          {statRow(
-            'Ranged Atk',
-            signed(rangedAttack),
-            <>
-              {modInput('BAB', bab)}
-              {modInput('Dex', dexMod)}
-              {modInput('Size', sizeMod)}
-            </>,
-          )}
-        </>,
-      )}
-
-      {subsection(
-        'Movement',
-        <>
-          {statRow(
-            'Speed',
-            `${speedFeet} ft`,
-            <>
-              {modInput('Base', speedBase, (v) => updateNumeric('speed.base', v), 0)}
-              {modInput('Armor Adj', speedArmorAdjust, (v) => updateNumeric('speed.armorAdjust', v), -60)}
-              {modInput('Fly', speedFly, (v) => updateNumeric('speed.fly', v), 0)}
-              {modInput('Swim', speedSwim, (v) => updateNumeric('speed.swim', v), 0)}
-            </>,
-          )}
-
-          {statRow(
-            'Initiative',
-            signed(initiativeTotal),
-            <>
-              {modInput('Dex', dexMod)}
-              {modInput('Misc', initMisc, (v) => updateNumeric('initiative.miscBonus', v))}
-            </>,
-          )}
-        </>,
-        false,
-      )}
-
-      <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
-        Save inputs are ordered: base, magic, misc, temp. AC follows SRD: 10 + armor + shield + Dex + size + dodge + natural + deflection + misc.
-      </p>
-    </div>
-  );
-}
-
-
-
 
 // ── Main editor ───────────────────────────────────────────────────────────────
 
@@ -1166,16 +679,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           onClick={onCancel}
           title="Back to characters"
           aria-label="Back to characters"
-          className="inline-flex items-center justify-center"
-          style={{
-            width: 30,
-            height: 30,
-            border: 'none',
-            color: 'var(--color-fg-muted)',
-            background: 'transparent',
-            cursor: 'pointer',
-            padding: 0,
-          }}
+          className="inline-flex items-center justify-center character-editor-back-button"
         >
           <svg
             width="22"
@@ -1203,8 +707,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
         </button>
         <span
           aria-hidden="true"
-          className="inline-flex items-center justify-center"
-          style={{ width: 10, color: 'var(--color-fg-muted)' }}
+          className="inline-flex items-center justify-center character-editor-crumb-dots"
         >
           <svg
             width="8"
@@ -1218,13 +721,13 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
             <circle cx="4" cy="16" r="1.5" fill="currentColor" />
           </svg>
         </span>
-        <h2 className="text-xl font-semibold" style={{ color: 'var(--color-fg-default)' }}>
+        <h2 className="text-xl font-semibold character-editor-title">
           {headerTitle}
         </h2>
       </div>
 
       {loadingCharacter && (
-        <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+        <p className="text-sm character-editor-muted">
           Loading character...
         </p>
       )}
@@ -1243,7 +746,6 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
             draft={draft}
             isEdit={isEdit}
             nameError={nameError}
-            inputStyle={inputStyle}
             onNameChange={(value) => setField('name', value)}
             onNameBlur={() => setNameTouched(true)}
             onGenderChange={(value) => setField('gender', value)}
@@ -1256,7 +758,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
         {/* ── Classes ── */}
         {/* ── Classes ── */}
         <Accordion
-          title={<>Class &amp; Level <span style={{ color: 'var(--color-danger-fg)', fontSize: '0.75rem' }}>*</span></>}
+          title={<>Class &amp; Level <span className="character-editor-required-star">*</span></>}
           summary={draft.classes.filter((c) => c.name).map((c) => `${c.name} ${c.level}`).join(' / ') || undefined}
         >
           <ClassLevelSection
@@ -1276,11 +778,11 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           title="Ability Scores"
           summary={(
             <>
-              <span style={{ marginRight: 10 }}><strong>Str</strong> {abilityTotals.strength}</span>
-              <span style={{ marginRight: 10 }}><strong>Dex</strong> {abilityTotals.dexterity}</span>
-              <span style={{ marginRight: 10 }}><strong>Con</strong> {abilityTotals.constitution}</span>
-              <span style={{ marginRight: 10 }}><strong>Int</strong> {abilityTotals.intelligence}</span>
-              <span style={{ marginRight: 10 }}><strong>Wis</strong> {abilityTotals.wisdom}</span>
+              <span className="character-editor-summary-item"><strong>Str</strong> {abilityTotals.strength}</span>
+              <span className="character-editor-summary-item"><strong>Dex</strong> {abilityTotals.dexterity}</span>
+              <span className="character-editor-summary-item"><strong>Con</strong> {abilityTotals.constitution}</span>
+              <span className="character-editor-summary-item"><strong>Int</strong> {abilityTotals.intelligence}</span>
+              <span className="character-editor-summary-item"><strong>Wis</strong> {abilityTotals.wisdom}</span>
               <span><strong>Cha</strong> {abilityTotals.charisma}</span>
             </>
           )}
@@ -1292,7 +794,6 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
             remainingAbilityPoints={remainingAbilityPoints}
             earnedLevelUpPoints={earnedLevelUpPoints}
             spentLevelUpPoints={spentLevelUpPoints}
-            inputStyle={inputStyle}
             onBaseChange={setAbilityBase}
             onLevelUpChange={setLevelUp}
             onEnhancementChange={setEnhancement}
@@ -1358,7 +859,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
 
         {/* ── Actions ── */}
         {(saving || error) && (
-          <p className="text-sm" style={{ color: error ? 'var(--color-danger-fg)' : 'var(--color-fg-muted)' }}>
+          <p className={[ 'text-sm', error ? 'character-editor-danger' : 'character-editor-muted' ].join(' ')}>
             {error ?? 'Saving...'}
           </p>
         )}
