@@ -156,8 +156,8 @@ export function CombatantCard({ combatant, isActiveRound, isSelected, isDeferred
       style={{
         ...style,
         position: 'relative',
-        backgroundColor: isActiveRound ? 'var(--color-success-subtle)' : 'var(--color-canvas-default)',
-        border: `1px solid ${isActiveRound ? 'var(--color-success-fg)' : 'var(--color-border-default)'}`,
+        backgroundColor: isActiveRound ? 'var(--color-canvas-inset)' : 'var(--color-canvas-default)',
+        border: `1px solid ${isActiveRound ? 'var(--color-border-default)' : 'var(--color-border-default)'}`,
         borderRadius: '8px',
         boxShadow: 'none',
         padding: '4px 6px',

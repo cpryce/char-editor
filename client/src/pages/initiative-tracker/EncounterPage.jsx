@@ -37,6 +37,7 @@ export function EncounterPage({ sessionId, onBack }) {
   const [combatants, setCombatants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [started, setStarted] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [round, setRound] = useState(1);
   const [selectedId, setSelectedId] = useState(null);
@@ -54,7 +55,7 @@ export function EncounterPage({ sessionId, onBack }) {
   );
 
   useEffect(() => {
-    fetch(`/api/sessions/${id}`, { credentials: 'include' })
+    fetch(`/api/encounters/${id}`, { credentials: 'include' })
       .then((r) => r.json())
       .then((data) => {
         setSession(data);
@@ -80,7 +81,7 @@ export function EncounterPage({ sessionId, onBack }) {
       .map(({ id: cid, name, type, modifier }) => ({ id: cid, name, type, modifier: modifier ?? 0 }));
     setSaving(true);
     try {
-      await fetch(`/api/sessions/${id}`, {
+      await fetch(`/api/encounters/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -123,7 +124,7 @@ export function EncounterPage({ sessionId, onBack }) {
   }, []);
 
   const nextTurn = useCallback(() => {
-    if (combatants.length === 0) return;
+    if (!started || combatants.length === 0) return;
     const next = activeIndex + 1;
     if (next >= combatants.length) {
       setRound((r) => r + 1);
@@ -132,9 +133,12 @@ export function EncounterPage({ sessionId, onBack }) {
     } else {
       setActiveIndex(next);
     }
-  }, [combatants.length, activeIndex]);
+  }, [started, combatants.length, activeIndex]);
 
-  const prevTurn = useCallback(() => setActiveIndex((prev) => Math.max(0, prev - 1)), []);
+  const prevTurn = useCallback(() => {
+    if (!started) return;
+    setActiveIndex((prev) => Math.max(0, prev - 1));
+  }, [started]);
 
   const deselectTimerRef = useRef(null);
 
@@ -216,8 +220,10 @@ export function EncounterPage({ sessionId, onBack }) {
   };
 
   const [focusId, setFocusId] = useState(null);
+  const [pickerSelection, setPickerSelection] = useState(new Set());
 
   const openCharPicker = () => {
+    setPickerSelection(new Set());
     setShowCharPicker(true);
     if (characters === null) {
       fetch('/api/characters', { credentials: 'include' })
@@ -227,19 +233,33 @@ export function EncounterPage({ sessionId, onBack }) {
     }
   };
 
-  const importCharacter = (char) => {
-    const modifier = initiativeModifierFromCharacter(char);
-    const c = { id: newId(), name: char.name, type: 'player', initiative: 0, modifier, flatFooted: false, statuses: [] };
+  const togglePickerChar = (id) => {
+    setPickerSelection((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const importSelected = () => {
+    if (!characters || pickerSelection.size === 0) return;
+    let lastId = null;
     setCombatants((prev) => {
-      const next = [...prev, c];
+      let next = [...prev];
+      characters.filter((ch) => pickerSelection.has(ch._id)).forEach((char) => {
+        const modifier = initiativeModifierFromCharacter(char);
+        const c = { id: newId(), name: char.name, type: 'player', initiative: 0, modifier, flatFooted: false, statuses: [] };
+        next = [...next, c];
+        lastId = c.id;
+      });
       savePlayers(next);
       return next;
     });
-    setFocusId(c.id);
+    if (lastId) setFocusId(lastId);
     setShowCharPicker(false);
   };
 
-  const saveSessionName = async (name) => {
+  const saveEncounterName = async (name) => {
     const trimmed = name.trim();
     if (!trimmed || trimmed === session?.name) {
       setEditName(session?.name ?? '');
@@ -247,7 +267,7 @@ export function EncounterPage({ sessionId, onBack }) {
     }
     setSaving(true);
     try {
-      const res = await fetch(`/api/sessions/${id}`, {
+      const res = await fetch(`/api/encounters/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -290,6 +310,7 @@ export function EncounterPage({ sessionId, onBack }) {
   };
 
   const resetRound = () => {
+    setStarted(false);
     setActiveIndex(0);
     setRound(1);
     setCombatants((prev) => prev.map((c) => ({ ...c, deferred: false })));
@@ -324,14 +345,14 @@ export function EncounterPage({ sessionId, onBack }) {
             lineHeight: 1,
             padding: '2px 4px',
           }}
-          title="All sessions"
+          title="All encounters"
         >←</button>
         <input
           type="text"
           value={editName}
           onChange={(e) => setEditName(e.target.value)}
           onFocus={(e) => e.target.select()}
-          onBlur={(e) => saveSessionName(e.target.value)}
+          onBlur={(e) => saveEncounterName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') e.target.blur();
             if (e.key === 'Escape') { setEditName(session?.name ?? ''); e.target.blur(); }
@@ -404,21 +425,38 @@ export function EncounterPage({ sessionId, onBack }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '4px 14px' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
               <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-fg-subtle)' }}>Round</span>
-              <span style={{ fontSize: '20px', fontWeight: 700, lineHeight: 1, color: 'var(--color-accent-fg)' }}>{round}</span>
+              <span style={{ fontSize: '20px', fontWeight: 700, lineHeight: 1, color: 'var(--color-accent-fg)' }}>{started ? round : 0}</span>
             </div>
             <div style={{ width: '1px', alignSelf: 'stretch', backgroundColor: 'var(--color-border-muted)' }} />
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', minWidth: 0 }}>
               <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-fg-subtle)', flexShrink: 0 }}>Turn</span>
               <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-fg-default)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
-                {combatants[activeIndex]?.name ?? '—'}
+                {started ? (combatants[activeIndex]?.name ?? '—') : ''}
               </span>
             </div>
           </div>
 
-          {/* Right: prev/next/sort/reset */}
+          {/* Right: start/prev/next/sort/reset */}
           <div className="flex gap-2" style={{ justifyContent: 'flex-end' }}>
-            <button onClick={prevTurn} style={iconBtnStyle('secondary')} title="Previous turn">←</button>
-            <button onClick={nextTurn} style={iconBtnStyle('primary')} title="Next turn">→</button>
+            {!started && (
+              <button
+                onClick={() => setStarted(true)}
+                style={{
+                  ...iconBtnStyle('primary'),
+                  padding: '4px 12px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  gap: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title="Start combat"
+              >
+                ▶
+              </button>
+            )}
+            <button onClick={prevTurn} style={{ ...iconBtnStyle('secondary'), opacity: started ? 1 : 0.35, cursor: started ? 'pointer' : 'default' }} title="Previous turn">←</button>
+            <button onClick={nextTurn} style={{ ...iconBtnStyle('primary'), opacity: started ? 1 : 0.35, cursor: started ? 'pointer' : 'default' }} title="Next turn">→</button>
             <button onClick={sortByInitiative} style={iconBtnStyle('secondary')} title="Sort by initiative">⇅</button>
             <button onClick={resetRound} style={iconBtnStyle('danger')} title="Reset round">↺</button>
           </div>
@@ -444,7 +482,7 @@ export function EncounterPage({ sessionId, onBack }) {
                     key={c.id}
                     combatant={c}
                     index={i}
-                    isActiveRound={i === activeIndex}
+                    isActiveRound={started && i === activeIndex}
                     isSelected={c.id === selectedId}
                     isDeferred={!!c.deferred}
                     onSelect={(cid) => setSelectedId((prev) => prev === cid ? null : cid)}
@@ -459,21 +497,6 @@ export function EncounterPage({ sessionId, onBack }) {
           </DndContext>
         )}
 
-        {/* Rules reminder */}
-        <div
-          className="mt-6 p-4 rounded-lg text-xs"
-          style={{
-            backgroundColor: 'var(--color-canvas-inset)',
-            border: '1px solid var(--color-border-muted)',
-            color: 'var(--color-fg-muted)',
-          }}
-        >
-          <strong style={{ color: 'var(--color-fg-default)' }}>D&D 3.5 Initiative Rules:</strong>{' '}
-          Roll d20 + DEX modifier; highest acts first. Ties broken by modifier; further ties re-roll.
-          Combatants are flat-footed (FF) until their first action.{' '}
-          <strong style={{ color: 'var(--color-fg-default)' }}>Saved:</strong> player roster only.
-          Initiative values, modifiers, and NPCs reset each session.
-        </div>
       </div>
 
       {/* Character picker modal */}
@@ -500,6 +523,7 @@ export function EncounterPage({ sessionId, onBack }) {
               boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
             }}
           >
+            {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
               <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--color-fg-default)' }}>
                 Import from Characters
@@ -509,55 +533,104 @@ export function EncounterPage({ sessionId, onBack }) {
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: 'var(--color-fg-muted)', lineHeight: 1, padding: '2px 4px' }}
               >✕</button>
             </div>
-            <p style={{ margin: '0 0 12px', fontSize: '12px', color: 'var(--color-fg-muted)' }}>
-              Click a character to add them as a player with their DEX modifier pre-filled.
-            </p>
+
+            {/* Character list */}
             <div style={{ overflowY: 'auto', flex: 1 }}>
               {characters === null ? (
                 <p style={{ fontSize: '13px', color: 'var(--color-fg-muted)', textAlign: 'center', padding: '24px 0' }}>Loading…</p>
               ) : characters.length === 0 ? (
                 <p style={{ fontSize: '13px', color: 'var(--color-fg-muted)', textAlign: 'center', padding: '24px 0' }}>No characters found.</p>
               ) : (
-                characters.map((char) => {
-                  const mod = initiativeModifierFromCharacter(char);
-                  const modStr = mod >= 0 ? `+${mod}` : `${mod}`;
-                  return (
-                    <button
-                      key={char._id}
-                      onClick={() => importCharacter(char)}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        width: '100%', textAlign: 'left',
-                        padding: '8px 10px', borderRadius: '6px',
-                        border: 'none', cursor: 'pointer',
-                        backgroundColor: 'transparent',
-                        marginBottom: '2px',
+                <>
+                  {/* Select all row */}
+                  <label
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      padding: '6px 10px', borderRadius: '6px', cursor: 'pointer',
+                      marginBottom: '4px',
+                      borderBottom: '1px solid var(--color-border-muted)',
+                      paddingBottom: '10px', marginBottom: '6px',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pickerSelection.size === characters.length}
+                      ref={(el) => { if (el) el.indeterminate = pickerSelection.size > 0 && pickerSelection.size < characters.length; }}
+                      onChange={() => {
+                        if (pickerSelection.size === characters.length) {
+                          setPickerSelection(new Set());
+                        } else {
+                          setPickerSelection(new Set(characters.map((c) => c._id)));
+                        }
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-canvas-subtle)'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                      <div>
-                        <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-fg-default)' }}>{char.name}</div>
-                        {char.classes?.length > 0 && (
-                          <div style={{ fontSize: '11px', color: 'var(--color-fg-muted)' }}>
-                            {char.classes.map((c) => `${c.name} ${c.level}`).join(' / ')}
-                          </div>
-                        )}
-                      </div>
-                      <span style={{
-                        fontSize: '13px', fontWeight: 700,
-                        color: 'var(--color-accent-fg)',
-                        backgroundColor: 'var(--color-accent-subtle)',
-                        border: '1px solid var(--color-accent-fg)33',
-                        borderRadius: '6px', padding: '2px 8px', flexShrink: 0,
-                      }}>
-                        Init {modStr}
-                      </span>
-                    </button>
-                  );
-                })
+                      style={{ width: '15px', height: '15px', cursor: 'pointer', flexShrink: 0 }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-fg-default)' }}>Select all</span>
+                  </label>
+
+                  {characters.map((char) => {
+                    const mod = initiativeModifierFromCharacter(char);
+                    const modStr = mod >= 0 ? `+${mod}` : `${mod}`;
+                    const checked = pickerSelection.has(char._id);
+                    return (
+                      <label
+                        key={char._id}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '10px',
+                          padding: '8px 10px', borderRadius: '6px', cursor: 'pointer',
+                          marginBottom: '2px',
+                          backgroundColor: checked ? 'var(--color-accent-subtle)' : 'transparent',
+                        }}
+                        onMouseEnter={(e) => { if (!checked) e.currentTarget.style.backgroundColor = 'var(--color-canvas-subtle)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = checked ? 'var(--color-accent-subtle)' : 'transparent'; }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => togglePickerChar(char._id)}
+                          style={{ width: '15px', height: '15px', cursor: 'pointer', flexShrink: 0 }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-fg-default)' }}>{char.name}</div>
+                          {char.classes?.length > 0 && (
+                            <div style={{ fontSize: '11px', color: 'var(--color-fg-muted)' }}>
+                              {char.classes.map((c) => `${c.name} ${c.level}`).join(' / ')}
+                            </div>
+                          )}
+                        </div>
+                        <span style={{
+                          fontSize: '13px', fontWeight: 700,
+                          color: 'var(--color-accent-fg)',
+                          backgroundColor: 'var(--color-accent-subtle)',
+                          border: '1px solid var(--color-accent-fg)33',
+                          borderRadius: '6px', padding: '2px 8px', flexShrink: 0,
+                        }}>
+                          Init {modStr}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </>
               )}
             </div>
+
+            {/* Footer */}
+            {characters && characters.length > 0 && (
+              <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={importSelected}
+                  disabled={pickerSelection.size === 0}
+                  style={{
+                    padding: '6px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600,
+                    border: 'none', cursor: pickerSelection.size === 0 ? 'not-allowed' : 'pointer',
+                    backgroundColor: pickerSelection.size === 0 ? 'var(--color-canvas-subtle)' : 'var(--color-accent-emphasis)',
+                    color: pickerSelection.size === 0 ? 'var(--color-fg-subtle)' : '#ffffff',
+                  }}
+                >
+                  {pickerSelection.size === 0 ? 'Add selected' : `Add ${pickerSelection.size} selected`}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

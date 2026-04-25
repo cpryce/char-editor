@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const MAX_SESSIONS = 5;
+const MAX_ENCOUNTERS = 5;
 
 function formatRelativeTime(dateStr) {
   if (!dateStr) return 'Never opened';
@@ -18,26 +18,26 @@ function formatRelativeTime(dateStr) {
   return `${Math.floor(months / 12)}y ago`;
 }
 
-export function SessionsPage({ onOpenSession }) {
-  const [sessions, setSessions] = useState([]);
+export function EncountersPage({ onOpenEncounter }) {
+  const [encounters, setEncounters] = useState([]);
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('/api/sessions', { credentials: 'include' })
+    fetch('/api/encounters', { credentials: 'include' })
       .then((r) => r.json())
-      .then((data) => { setSessions(data); setLoading(false); })
+      .then((data) => { setEncounters(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
-  const createSession = async (e) => {
+  const createEncounter = async (e) => {
     e.preventDefault();
     if (!newName.trim()) return;
     setCreating(true);
     setError('');
-    const res = await fetch('/api/sessions', {
+    const res = await fetch('/api/encounters', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -45,26 +45,26 @@ export function SessionsPage({ onOpenSession }) {
     });
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error || 'Failed to create session');
+      setError(data.error || 'Failed to create encounter');
       setCreating(false);
       return;
     }
-    setSessions((prev) => [data, ...prev]);
+    setEncounters((prev) => [data, ...prev]);
     setNewName('');
     setCreating(false);
-    onOpenSession(data.id);
+    onOpenEncounter(data.id);
   };
 
-  const deleteSession = async (id) => {
-    if (!confirm('Delete this encounter session?')) return;
-    await fetch(`/api/sessions/${id}`, { method: 'DELETE', credentials: 'include' });
-    setSessions((prev) => prev.filter((s) => s.id !== id));
+  const deleteEncounter = async (id) => {
+    if (!confirm('Delete this encounter?')) return;
+    await fetch(`/api/encounters/${id}`, { method: 'DELETE', credentials: 'include' });
+    setEncounters((prev) => prev.filter((s) => s.id !== id));
   };
 
-  const renameSession = async (id, name) => {
+  const renameEncounter = async (id, name) => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const res = await fetch(`/api/sessions/${id}`, {
+    const res = await fetch(`/api/encounters/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -72,22 +72,22 @@ export function SessionsPage({ onOpenSession }) {
     });
     if (res.ok) {
       const data = await res.json();
-      setSessions((prev) => prev.map((s) => s.id === id ? { ...s, name: data.name } : s));
+      setEncounters((prev) => prev.map((s) => s.id === id ? { ...s, name: data.name } : s));
     }
   };
 
-  const atLimit = sessions.length >= MAX_SESSIONS;
+  const atLimit = encounters.length >= MAX_ENCOUNTERS;
 
   return (
     <div className="px-6 py-8">
       <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--color-fg-default)' }}>
-        Encounter Sessions
+        Encounters
       </h2>
       <p className="text-sm mb-6" style={{ color: 'var(--color-fg-muted)' }}>
-        {sessions.length} / {MAX_SESSIONS} sessions used.
+        {encounters.length} / {MAX_ENCOUNTERS} encounters used.
       </p>
 
-      <form onSubmit={createSession} className="flex gap-2 mb-2">
+      <form onSubmit={createEncounter} className="flex gap-2 mb-2">
         <input
           type="text"
           value={newName}
@@ -115,30 +115,30 @@ export function SessionsPage({ onOpenSession }) {
             opacity: creating || atLimit ? 0.5 : 1,
           }}
         >
-          Create Session
+          Create Encounter
         </button>
       </form>
 
       {atLimit && (
         <p className="text-xs mb-4" style={{ color: 'var(--color-danger-fg)' }}>
-          Maximum of {MAX_SESSIONS} sessions reached. Delete a session to create a new one.
+          Maximum of {MAX_ENCOUNTERS} encounters reached. Delete an encounter to create a new one.
         </p>
       )}
       {error && <p className="text-xs mb-4" style={{ color: 'var(--color-danger-fg)' }}>{error}</p>}
 
       {loading ? (
-        <p style={{ color: 'var(--color-fg-muted)' }}>Loading sessions…</p>
-      ) : sessions.length === 0 ? (
+        <p style={{ color: 'var(--color-fg-muted)' }}>Loading encounters…</p>
+      ) : encounters.length === 0 ? (
         <div
           className="text-center py-16 rounded-xl"
           style={{ backgroundColor: 'var(--color-canvas-default)', border: '1px solid var(--color-border-default)' }}
         >
-          <p style={{ color: 'var(--color-fg-muted)' }}>No encounter sessions yet.</p>
+          <p style={{ color: 'var(--color-fg-muted)' }}>No encounters yet.</p>
           <p className="text-sm mt-1" style={{ color: 'var(--color-fg-subtle)' }}>Create your first encounter above.</p>
         </div>
       ) : (
         <ul className="flex flex-col gap-3">
-          {sessions.map((s, i) => (
+          {encounters.map((s, i) => (
             <li
               key={s.id}
               className="flex items-center justify-between px-4 py-3 rounded-lg"
@@ -148,13 +148,13 @@ export function SessionsPage({ onOpenSession }) {
                 boxShadow: 'var(--color-shadow-medium, 0 3px 6px rgba(140,149,159,0.15))',
               }}
             >
-              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenSession(s.id)}>
+              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenEncounter(s.id)}>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     defaultValue={s.name}
                     onFocus={(e) => { e.target.select(); e.target.style.borderColor = 'var(--color-accent-fg)'; }}
-                    onBlur={(e) => { e.target.style.borderColor = 'transparent'; renameSession(s.id, e.target.value); }}
+                    onBlur={(e) => { e.target.style.borderColor = 'transparent'; renameEncounter(s.id, e.target.value); }}
                     onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { e.target.value = s.name; e.target.blur(); } e.stopPropagation(); }}
                     onClick={(e) => e.stopPropagation()}
                     style={{
@@ -182,7 +182,7 @@ export function SessionsPage({ onOpenSession }) {
                 </div>
               </div>
               <button
-                onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }}
+                onClick={(e) => { e.stopPropagation(); deleteEncounter(s.id); }}
                 className="text-xs px-2 py-1 rounded"
                 style={{ color: 'var(--color-danger-fg)', border: '1px solid var(--color-border-muted)', backgroundColor: 'transparent', cursor: 'pointer' }}
               >

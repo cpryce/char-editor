@@ -269,61 +269,61 @@ app.delete('/api/custom-feats/:id', async (req, res) => {
   res.status(204).end();
 });
 
-// ── Encounter Sessions ──────────────────────────────────────────
+// ── Encounters ──────────────────────────────────────────
 
-const MAX_SESSIONS = 5;
+const MAX_ENCOUNTERS = 5;
 
-app.get('/api/sessions', async (req, res) => {
+app.get('/api/encounters', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  const sessions = await EncounterSession.find({ userId: u._id }).sort({ lastAccessed: -1 }).lean();
-  res.json(sessions.map((s) => ({ ...s, id: s._id.toString() })));
+  const encounters = await EncounterSession.find({ userId: u._id }).sort({ lastAccessed: -1 }).lean();
+  res.json(encounters.map((s) => ({ ...s, id: s._id.toString() })));
 });
 
-app.post('/api/sessions', async (req, res) => {
+app.post('/api/encounters', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const count = await EncounterSession.countDocuments({ userId: u._id });
-  if (count >= MAX_SESSIONS) {
-    res.status(400).json({ error: `Maximum of ${MAX_SESSIONS} sessions reached.` });
+  if (count >= MAX_ENCOUNTERS) {
+    res.status(400).json({ error: `Maximum of ${MAX_ENCOUNTERS} encounters reached.` });
     return;
   }
   const { name } = req.body as { name?: string };
   if (!name?.trim()) { res.status(400).json({ error: 'Name is required.' }); return; }
-  const session = await EncounterSession.create({ userId: u._id, name: name.trim() });
-  res.status(201).json({ ...session.toObject(), id: session._id.toString() });
+  const encounter = await EncounterSession.create({ userId: u._id, name: name.trim() });
+  res.status(201).json({ ...encounter.toObject(), id: encounter._id.toString() });
 });
 
-app.get('/api/sessions/:id', async (req, res) => {
+app.get('/api/encounters/:id', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  const session = await EncounterSession.findOne({ _id: req.params.id, userId: u._id }).lean();
-  if (!session) { res.status(404).json({ error: 'Not found' }); return; }
-  await EncounterSession.updateOne({ _id: session._id }, { lastAccessed: new Date() });
-  res.json({ ...session, id: session._id.toString() });
+  const encounter = await EncounterSession.findOne({ _id: req.params.id, userId: u._id }).lean();
+  if (!encounter) { res.status(404).json({ error: 'Not found' }); return; }
+  await EncounterSession.updateOne({ _id: encounter._id }, { lastAccessed: new Date() });
+  res.json({ ...encounter, id: encounter._id.toString() });
 });
 
-app.put('/api/sessions/:id', async (req, res) => {
+app.put('/api/encounters/:id', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const { name, players } = req.body as { name?: string; players?: unknown };
   const update: Record<string, unknown> = { lastAccessed: new Date() };
   if (name !== undefined) update.name = name.trim();
   if (players !== undefined) update.players = players;
-  const encSession = await EncounterSession.findOneAndUpdate(
+  const encounter = await EncounterSession.findOneAndUpdate(
     { _id: req.params.id, userId: u._id },
     update,
     { returnDocument: 'after', runValidators: true }
   ).lean();
-  if (!encSession) { res.status(404).json({ error: 'Not found' }); return; }
-  res.json({ ...encSession, id: encSession._id.toString() });
+  if (!encounter) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json({ ...encounter, id: encounter._id.toString() });
 });
 
-app.delete('/api/sessions/:id', async (req, res) => {
+app.delete('/api/encounters/:id', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  const encSession = await EncounterSession.findOneAndDelete({ _id: req.params.id, userId: u._id });
-  if (!encSession) { res.status(404).json({ error: 'Not found' }); return; }
+  const encounter = await EncounterSession.findOneAndDelete({ _id: req.params.id, userId: u._id });
+  if (!encounter) { res.status(404).json({ error: 'Not found' }); return; }
   res.status(204).end();
 });
 
