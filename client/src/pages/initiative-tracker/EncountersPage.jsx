@@ -192,6 +192,18 @@ export function EncountersPage({ onOpenEncounter }) {
           ))}
         </ul>
       )}
+
+      <p className="text-xs mt-8" style={{ color: 'var(--color-fg-subtle)' }}>
+        Dragon icon by{' '}
+        <a
+          href="https://www.svgrepo.com/svg/355412/mode-standard-dragon"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: 'var(--color-accent-fg)' }}
+        >
+          SVG Repo
+        </a>
+      </p>
     </div>
   );
 }

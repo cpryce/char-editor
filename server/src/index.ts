@@ -20,6 +20,7 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const SESSION_COOKIE_NAME = 'connect.sid';
 const COOKIE_SAME_SITE = (process.env.COOKIE_SAME_SITE ?? (IS_PRODUCTION ? 'none' : 'lax')) as 'lax' | 'strict' | 'none';
 const COOKIE_SECURE = process.env.COOKIE_SECURE === 'false' ? false : IS_PRODUCTION;
+const mongooseReady = MONGO_URI ? mongoose.connect(MONGO_URI) : Promise.resolve(null);
 
 // ── Middleware ──────────────────────────────────────────────────
 app.set('trust proxy', 1);
@@ -27,12 +28,22 @@ app.set('trust proxy', 1);
 app.use(cors({ origin: process.env.CLIENT_URL ?? 'http://localhost:5173', credentials: true }));
 app.use(express.json());
 
-// MongoStore.create() is lazy — it connects using the same URI as mongoose.
-// Creating it at module level so the session middleware can be fully wired
-// before routes are registered.
+// Reuse the same Mongo connection for both mongoose models and session store.
+// This avoids a second independent connect attempt that can emit ECONNREFUSED
+// while the main mongoose connection is still negotiating.
 const store = MONGO_URI
-  ? MongoStore.create({ mongoUrl: MONGO_URI, collectionName: 'sessions', ttl: 14 * 24 * 60 * 60 })
+  ? MongoStore.create({
+    clientPromise: mongooseReady.then(() => mongoose.connection.getClient()),
+    collectionName: 'sessions',
+    ttl: 14 * 24 * 60 * 60,
+  })
   : undefined;
+
+if (store) {
+  store.on('error', (err) => {
+    console.error('Session store error:', err.message);
+  });
+}
 
 app.use(session({
   name: SESSION_COOKIE_NAME,
@@ -340,7 +351,7 @@ async function start() {
   if (!MONGO_URI) {
     console.warn('MONGO_URI not set – skipping database connection');
   } else {
-    await mongoose.connect(MONGO_URI);
+    await mongooseReady;
     console.log('Connected to MongoDB');
   }
 
