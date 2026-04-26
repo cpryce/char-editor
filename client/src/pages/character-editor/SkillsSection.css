@@ -2,9 +2,13 @@
 
 .skills-table-wrapper {
   border: 1px solid var(--color-border-default);
+  overflow: clip; /* clip (not hidden) so sticky children can escape */
 }
 
 .skills-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   color: var(--color-fg-muted);
   border-bottom: 1px solid var(--color-border-default);
   background: var(--color-canvas-subtle);

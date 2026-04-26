@@ -154,17 +154,17 @@ function deriveCombatStats({
   combat,
   classes,
   size,
-  tempScores,
+  abilityMods,
 }: {
   combat: CharacterDraft['combat'];
   classes: CharacterDraft['classes'];
   size: CharacterDraft['size'];
-  tempScores: Record<AbilityKey, number>;
+  abilityMods: Record<AbilityKey, number>;
 }): CombatDerivedStats {
-  const dexMod = abilityModifier(tempScores.dexterity);
-  const conMod = abilityModifier(tempScores.constitution);
-  const wisMod = abilityModifier(tempScores.wisdom);
-  const strMod = abilityModifier(tempScores.strength);
+  const dexMod = abilityMods.dexterity;
+  const conMod = abilityMods.constitution;
+  const wisMod = abilityMods.wisdom;
+  const strMod = abilityMods.strength;
   const sizeMod = SIZE_MODIFIERS[size] ?? 0;
   const acArmor = safeCombatNumber(combat.armorClass.armor);
   const acShield = safeCombatNumber(combat.armorClass.shield);
@@ -256,26 +256,21 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
   const spentLevelUpPoints = ABILITY_KEYS.reduce((sum, key) => sum + (draft.abilityScores[key].levelUp ?? 0), 0);
   const abilityTotals = useMemo(() => deriveAbilityTotals(draft.abilityScores), [draft.abilityScores]);
 
-  const [tempScores, setTempScores] = useState<Record<AbilityKey, number>>(() => ({
-    strength:     draft.abilityScores.strength.temp     ?? abilityTotals.strength,
-    dexterity:    draft.abilityScores.dexterity.temp    ?? abilityTotals.dexterity,
-    constitution: draft.abilityScores.constitution.temp ?? abilityTotals.constitution,
-    intelligence: draft.abilityScores.intelligence.temp ?? abilityTotals.intelligence,
-    wisdom:       draft.abilityScores.wisdom.temp       ?? abilityTotals.wisdom,
-    charisma:     draft.abilityScores.charisma.temp     ?? abilityTotals.charisma,
-  }));
-  useEffect(() => {
-    setTempScores((prev) => ({
-      strength:     draft.abilityScores.strength.temp     ?? (prev.strength     === abilityTotals.strength ? abilityTotals.strength : prev.strength),
-      dexterity:    draft.abilityScores.dexterity.temp    ?? (prev.dexterity    === abilityTotals.dexterity ? abilityTotals.dexterity : prev.dexterity),
-      constitution: draft.abilityScores.constitution.temp ?? (prev.constitution === abilityTotals.constitution ? abilityTotals.constitution : prev.constitution),
-      intelligence: draft.abilityScores.intelligence.temp ?? (prev.intelligence === abilityTotals.intelligence ? abilityTotals.intelligence : prev.intelligence),
-      wisdom:       draft.abilityScores.wisdom.temp       ?? (prev.wisdom       === abilityTotals.wisdom ? abilityTotals.wisdom : prev.wisdom),
-      charisma:     draft.abilityScores.charisma.temp     ?? (prev.charisma     === abilityTotals.charisma ? abilityTotals.charisma : prev.charisma),
-    }));
-  }, [abilityTotals]);
+  // Effective modifier for each ability: uses temp score override if set, otherwise the computed total.
+  const abilityMods = useMemo<Record<AbilityKey, number>>(() => {
+    const effectiveScore = (key: AbilityKey) =>
+      draft.abilityScores[key].temp ?? abilityTotals[key];
+    return {
+      strength:     abilityModifier(effectiveScore('strength')),
+      dexterity:    abilityModifier(effectiveScore('dexterity')),
+      constitution: abilityModifier(effectiveScore('constitution')),
+      intelligence: abilityModifier(effectiveScore('intelligence')),
+      wisdom:       abilityModifier(effectiveScore('wisdom')),
+      charisma:     abilityModifier(effectiveScore('charisma')),
+    };
+  }, [draft.abilityScores, abilityTotals]);
 
-  const intelligenceMod = abilityModifier(abilityTotals.intelligence);
+  const intelligenceMod = abilityMods.intelligence;
   const availableSkillPoints = totalSkillPointsAvailable(draft.classes, intelligenceMod, draft.race);
   const spentPoints = spentSkillPoints(draft.skills);
   const selectedClass = draft.classes[0];
@@ -286,7 +281,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
     combat: draft.combat,
     classes: draft.classes,
     size: draft.size,
-    tempScores,
+    abilityMods,
   });
   const combatSummary = `AC ${combatStats.totalAC} · Init ${signed(combatStats.initiativeTotal)} · F/R/W ${signed(combatStats.fortitudeTotal)}/${signed(combatStats.reflexTotal)}/${signed(combatStats.willTotal)}`;
   const hasUnselectedClass = draft.classes.some((c) => !c.name.trim());
@@ -797,10 +792,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
             onBaseChange={setAbilityBase}
             onLevelUpChange={setLevelUp}
             onEnhancementChange={setEnhancement}
-            onTempScoreChange={(key, val) => {
-              setTempScores((prev) => ({ ...prev, [key]: val ?? abilityTotals[key] }));
-              setAbilityTempScore(key, val);
-            }}
+            onTempScoreChange={(key, val) => setAbilityTempScore(key, val)}
           />
         </Accordion>
 

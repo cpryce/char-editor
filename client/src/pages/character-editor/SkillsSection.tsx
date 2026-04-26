@@ -61,7 +61,7 @@ export function SkillsSection({
   }
 
   return (
-    <div className="skills-table-wrapper rounded overflow-hidden">
+    <div className="skills-table-wrapper rounded">
       <div
         className={[
           'px-3 py-2 text-xs flex items-center justify-end gap-2 skills-toolbar',
