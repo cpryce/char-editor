@@ -37,6 +37,26 @@ export function CharactersPage({ onNewCharacter, onEditCharacter }: CharactersPa
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<'name' | 'class' | 'level' | 'updatedAt'>('updatedAt');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  function handleSort(key: typeof sortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  }
+
+  const sorted = [...characters].sort((a, b) => {
+    let cmp = 0;
+    if (sortKey === 'name')      cmp = a.name.localeCompare(b.name);
+    if (sortKey === 'class')     cmp = classLabel(a.classes).localeCompare(classLabel(b.classes));
+    if (sortKey === 'level')     cmp = totalLevel(a.classes) - totalLevel(b.classes);
+    if (sortKey === 'updatedAt') cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
 
   async function deleteCharacter(id: string) {
     setError(null);
@@ -101,14 +121,41 @@ export function CharactersPage({ onNewCharacter, onEditCharacter }: CharactersPa
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-[var(--color-canvas-subtle)]">
-                {['Name', 'Class', 'Level', 'Last Modified', ''].map((h) => (
+                {(
+                  [
+                    { label: 'Name',          key: 'name'      },
+                    { label: 'Class',         key: 'class'     },
+                    { label: 'Level',         key: 'level'     },
+                    { label: 'Last Modified', key: 'updatedAt' },
+                  ] as const
+                ).map(({ label, key }) => (
                   <th
-                    key={h}
-                    className="text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]"
+                    key={key}
+                    onClick={() => handleSort(key)}
+                    className="text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)] cursor-pointer select-none hover:text-[color:var(--color-fg-default)]"
                   >
-                    {h}
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      {sortKey === key && (
+                        <svg
+                          width="10"
+                          height="10"
+                          viewBox="0 0 10 10"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          style={{ color: 'var(--color-fg-muted)', opacity: 0.6 }}
+                        >
+                          {sortDir === 'asc' ? (
+                            <path d="M2 6l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          ) : (
+                            <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          )}
+                        </svg>
+                      )}
+                    </span>
                   </th>
                 ))}
+                <th className="border-b border-[var(--color-border-default)]"></th>
               </tr>
             </thead>
             <tbody>
@@ -129,7 +176,7 @@ export function CharactersPage({ onNewCharacter, onEditCharacter }: CharactersPa
                     to get started.
                   </td>
                 </tr>
-              ) : characters.map((char, i) => (
+              ) : sorted.map((char, i) => (
                 <tr
                   key={char._id}
                   className={`border-b border-[var(--color-border-muted)] cursor-pointer hover:bg-[var(--color-accent-subtle)] ${i % 2 === 0 ? 'bg-[var(--color-canvas-default)]' : 'bg-[var(--color-canvas-subtle)]'}`}
