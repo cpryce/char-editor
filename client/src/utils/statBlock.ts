@@ -214,3 +214,43 @@ export function statBlockToPlainText(data: StatBlockData): string {
     .map((para) => para.map((seg) => seg.bold + seg.normal).join(''))
     .join('\n\n');
 }
+
+// ── RTF export ────────────────────────────────────────────────────────────────
+
+/** Escape a string for inclusion in an RTF document (ansi/cp1252). */
+function rtfEscape(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/\{/g, '\\{')
+    .replace(/\}/g, '\\}')
+    // en-dash and em-dash
+    .replace(/\u2013/g, '\\endash ')
+    .replace(/\u2014/g, '\\emdash ')
+    // any remaining non-ASCII: encode as \'XX
+    .replace(/[^\x00-\x7F]/g, (ch) => `\\'${ch.charCodeAt(0).toString(16).padStart(2, '0')}`);
+}
+
+/**
+ * Generates a minimal RTF document from stat block data.
+ * Uses Times New Roman 11pt, matching the DMG example RTF format.
+ * Suitable for opening/editing in MS Word.
+ */
+export function statBlockToRtf(data: StatBlockData): string {
+  const header = [
+    '{\\rtf1\\ansi\\ansicpg1252\\deff0',
+    '{\\fonttbl{\\f0\\froman\\fcharset0 Times New Roman;}}',
+    '{\\colortbl ;\\red0\\green0\\blue0;}',
+    '\\f0\\fs22\\cf1',
+  ].join('\n');
+
+  const paragraphs = data.map((para) => {
+    const runs = para.map((seg) => {
+      const boldRun   = seg.bold   ? `{\\b ${rtfEscape(seg.bold)}}`  : '';
+      const normalRun = seg.normal ? rtfEscape(seg.normal)            : '';
+      return boldRun + normalRun;
+    }).join('');
+    return `\\pard\\plain\\ql\\widctlpar\\f0\\fs22 ${runs}\\par`;
+  });
+
+  return `${header}\n${paragraphs.join('\n')}\n}`;
+}
