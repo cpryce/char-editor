@@ -132,12 +132,12 @@ export interface ICharacter extends Document {
 
   // Ability Scores
   abilityScores: {
-    strength:     { base: number; racial: number; enhancement: number; misc: number; temp: number; levelUp: number };
-    dexterity:    { base: number; racial: number; enhancement: number; misc: number; temp: number; levelUp: number };
-    constitution: { base: number; racial: number; enhancement: number; misc: number; temp: number; levelUp: number };
-    intelligence: { base: number; racial: number; enhancement: number; misc: number; temp: number; levelUp: number };
-    wisdom:       { base: number; racial: number; enhancement: number; misc: number; temp: number; levelUp: number };
-    charisma:     { base: number; racial: number; enhancement: number; misc: number; temp: number; levelUp: number };
+    strength:     { base: number; racial: number; enhancement: number; misc: number; temp: number | null; tempMod: number | null; levelUp: number };
+    dexterity:    { base: number; racial: number; enhancement: number; misc: number; temp: number | null; tempMod: number | null; levelUp: number };
+    constitution: { base: number; racial: number; enhancement: number; misc: number; temp: number | null; tempMod: number | null; levelUp: number };
+    intelligence: { base: number; racial: number; enhancement: number; misc: number; temp: number | null; tempMod: number | null; levelUp: number };
+    wisdom:       { base: number; racial: number; enhancement: number; misc: number; temp: number | null; tempMod: number | null; levelUp: number };
+    charisma:     { base: number; racial: number; enhancement: number; misc: number; temp: number | null; tempMod: number | null; levelUp: number };
   };
 
   // Hit Points

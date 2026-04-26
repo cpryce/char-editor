@@ -311,6 +311,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
   const [customFeats, setCustomFeats] = useState<CustomFeat[]>([]);
   const [nameTouched, setNameTouched] = useState(false);
   const [showStatBlock, setShowStatBlock] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const saveSequenceRef = useRef(0);
   const nameError = nameTouched && !draft.name.trim() ? 'Name is required.' : undefined;
   const isEdit = Boolean(characterId);
@@ -782,18 +783,47 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
             <circle cx="4" cy="16" r="1.5" fill="currentColor" />
           </svg>
         </span>
-        <h2 className="text-xl font-semibold character-editor-title">
+        <h2 className="text-xl font-semibold character-editor-title flex-1">
           {headerTitle}
         </h2>
-        {hasRequiredFields && (
-          <button
-            type="button"
-            onClick={() => setShowStatBlock(true)}
-            className="stat-block-open-btn"
-          >
-            Stat Block
-          </button>
-        )}
+        <div className="flex items-center gap-2 ml-auto">
+          {hasRequiredFields && (
+            <button
+              type="button"
+              onClick={() => setShowStatBlock(true)}
+              className="stat-block-open-btn"
+            >
+              Stat Block
+            </button>
+          )}
+          {autoSaveCharacterId && (
+            <button
+              type="button"
+              disabled={exportingPdf}
+              className="stat-block-open-btn"
+              onClick={async () => {
+                setExportingPdf(true);
+                try {
+                  const res = await fetch(`/api/characters/${autoSaveCharacterId}/export-pdf`, { credentials: 'include' });
+                  if (!res.ok) throw new Error('Export failed');
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${draft.name.replace(/[^a-z0-9_\- ]/gi, '_')}_character_sheet.pdf`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch {
+                  // non-critical — silently fail
+                } finally {
+                  setExportingPdf(false);
+                }
+              }}
+            >
+              {exportingPdf ? 'Exporting…' : 'Export PDF'}
+            </button>
+          )}
+        </div>
       </div>
 
       {loadingCharacter && (

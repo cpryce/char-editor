@@ -9,6 +9,7 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import mongoose from 'mongoose';
 import path from 'path';
 import { User } from './models/User';
+import { fillCharacterPdf } from './utils/fillCharacterPdf';
 import { Character } from './models/Character';
 import { CustomFeat } from './models/CustomFeat';
 import { EncounterSession } from './models/EncounterSession';
@@ -177,6 +178,23 @@ app.post('/api/characters', async (req, res) => {
     } else {
       throw err;
     }
+  }
+});
+
+app.get('/api/characters/:id/export-pdf', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const character = await Character.findOne({ _id: req.params.id, owner: u._id });
+  if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+  try {
+    const pdfBytes = await fillCharacterPdf(character);
+    const safeName = (character.name ?? 'character').replace(/[^a-z0-9_\- ]/gi, '_');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}_character_sheet.pdf"`);
+    res.end(Buffer.from(pdfBytes));
+  } catch (err: unknown) {
+    console.error('PDF export error:', err);
+    res.status(500).json({ error: 'Failed to generate PDF' });
   }
 });
 
