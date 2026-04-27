@@ -178,8 +178,8 @@ export function CombatSection({
             {modInput('Shield', acShield, (v) => updateNumeric('armorClass.shield', v))}
             {modInput('Dex', acDexMod)}
             {modInput('Dodge', acDodge, (v) => updateNumeric('armorClass.dodge', v))}
-            {modInput('Deflection', acDeflection, (v) => updateNumeric('armorClass.deflection', v))}
-            {modInput('Natural', acNatural, (v) => updateNumeric('armorClass.natural', v))}
+            {modInput('Deflection', acDeflection)}
+            {modInput('Natural', acNatural)}
             {modInput('Misc', acMisc, (v) => updateNumeric('armorClass.misc', v))}
             <div className="basis-full text-xs combat-muted-text">
               Touch {touchAC} / Flat {flatFootedAC}

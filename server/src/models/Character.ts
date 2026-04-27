@@ -43,6 +43,23 @@ const armorLoadoutSchema = new Schema(
   { _id: false },
 );
 
+const weaponLoadoutSchema = new Schema(
+  {
+    name:             { type: String, required: true },
+    proficiency:      { type: String, required: true }, // 'Simple' | 'Martial' | 'Exotic'
+    handedness:       { type: String, required: true }, // 'Light' | 'One-Handed' | 'Two-Handed'
+    damageMedium:     { type: String, default: '—' },
+    damageSmall:      { type: String, default: '—' },
+    critical:         { type: String, default: '×2' },
+    rangeIncrement:   { type: String, default: '—' },
+    weight:           { type: String, default: '' },
+    damageType:       { type: String, default: '' },
+    enhancementBonus: { type: Number, default: 0 },
+    special:          { type: String, default: '' },
+  },
+  { _id: false },
+);
+
 const classLevelSchema = new Schema(
   {
     name:       { type: String, required: true },
@@ -167,32 +184,6 @@ export interface ICharacter extends Document {
   combat: {
     initiative:  { miscBonus: number };
     speed:       { base: number; armorAdjust: number; fly: number; swim: number };
-    gear: {
-      armor: {
-        name: string;
-        category: string;
-        armorBonus: number;
-        enhancementBonus: number;
-        maxDexBonus: string | null;
-        armorCheckPenalty: number;
-        arcaneSpellFailure: string;
-        speed: string;
-        weight: string;
-        armorAdjust: number;
-      } | null;
-      shield: {
-        name: string;
-        category: string;
-        armorBonus: number;
-        enhancementBonus: number;
-        maxDexBonus: string | null;
-        armorCheckPenalty: number;
-        arcaneSpellFailure: string;
-        speed: string;
-        weight: string;
-        armorAdjust: number;
-      } | null;
-    };
     armorClass:  { armor: number; shield: number; dodge: number; natural: number; deflection: number; misc: number };
     saves: {
       fortitude: { base: number; magic: number; misc: number; temp: number };
@@ -201,6 +192,44 @@ export interface ICharacter extends Document {
     };
     baseAttackBonus: number;
     grappleBonus:    number;
+  };
+
+  // Inventory
+  inventory: {
+    head:      string;
+    face:      string;
+    neck:      string;
+    shoulders: string;
+    chest:     string;
+    wrists:    string;
+    hands:     string;
+    ringLeft:  string;
+    ringRight: string;
+    waist:     string;
+    feet:      string;
+    body: {
+      name: string; category: string; armorBonus: number; enhancementBonus: number;
+      maxDexBonus: string | null; armorCheckPenalty: number; arcaneSpellFailure: string;
+      speed: string; weight: string; armorAdjust: number;
+    } | null;
+    mainHand: {
+      name: string; proficiency: string; handedness: string;
+      damageMedium: string; damageSmall: string; critical: string;
+      rangeIncrement: string; weight: string; damageType: string;
+      enhancementBonus: number; special: string;
+    } | null;
+    offHandWeapon: {
+      name: string; proficiency: string; handedness: string;
+      damageMedium: string; damageSmall: string; critical: string;
+      rangeIncrement: string; weight: string; damageType: string;
+      enhancementBonus: number; special: string;
+    } | null;
+    offHandShield: {
+      name: string; category: string; armorBonus: number; enhancementBonus: number;
+      maxDexBonus: string | null; armorCheckPenalty: number; arcaneSpellFailure: string;
+      speed: string; weight: string; armorAdjust: number;
+    } | null;
+    slotBonuses?: Record<string, { type: string; value: number }>;
   };
 
   // Skills, Feats, Equipment, Currency
@@ -265,10 +294,6 @@ const characterSchema = new Schema<ICharacter>(
         fly: { type: Number, default: 0 },
         swim: { type: Number, default: 0 },
       },
-      gear: {
-        armor: { type: armorLoadoutSchema, default: null },
-        shield: { type: armorLoadoutSchema, default: null },
-      },
       armorClass: {
         armor:       { type: Number, default: 0 },
         shield:      { type: Number, default: 0 },
@@ -284,6 +309,26 @@ const characterSchema = new Schema<ICharacter>(
       },
       baseAttackBonus: { type: Number, default: 0 },
       grappleBonus:    { type: Number, default: 0 },
+    },
+
+    // Inventory
+    inventory: {
+      head:      { type: String, default: '' },
+      face:      { type: String, default: '' },
+      neck:      { type: String, default: '' },
+      shoulders: { type: String, default: '' },
+      chest:     { type: String, default: '' },
+      wrists:    { type: String, default: '' },
+      hands:     { type: String, default: '' },
+      ringLeft:  { type: String, default: '' },
+      ringRight: { type: String, default: '' },
+      waist:     { type: String, default: '' },
+      feet:      { type: String, default: '' },
+      body:          { type: armorLoadoutSchema,  default: null },
+      mainHand:      { type: weaponLoadoutSchema, default: null },
+      offHandWeapon: { type: weaponLoadoutSchema, default: null },
+      offHandShield: { type: armorLoadoutSchema,  default: null },
+      slotBonuses:   { type: Schema.Types.Mixed,   default: {} },
     },
 
     // Skills, Feats, Equipment, Currency

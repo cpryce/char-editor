@@ -1,0 +1,227 @@
+.inventory-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Worn slots grid ─────────────────────────────────────────────────────── */
+.inventory-slots-grid {
+  display: grid;
+  grid-template-columns: max-content minmax(130px, 1fr) 10rem 4rem;
+  gap: 4px 8px;
+  align-items: center;
+}
+
+.inventory-slot-label {
+  color: var(--color-fg-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.inventory-slot-input {
+  width: 100%;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: var(--color-canvas-default);
+  color: var(--color-fg-default);
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+/* ── Slot AC bonus fields ──────────────────────────────────────────────────── */
+
+.inventory-slots-col-header {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-fg-muted);
+  padding-bottom: 2px;
+}
+
+.inventory-slot-bonus-type {
+  width: 100%;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: var(--color-canvas-default);
+  color: var(--color-fg-default);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.inventory-slot-bonus-value {
+  width: 100%;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: var(--color-canvas-default);
+  color: var(--color-fg-default);
+  padding: 4px 6px;
+  font-size: 12px;
+  text-align: right;
+}
+
+.inventory-slot-prefilled {
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  padding: 4px 0;
+}
+
+.inventory-slot-label--muted {
+  color: var(--color-fg-subtle);
+}
+
+.inventory-slot-empty {
+  font-style: italic;
+  font-size: 12px;
+  color: var(--color-fg-subtle);
+}
+
+/* ── Body armor row ──────────────────────────────────────────────────────── */
+.inventory-body-stats {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+.inventory-body-stat {
+  white-space: nowrap;
+}
+
+.inventory-body-stat strong {
+  color: var(--color-fg-default);
+  font-weight: 500;
+}
+
+/* ── Section heading ─────────────────────────────────────────────────────── */
+.inventory-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-fg-muted);
+  margin-bottom: 4px;
+}
+
+/* ── Hands table ─────────────────────────────────────────────────────────── */
+.inventory-hands-wrap {
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.inventory-hands-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.inventory-hands-thead {
+  background: var(--color-canvas-subtle);
+}
+
+.inventory-hands-th {
+  color: var(--color-fg-muted);
+  border-bottom: 1px solid var(--color-border-default);
+  text-align: left;
+  font-weight: 500;
+  padding: 7px 12px;
+}
+
+.inventory-hands-row-even {
+  background: var(--color-canvas-default);
+}
+
+.inventory-hands-row-odd {
+  background: var(--color-canvas-subtle);
+}
+
+.inventory-hands-td {
+  border-bottom: 1px solid var(--color-border-muted);
+  padding: 6px 12px;
+  color: var(--color-fg-default);
+  vertical-align: middle;
+}
+
+.inventory-hands-label {
+  color: var(--color-fg-muted);
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.inventory-hands-input {
+  width: 100%;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: var(--color-canvas-default);
+  color: var(--color-fg-default);
+  padding: 4px 8px;
+}
+
+.inventory-hands-input--number {
+  min-width: 56px;
+  max-width: 68px;
+}
+
+.inventory-hands-input--readonly {
+  background: var(--color-canvas-subtle);
+  color: var(--color-fg-muted);
+  cursor: default;
+}
+
+.inventory-hands-stat {
+  color: var(--color-fg-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.inventory-hands-clear {
+  border: none;
+  background: transparent;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.inventory-hands-clear:hover {
+  color: var(--color-danger-fg);
+  background: var(--color-danger-subtle);
+}
+
+.inventory-offhand-mode {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.inventory-offhand-mode label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.inventory-offhand-mode label:has(input:checked) {
+  color: var(--color-fg-default);
+}
+
+.inventory-two-handed-note {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.inventory-help {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}

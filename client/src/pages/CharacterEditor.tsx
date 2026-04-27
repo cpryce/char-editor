@@ -32,7 +32,7 @@ import { AbilityScoresSection, ABILITY_KEYS } from './character-editor/AbilitySc
 import { FeatsSection } from './character-editor/FeatsSection';
 import { CombatSection } from './character-editor/CombatSection';
 import type { CombatDerivedStats } from './character-editor/CombatSection';
-import { WeaponsArmorSection } from './character-editor/WeaponsArmorSection';
+import { InventorySection } from './character-editor/InventorySection';
 import { SkillsSection } from './character-editor/SkillsSection';
 import type { AbilityKey } from './character-editor/AbilityScoresSection';
 import { generateStatBlock, statBlockToPlainText, statBlockToRtf } from '../utils/statBlock';
@@ -226,11 +226,13 @@ function deriveAbilityTotals(scores: CharacterDraft['abilityScores']): Record<Ab
 
 function deriveCombatStats({
   combat,
+  inventory,
   classes,
   size,
   abilityMods,
 }: {
   combat: CharacterDraft['combat'];
+  inventory: CharacterDraft['inventory'];
   classes: CharacterDraft['classes'];
   size: CharacterDraft['size'];
   abilityMods: Record<AbilityKey, number>;
@@ -242,7 +244,6 @@ function deriveCombatStats({
   const sizeMod = SIZE_MODIFIERS[size] ?? 0;
   const acArmor = safeCombatNumber(combat.armorClass.armor);
   const acShield = safeCombatNumber(combat.armorClass.shield);
-  const acDodge = safeCombatNumber(combat.armorClass.dodge);
   const acNatural = safeCombatNumber(combat.armorClass.natural);
   const acDeflection = safeCombatNumber(combat.armorClass.deflection);
   const acMisc = safeCombatNumber(combat.armorClass.misc);
@@ -256,14 +257,20 @@ function deriveCombatStats({
   const reflexBase = baseSaveBonusFromClasses(classes, 'reflex');
   const willBase = baseSaveBonusFromClasses(classes, 'will');
 
-  const armorMaxDex = parseMaxDexBonus(combat.gear.armor?.maxDexBonus);
-  const shieldMaxDex = parseMaxDexBonus(combat.gear.shield?.maxDexBonus);
+  const armorMaxDex = parseMaxDexBonus(inventory.body?.maxDexBonus);
+  const shieldMaxDex = parseMaxDexBonus(inventory.offHandShield?.maxDexBonus);
   const maxDexCap = [armorMaxDex, shieldMaxDex]
     .filter((cap): cap is number => cap !== null)
     .reduce<number | null>((lowest, cap) => (lowest === null ? cap : Math.min(lowest, cap)), null);
   const acDexMod = dexMod <= 0
     ? dexMod
     : (maxDexCap === null ? dexMod : Math.min(dexMod, maxDexCap));
+
+  // Slot dodge bonuses stack on top of the manually-entered dodge value.
+  const slotBonusEntries = Object.values(inventory.slotBonuses ?? {})
+    .filter((b): b is { type: string; value: number } => b != null);
+  const slotDodge = slotBonusEntries.reduce((acc, b) => (b.type === 'dodge' ? acc + b.value : acc), 0);
+  const acDodge = safeCombatNumber(combat.armorClass.dodge) + slotDodge;
 
   const totalAC = 10 + acArmor + acShield + acDexMod + sizeMod + acDodge + acNatural + acDeflection + acMisc;
   const touchAC = 10 + acDexMod + sizeMod + acDodge + acDeflection + acMisc;
@@ -365,15 +372,18 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
     : 0;
   const combatStats = deriveCombatStats({
     combat: draft.combat,
+    inventory: draft.inventory,
     classes: draft.classes,
     size: draft.size,
     abilityMods,
   });
   const combatSummary = `AC ${combatStats.totalAC} · Init ${signed(combatStats.initiativeTotal)} · F/R/W ${signed(combatStats.fortitudeTotal)}/${signed(combatStats.reflexTotal)}/${signed(combatStats.willTotal)}`;
-  const weaponsArmorSummary = [
-    draft.combat.gear.armor?.name,
-    draft.combat.gear.shield?.name,
-  ].filter(Boolean).join(' + ') || 'No armor or shield selected';
+  const inventorySummary = [
+    draft.inventory.body?.name,
+    draft.inventory.mainHand?.name,
+    draft.inventory.offHandWeapon?.name,
+    draft.inventory.offHandShield?.name,
+  ].filter(Boolean).join(' + ') || 'No items equipped';
   const hasUnselectedClass = draft.classes.some((c) => !c.name.trim());
   const hasRequiredFields = draft.name.trim().length > 0
     && draft.classes.length > 0
@@ -441,16 +451,35 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           ...rawCombat,
           initiative: { ...base.combat.initiative, ...(rawCombat.initiative ?? {}) },
           speed: { ...base.combat.speed, ...(rawCombat.speed ?? {}) },
-          gear: {
-            armor: rawCombat.gear?.armor ? { ...rawCombat.gear.armor } : null,
-            shield: rawCombat.gear?.shield ? { ...rawCombat.gear.shield } : null,
-          },
           armorClass: { ...base.combat.armorClass, ...(rawCombat.armorClass ?? {}) },
           saves: {
             fortitude: { ...base.combat.saves.fortitude, ...(rawCombat.saves?.fortitude ?? {}) },
             reflex: { ...base.combat.saves.reflex, ...(rawCombat.saves?.reflex ?? {}) },
             will: { ...base.combat.saves.will, ...(rawCombat.saves?.will ?? {}) },
           },
+        };
+
+        const rawInv = (data.inventory as CharacterDraft['inventory'] | undefined) ?? base.inventory;
+        const normalizedInventory: CharacterDraft['inventory'] = {
+          ...base.inventory,
+          head:      typeof rawInv.head      === 'string' ? rawInv.head      : '',
+          face:      typeof rawInv.face      === 'string' ? rawInv.face      : '',
+          neck:      typeof rawInv.neck      === 'string' ? rawInv.neck      : '',
+          shoulders: typeof rawInv.shoulders === 'string' ? rawInv.shoulders : '',
+          chest:     typeof rawInv.chest     === 'string' ? rawInv.chest     : '',
+          wrists:    typeof rawInv.wrists    === 'string' ? rawInv.wrists    : '',
+          hands:     typeof rawInv.hands     === 'string' ? rawInv.hands     : '',
+          ringLeft:  typeof rawInv.ringLeft  === 'string' ? rawInv.ringLeft  : '',
+          ringRight: typeof rawInv.ringRight === 'string' ? rawInv.ringRight : '',
+          waist:     typeof rawInv.waist     === 'string' ? rawInv.waist     : '',
+          feet:      typeof rawInv.feet      === 'string' ? rawInv.feet      : '',
+          body:          rawInv.body          ? { ...rawInv.body }          : null,
+          mainHand:      rawInv.mainHand      ? { ...rawInv.mainHand }      : null,
+          offHandWeapon: rawInv.offHandWeapon ? { ...rawInv.offHandWeapon } : null,
+          offHandShield: rawInv.offHandShield ? { ...rawInv.offHandShield } : null,
+          slotBonuses:   (typeof rawInv.slotBonuses === 'object' && rawInv.slotBonuses !== null
+            ? rawInv.slotBonuses
+            : {}) as Inventory['slotBonuses'],
         };
 
         const loaded: CharacterDraft = {
@@ -491,6 +520,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           })(),
           hitPoints: (data.hitPoints as CharacterDraft['hitPoints']) ?? base.hitPoints,
           combat: normalizedCombat,
+          inventory: normalizedInventory,
           skills: mergedSkills,
         };
 
@@ -955,12 +985,17 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
         </Accordion>
 
         <Accordion
-          title="Weapons & Armor"
-          summary={weaponsArmorSummary}
+          title="Inventory"
+          summary={inventorySummary}
         >
-          <WeaponsArmorSection
+          <InventorySection
+            inventory={draft.inventory}
             combat={draft.combat}
-            onCombatChange={(value) => setField('combat', value)}
+            size={draft.size}
+            onChange={(inventory, combat) => {
+              setField('inventory', inventory);
+              setField('combat', combat);
+            }}
             inputStyle={inputStyle}
           />
         </Accordion>

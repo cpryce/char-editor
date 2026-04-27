@@ -549,7 +549,6 @@ export function newCharacterDraft(): CharacterDraft {
     combat: {
       initiative: { miscBonus: 0 },
       speed: { base: 30, armorAdjust: 0, fly: 0, swim: 0 },
-      gear: { armor: null, shield: null },
       armorClass: { armor: 0, shield: 0, dodge: 0, natural: 0, deflection: 0, misc: 0 },
       saves: {
         fortitude: { base: 0, magic: 0, misc: 0, temp: 0 },
@@ -558,6 +557,17 @@ export function newCharacterDraft(): CharacterDraft {
       },
       baseAttackBonus: 0,
       grappleBonus: 0,
+    },
+    inventory: {
+      head: '', face: '', neck: '', shoulders: '',
+      chest: '', wrists: '', hands: '',
+      ringLeft: '', ringRight: '',
+      waist: '', feet: '',
+      body: null,
+      mainHand: null,
+      offHandWeapon: null,
+      offHandShield: null,
+      slotBonuses: {},
     },
     skills: SKILL_DEFS.map((def) => ({
       name: def.name,

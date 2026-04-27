@@ -69,6 +69,22 @@ export interface FeatSlot {
   shortDescription?: string; // from SRD catalog; undefined for custom/free-text feats
 }
 
+/** Bonus types that can apply to Armor Class, per the d20 SRD stacking rules. */
+export type AcBonusType =
+  | 'armor' | 'shield' | 'deflection' | 'dodge'
+  | 'natural' | 'insight' | 'luck' | 'sacred' | 'profane';
+
+/** An AC bonus granted by an item in a named inventory slot. */
+export interface SlotAcBonus {
+  type: AcBonusType;
+  value: number;
+}
+
+/** Keys of the free-text worn-item slots (excludes the structured body/hand slots). */
+export type TextSlotKey =
+  | 'head' | 'face' | 'neck' | 'shoulders' | 'chest'
+  | 'wrists' | 'hands' | 'ringLeft' | 'ringRight' | 'waist' | 'feet';
+
 export interface ArmorLoadout {
   name: string;
   category: 'Light Armor' | 'Medium Armor' | 'Heavy Armor' | 'Shield';
@@ -80,6 +96,55 @@ export interface ArmorLoadout {
   speed: string;
   weight: string;
   armorAdjust: number;
+  /** Special material from d20 SRD (e.g. 'mithral', 'adamantine'). */
+  material?: string;
+}
+
+export interface WeaponLoadout {
+  name: string;
+  proficiency: 'Simple' | 'Martial' | 'Exotic';
+  handedness: 'Light' | 'One-Handed' | 'Two-Handed';
+  /** Damage for a Medium character. */
+  damageMedium: string;
+  /** Damage for a Small character. */
+  damageSmall: string;
+  /** e.g. "19-20/×2" */
+  critical: string;
+  /** "—" for melee-only, otherwise e.g. "30 ft." */
+  rangeIncrement: string;
+  weight: string;
+  damageType: string;
+  enhancementBonus: number;
+  special: string;
+  /** Special material from d20 SRD (e.g. 'mithral', 'cold-iron'). */
+  material?: string;
+}
+
+/** All equipment slots on a character. */
+export interface Inventory {
+  // Named worn slots (free-text item name)
+  head:      string;
+  face:      string;
+  neck:      string;
+  shoulders: string;
+  chest:     string;
+  wrists:    string;
+  hands:     string;
+  ringLeft:  string;
+  ringRight: string;
+  waist:     string;
+  feet:      string;
+  // Complex slots with structured loadouts
+  /** Body slot — holds armor. Syncs to combat.armorClass.armor. */
+  body:          ArmorLoadout | null;
+  /** Main-hand weapon. When Two-Handed, offHandWeapon and offHandShield must both be null. */
+  mainHand:      WeaponLoadout | null;
+  /** Off-hand weapon. Mutually exclusive with offHandShield. Null when mainHand is Two-Handed. */
+  offHandWeapon: WeaponLoadout | null;
+  /** Off-hand shield. Mutually exclusive with offHandWeapon. Null when mainHand is Two-Handed. Syncs to combat.armorClass.shield. */
+  offHandShield: ArmorLoadout | null;
+  /** Optional AC bonuses from items in worn text slots. Dodge stacks; all other types take only the best. */
+  slotBonuses: Partial<Record<TextSlotKey, SlotAcBonus>>;
 }
 
 // ── Full character form state ─────────────────────────────────────────────────
@@ -117,7 +182,6 @@ export interface CharacterDraft {
   combat: {
     initiative: { miscBonus: number };
     speed: { base: number; armorAdjust: number; fly: number; swim: number };
-    gear: { armor: ArmorLoadout | null; shield: ArmorLoadout | null };
     armorClass: { armor: number; shield: number; dodge: number; natural: number; deflection: number; misc: number };
     saves: {
       fortitude: { base: number; magic: number; misc: number; temp: number };
@@ -127,6 +191,8 @@ export interface CharacterDraft {
     baseAttackBonus: number;
     grappleBonus: number;
   };
+
+  inventory: Inventory;
 
   skills: Skill[];
   feats: FeatSlot[];
