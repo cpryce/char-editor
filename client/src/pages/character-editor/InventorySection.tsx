@@ -335,75 +335,92 @@ export function InventorySection({
       {/* ── 1. Weapons ── */}
       <div>
         <p className="inventory-section-title">Weapons</p>
-        <div className="inventory-hands-wrap">
-          <table className="inventory-hands-table" aria-label="Weapon slots">
-            <thead className="inventory-hands-thead">
-              <tr>
-                {['Slot', 'Weapon', 'Material', 'Handedness', dmgLabel, 'Critical', 'Range', 'Type', 'Enh', 'Wt', ''].map((h) => (
-                  <th key={h} className="inventory-hands-th">{h}</th>
+        <div className="inventory-weapon-selector">
+          <div className="inventory-hands-wrap">
+            <table className="inventory-hands-table" aria-label="Main-hand weapon">
+              <thead className="inventory-hands-thead">
+                <tr>
+                  {['Main Hand', 'Material', 'Handedness', dmgLabel, 'Critical', 'Range', 'Type', 'Enh', 'Wt', ''].map((h) => (
+                    <th key={h} className="inventory-hands-th">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <WeaponRow
+                  label=""
+                  weapon={mainHand}
+                  rowClass="inventory-hands-row-even"
+                  showSmallDamage={showSmallDamage}
+                  inputStyle={inputStyle}
+                  onSelect={handleMainHandSelect}
+                  onFieldChange={updateMainHandField}
+                  onClear={() => updateInventory({ mainHand: null })}
+                />
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="inventory-weapon-selector">
+          <div className="inventory-weapon-selector-header">
+            {!isTwoHanded && (
+              <div className="inventory-offhand-mode">
+                {(['none', 'weapon', 'shield'] as const).map((mode) => (
+                  <label key={mode}>
+                    <input
+                      type="radio"
+                      name="offhand-mode"
+                      value={mode}
+                      checked={offHandMode === mode}
+                      onChange={() => setOffHandMode(mode)}
+                    />
+                    {mode === 'none' ? 'Empty' : mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  </label>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              <WeaponRow
-                label="Main-hand"
-                weapon={mainHand}
-                rowClass="inventory-hands-row-even"
-                showSmallDamage={showSmallDamage}
-                inputStyle={inputStyle}
-                onSelect={handleMainHandSelect}
-                onFieldChange={updateMainHandField}
-                onClear={() => updateInventory({ mainHand: null })}
-              />
-              <tr className="inventory-hands-row-odd">
-                <td className="inventory-hands-td inventory-hands-label">Off-hand</td>
-                <td className="inventory-hands-td" colSpan={9}>
-                  {isTwoHanded ? (
-                    <span className="inventory-two-handed-note">
-                      Off-hand unavailable — two-handed weapon in main hand.
-                    </span>
-                  ) : (
-                    <>
-                      <div className="inventory-offhand-mode">
-                        {(['none', 'weapon', 'shield'] as const).map((mode) => (
-                          <label key={mode}>
-                            <input
-                              type="radio"
-                              name="offhand-mode"
-                              value={mode}
-                              checked={offHandMode === mode}
-                              onChange={() => setOffHandMode(mode)}
-                            />
-                            {mode === 'none' ? 'Empty' : mode.charAt(0).toUpperCase() + mode.slice(1)}
-                          </label>
-                        ))}
-                      </div>
-                      {offHandMode === 'weapon' && (
-                        <table className="inventory-hands-table" style={{ marginTop: 4 }}>
-                          <thead className="inventory-hands-thead">
-                            <tr>
-                              {['Weapon', 'Material', 'Handedness', dmgLabel, 'Critical', 'Range', 'Type', 'Enh', 'Wt', ''].map((h) => (
-                                <th key={h} className="inventory-hands-th">{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <WeaponRow
-                              label=""
-                              weapon={offWeapon}
-                              rowClass=""
-                              showSmallDamage={showSmallDamage}
-                              inputStyle={inputStyle}
-                              onSelect={handleOffHandWeaponSelect}
-                              onFieldChange={updateOffHandWeaponField}
-                              onClear={() => updateInventory({ offHandWeapon: null })}
-                              allowTwoHanded={false}
-                              entries={OFF_HAND_WEAPON_CATALOG}
-                            />
-                          </tbody>
-                        </table>
-                      )}
-                      {offHandMode === 'shield' && (
+              </div>
+            )}
+          </div>
+          <div className="inventory-hands-wrap">
+            <table className="inventory-hands-table" aria-label="Weapon slots">
+              {isTwoHanded ? (
+                <tbody>
+                  <tr className="inventory-hands-row-odd">
+                    <td className="inventory-hands-td" colSpan={10}>
+                      <span className="inventory-two-handed-note">
+                        Off-hand unavailable — two-handed weapon in main hand.
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              ) : offHandMode === 'weapon' ? (
+                <>
+                  <thead className="inventory-hands-thead">
+                    <tr>
+                      {['Off-Hand', 'Material', 'Handedness', dmgLabel, 'Critical', 'Range', 'Type', 'Enh', 'Wt', ''].map((h) => (
+                        <th key={h} className="inventory-hands-th">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <WeaponRow
+                      label=""
+                      weapon={offWeapon}
+                      rowClass="inventory-hands-row-odd"
+                      showSmallDamage={showSmallDamage}
+                      inputStyle={inputStyle}
+                      onSelect={handleOffHandWeaponSelect}
+                      onFieldChange={updateOffHandWeaponField}
+                      onClear={() => updateInventory({ offHandWeapon: null })}
+                      allowTwoHanded={false}
+                      entries={OFF_HAND_WEAPON_CATALOG}
+                    />
+                  </tbody>
+                </>
+              ) : (
+                <tbody>
+                  <tr className="inventory-hands-row-odd">
+                    <td className="inventory-hands-td" colSpan={10}>
+                      {offHandMode === 'shield' ? (
                         <ShieldRow
                           shield={offShield}
                           inputStyle={inputStyle}
@@ -411,13 +428,15 @@ export function InventorySection({
                           onFieldChange={updateOffHandShieldField}
                           onClear={() => updateInventory({ offHandShield: null })}
                         />
+                      ) : (
+                        <span className="inventory-help">No off-hand item selected.</span>
                       )}
-                    </>
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                    </td>
+                  </tr>
+                </tbody>
+              )}
+            </table>
+          </div>
         </div>
         <p className="inventory-help" style={{ marginTop: 8 }}>
           Light and one-handed weapons may be used in either hand.
