@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import type { CharacterDraft, AbilityScore, FeatSlot } from '../types/character';
+import type { CharacterDraft, AbilityScore, FeatSlot, Inventory, SlotAcBonus } from '../types/character';
 import { HIT_DIE_BY_CLASS } from '../types/character';
 import {
   newCharacterDraft,
@@ -268,7 +268,7 @@ function deriveCombatStats({
 
   // Slot dodge bonuses stack on top of the manually-entered dodge value.
   const slotBonusEntries = Object.values(inventory.slotBonuses ?? {})
-    .filter((b): b is { type: string; value: number } => b != null);
+    .filter((b): b is SlotAcBonus => b != null);
   const slotDodge = slotBonusEntries.reduce((acc, b) => (b.type === 'dodge' ? acc + b.value : acc), 0);
   const acDodge = safeCombatNumber(combat.armorClass.dodge) + slotDodge;
 

@@ -164,11 +164,9 @@ export function InventorySection({
     nextCombat: CharacterDraft['combat'],
   ): CharacterDraft['combat'] {
     const slotBonusEntries = Object.values(nextInv.slotBonuses ?? {})
-      .filter((b): b is { type: string; value: number } => b != null);
+      .filter((b): b is SlotAcBonus => b != null);
     const bestSlot = (t: string) =>
       slotBonusEntries.reduce((best, b) => (b.type === t ? Math.max(best, b.value) : best), 0);
-    const sumSlot  = (t: string) =>
-      slotBonusEntries.reduce((acc,  b) => (b.type === t ? acc + b.value : acc), 0);
     return {
       ...nextCombat,
       armorClass: {
