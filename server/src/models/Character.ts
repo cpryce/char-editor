@@ -27,6 +27,22 @@ const savingThrowSchema = new Schema(
   { _id: false },
 );
 
+const armorLoadoutSchema = new Schema(
+  {
+    name: { type: String, required: true },
+    category: { type: String, required: true },
+    armorBonus: { type: Number, default: 0 },
+    enhancementBonus: { type: Number, default: 0 },
+    maxDexBonus: { type: String, default: null },
+    armorCheckPenalty: { type: Number, default: 0 },
+    arcaneSpellFailure: { type: String, default: '' },
+    speed: { type: String, default: '' },
+    weight: { type: String, default: '' },
+    armorAdjust: { type: Number, default: 0 },
+  },
+  { _id: false },
+);
+
 const classLevelSchema = new Schema(
   {
     name:       { type: String, required: true },
@@ -151,6 +167,32 @@ export interface ICharacter extends Document {
   combat: {
     initiative:  { miscBonus: number };
     speed:       { base: number; armorAdjust: number; fly: number; swim: number };
+    gear: {
+      armor: {
+        name: string;
+        category: string;
+        armorBonus: number;
+        enhancementBonus: number;
+        maxDexBonus: string | null;
+        armorCheckPenalty: number;
+        arcaneSpellFailure: string;
+        speed: string;
+        weight: string;
+        armorAdjust: number;
+      } | null;
+      shield: {
+        name: string;
+        category: string;
+        armorBonus: number;
+        enhancementBonus: number;
+        maxDexBonus: string | null;
+        armorCheckPenalty: number;
+        arcaneSpellFailure: string;
+        speed: string;
+        weight: string;
+        armorAdjust: number;
+      } | null;
+    };
     armorClass:  { armor: number; shield: number; dodge: number; natural: number; deflection: number; misc: number };
     saves: {
       fortitude: { base: number; magic: number; misc: number; temp: number };
@@ -222,6 +264,10 @@ const characterSchema = new Schema<ICharacter>(
         armorAdjust: { type: Number, default: 0 },
         fly: { type: Number, default: 0 },
         swim: { type: Number, default: 0 },
+      },
+      gear: {
+        armor: { type: armorLoadoutSchema, default: null },
+        shield: { type: armorLoadoutSchema, default: null },
       },
       armorClass: {
         armor:       { type: Number, default: 0 },

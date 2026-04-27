@@ -7,6 +7,7 @@ function signed(value: number) {
 
 export type CombatDerivedStats = {
   dexMod: number;
+  acDexMod: number;
   conMod: number;
   wisMod: number;
   strMod: number;
@@ -49,6 +50,7 @@ export function CombatSection({
 }) {
   const {
     dexMod,
+    acDexMod,
     conMod,
     wisMod,
     strMod,
@@ -174,7 +176,7 @@ export function CombatSection({
           <>
             {modInput('Armor', acArmor, (v) => updateNumeric('armorClass.armor', v))}
             {modInput('Shield', acShield, (v) => updateNumeric('armorClass.shield', v))}
-            {modInput('Dex', dexMod)}
+            {modInput('Dex', acDexMod)}
             {modInput('Dodge', acDodge, (v) => updateNumeric('armorClass.dodge', v))}
             {modInput('Deflection', acDeflection, (v) => updateNumeric('armorClass.deflection', v))}
             {modInput('Natural', acNatural, (v) => updateNumeric('armorClass.natural', v))}

@@ -69,6 +69,19 @@ export interface FeatSlot {
   shortDescription?: string; // from SRD catalog; undefined for custom/free-text feats
 }
 
+export interface ArmorLoadout {
+  name: string;
+  category: 'Light Armor' | 'Medium Armor' | 'Heavy Armor' | 'Shield';
+  armorBonus: number;
+  enhancementBonus: number;
+  maxDexBonus: string | null;
+  armorCheckPenalty: number;
+  arcaneSpellFailure: string;
+  speed: string;
+  weight: string;
+  armorAdjust: number;
+}
+
 // ── Full character form state ─────────────────────────────────────────────────
 
 export interface CharacterDraft {
@@ -104,6 +117,7 @@ export interface CharacterDraft {
   combat: {
     initiative: { miscBonus: number };
     speed: { base: number; armorAdjust: number; fly: number; swim: number };
+    gear: { armor: ArmorLoadout | null; shield: ArmorLoadout | null };
     armorClass: { armor: number; shield: number; dodge: number; natural: number; deflection: number; misc: number };
     saves: {
       fortitude: { base: number; magic: number; misc: number; temp: number };

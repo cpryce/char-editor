@@ -32,6 +32,7 @@ import { AbilityScoresSection, ABILITY_KEYS } from './character-editor/AbilitySc
 import { FeatsSection } from './character-editor/FeatsSection';
 import { CombatSection } from './character-editor/CombatSection';
 import type { CombatDerivedStats } from './character-editor/CombatSection';
+import { WeaponsArmorSection } from './character-editor/WeaponsArmorSection';
 import { SkillsSection } from './character-editor/SkillsSection';
 import type { AbilityKey } from './character-editor/AbilityScoresSection';
 import { generateStatBlock, statBlockToPlainText, statBlockToRtf } from '../utils/statBlock';
@@ -204,6 +205,14 @@ function safeCombatNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
+function parseMaxDexBonus(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const match = value.match(/-?\d+/);
+  if (!match) return null;
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function deriveAbilityTotals(scores: CharacterDraft['abilityScores']): Record<AbilityKey, number> {
   return {
     strength: totalScore(scores.strength),
@@ -247,8 +256,17 @@ function deriveCombatStats({
   const reflexBase = baseSaveBonusFromClasses(classes, 'reflex');
   const willBase = baseSaveBonusFromClasses(classes, 'will');
 
-  const totalAC = 10 + acArmor + acShield + dexMod + sizeMod + acDodge + acNatural + acDeflection + acMisc;
-  const touchAC = 10 + dexMod + sizeMod + acDodge + acDeflection + acMisc;
+  const armorMaxDex = parseMaxDexBonus(combat.gear.armor?.maxDexBonus);
+  const shieldMaxDex = parseMaxDexBonus(combat.gear.shield?.maxDexBonus);
+  const maxDexCap = [armorMaxDex, shieldMaxDex]
+    .filter((cap): cap is number => cap !== null)
+    .reduce<number | null>((lowest, cap) => (lowest === null ? cap : Math.min(lowest, cap)), null);
+  const acDexMod = dexMod <= 0
+    ? dexMod
+    : (maxDexCap === null ? dexMod : Math.min(dexMod, maxDexCap));
+
+  const totalAC = 10 + acArmor + acShield + acDexMod + sizeMod + acDodge + acNatural + acDeflection + acMisc;
+  const touchAC = 10 + acDexMod + sizeMod + acDodge + acDeflection + acMisc;
   const flatFootedAC = 10 + acArmor + acShield + sizeMod + acNatural + acDeflection + acMisc;
   const initiativeTotal = dexMod + initMisc;
   const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc);
@@ -266,6 +284,7 @@ function deriveCombatStats({
     sizeMod,
     acArmor,
     acShield,
+    acDexMod,
     acDodge,
     acNatural,
     acDeflection,
@@ -351,6 +370,10 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
     abilityMods,
   });
   const combatSummary = `AC ${combatStats.totalAC} · Init ${signed(combatStats.initiativeTotal)} · F/R/W ${signed(combatStats.fortitudeTotal)}/${signed(combatStats.reflexTotal)}/${signed(combatStats.willTotal)}`;
+  const weaponsArmorSummary = [
+    draft.combat.gear.armor?.name,
+    draft.combat.gear.shield?.name,
+  ].filter(Boolean).join(' + ') || 'No armor or shield selected';
   const hasUnselectedClass = draft.classes.some((c) => !c.name.trim());
   const hasRequiredFields = draft.name.trim().length > 0
     && draft.classes.length > 0
@@ -418,6 +441,10 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           ...rawCombat,
           initiative: { ...base.combat.initiative, ...(rawCombat.initiative ?? {}) },
           speed: { ...base.combat.speed, ...(rawCombat.speed ?? {}) },
+          gear: {
+            armor: rawCombat.gear?.armor ? { ...rawCombat.gear.armor } : null,
+            shield: rawCombat.gear?.shield ? { ...rawCombat.gear.shield } : null,
+          },
           armorClass: { ...base.combat.armorClass, ...(rawCombat.armorClass ?? {}) },
           saves: {
             fortitude: { ...base.combat.saves.fortitude, ...(rawCombat.saves?.fortitude ?? {}) },
@@ -924,6 +951,17 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
             combat={draft.combat}
             onCombatChange={(value) => setField('combat', value)}
             derivedCombat={combatStats}
+          />
+        </Accordion>
+
+        <Accordion
+          title="Weapons & Armor"
+          summary={weaponsArmorSummary}
+        >
+          <WeaponsArmorSection
+            combat={draft.combat}
+            onCombatChange={(value) => setField('combat', value)}
+            inputStyle={inputStyle}
           />
         </Accordion>
 

@@ -549,6 +549,7 @@ export function newCharacterDraft(): CharacterDraft {
     combat: {
       initiative: { miscBonus: 0 },
       speed: { base: 30, armorAdjust: 0, fly: 0, swim: 0 },
+      gear: { armor: null, shield: null },
       armorClass: { armor: 0, shield: 0, dodge: 0, natural: 0, deflection: 0, misc: 0 },
       saves: {
         fortitude: { base: 0, magic: 0, misc: 0, temp: 0 },
