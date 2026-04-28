@@ -1,11 +1,11 @@
-import { useState, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import type { CharacterDraft, ArmorLoadout, WeaponLoadout, Inventory, AcBonusType, SlotAcBonus, TextSlotKey } from '../../types/character';
 import { ArmorAutocomplete } from '../../components/ArmorAutocomplete';
 import { WeaponAutocomplete } from '../../components/WeaponAutocomplete';
 import type { ArmorCatalogEntry } from '../../data/armor';
 import { ARMOR_ENTRIES, SHIELD_ENTRIES } from '../../data/armor';
 import type { WeaponCatalogEntry } from '../../data/weapons';
-import { WEAPON_CATALOG } from '../../data/weapons';
+import { WEAPON_CATALOG, getWeaponAttackClass } from '../../data/weapons';
 
 /** Weapons usable in the off-hand: Light and One-Handed only. */
 const OFF_HAND_WEAPON_CATALOG = WEAPON_CATALOG.filter((w) => w.handedness !== 'Two-Handed');
@@ -20,13 +20,19 @@ function totalArmorBonus(loadout: ArmorLoadout | null): number {
   return (loadout.armorBonus ?? 0) + (loadout.enhancementBonus ?? 0);
 }
 
-function buildIterativeAttackString(baseAttackBonus: number, enhancementBonus: number, combatMod: number): string {
+function buildIterativeAttackString(
+  primaryAttackBonus: number,
+  baseAttackBonus: number,
+  enhancementBonus: number,
+  combatMod: number,
+): string {
+  const primary = Number.isFinite(primaryAttackBonus) ? primaryAttackBonus : 0;
   const bab = Number.isFinite(baseAttackBonus) ? baseAttackBonus : 0;
   const enh = Number.isFinite(enhancementBonus) ? enhancementBonus : 0;
   const mod = Number.isFinite(combatMod) ? combatMod : 0;
   const attackCount = bab >= 16 ? 4 : bab >= 11 ? 3 : bab >= 6 ? 2 : 1;
   return Array.from({ length: attackCount }, (_, i) => {
-    const total = bab - (i * 5) + enh + mod;
+    const total = primary - (i * 5) + enh + mod;
     return total >= 0 ? `+${total}` : `${total}`;
   }).join('/');
 }
@@ -152,12 +158,18 @@ const SLOTS_AFTER_BODY: Array<{ key: TextSlotKey; label: string }> = [
 export function InventorySection({
   inventory,
   combat,
+  derivedBaseAttackBonus,
+  derivedMeleeAttackBonus,
+  derivedRangedAttackBonus,
   onChange,
   inputStyle,
   size,
 }: {
   inventory: Inventory;
   combat: CharacterDraft['combat'];
+  derivedBaseAttackBonus: number;
+  derivedMeleeAttackBonus: number;
+  derivedRangedAttackBonus: number;
   onChange: (inventory: Inventory, combat: CharacterDraft['combat']) => void;
   inputStyle: React.CSSProperties;
   size: CharacterDraft['size'];
@@ -248,6 +260,9 @@ export function InventorySection({
   function updateMainHandField(field: keyof WeaponLoadout, value: string | number) {
     const base = inventory.mainHand ?? defaultWeapon();
     const next = { ...base, [field]: value } as WeaponLoadout;
+    if (field === 'enhancementBonus' || field === 'combatMod') {
+      next.attackOverride = '';
+    }
     if (field === 'name' && typeof value === 'string' && !value.trim()) {
       updateInventory({ mainHand: null }); return;
     }
@@ -273,9 +288,47 @@ export function InventorySection({
   function updateOffHandWeaponField(field: keyof WeaponLoadout, value: string | number) {
     const base = inventory.offHandWeapon ?? defaultWeapon();
     const next = { ...base, [field]: value } as WeaponLoadout;
+    if (field === 'enhancementBonus' || field === 'combatMod') {
+      next.attackOverride = '';
+    }
     if (field === 'name' && typeof value === 'string' && !value.trim()) { updateInventory({ offHandWeapon: null }); return; }
     updateInventory({ offHandWeapon: next });
   }
+
+  const previousDerivedRef = useRef<{ bab: number; melee: number; ranged: number } | null>(null);
+  useEffect(() => {
+    const next = {
+      bab: Number(derivedBaseAttackBonus ?? 0),
+      melee: Number(derivedMeleeAttackBonus ?? 0),
+      ranged: Number(derivedRangedAttackBonus ?? 0),
+    };
+    if (previousDerivedRef.current == null) {
+      previousDerivedRef.current = next;
+      return;
+    }
+    if (
+      previousDerivedRef.current.bab === next.bab
+      && previousDerivedRef.current.melee === next.melee
+      && previousDerivedRef.current.ranged === next.ranged
+    ) {
+      return;
+    }
+    previousDerivedRef.current = next;
+
+    const nextPartial: Partial<Inventory> = {};
+    let changed = false;
+    if (inventory.mainHand?.attackOverride) {
+      nextPartial.mainHand = { ...inventory.mainHand, attackOverride: '' };
+      changed = true;
+    }
+    if (inventory.offHandWeapon?.attackOverride) {
+      nextPartial.offHandWeapon = { ...inventory.offHandWeapon, attackOverride: '' };
+      changed = true;
+    }
+    if (changed) {
+      updateInventory(nextPartial);
+    }
+  }, [derivedBaseAttackBonus, derivedMeleeAttackBonus, derivedRangedAttackBonus]);
 
   function handleOffHandShieldSelect(name: string, entry?: ArmorCatalogEntry) {
     if (!name.trim()) { updateInventory({ offHandShield: null }); return; }
@@ -378,7 +431,9 @@ export function InventorySection({
                 <WeaponRow
                   label=""
                   weapon={mainHand}
-                  bab={combat.baseAttackBonus}
+                  baseAttackBonus={derivedBaseAttackBonus}
+                  meleeAttackBonus={derivedMeleeAttackBonus}
+                  rangedAttackBonus={derivedRangedAttackBonus}
                   rowClass="inventory-hands-row-even"
                   showSmallDamage={showSmallDamage}
                   inputStyle={inputStyle}
@@ -435,7 +490,9 @@ export function InventorySection({
                     <WeaponRow
                       label=""
                       weapon={offWeapon}
-                      bab={combat.baseAttackBonus}
+                      baseAttackBonus={derivedBaseAttackBonus}
+                      meleeAttackBonus={derivedMeleeAttackBonus}
+                      rangedAttackBonus={derivedRangedAttackBonus}
                       rowClass="inventory-hands-row-odd"
                       showSmallDamage={showSmallDamage}
                       inputStyle={inputStyle}
@@ -532,7 +589,9 @@ export function InventorySection({
 function WeaponRow({
   label,
   weapon,
-  bab,
+  baseAttackBonus,
+  meleeAttackBonus,
+  rangedAttackBonus,
   rowClass,
   showSmallDamage,
   inputStyle,
@@ -544,7 +603,9 @@ function WeaponRow({
 }: {
   label: string;
   weapon: WeaponLoadout | null;
-  bab: number;
+  baseAttackBonus: number;
+  meleeAttackBonus: number;
+  rangedAttackBonus: number;
   rowClass: string;
   showSmallDamage: boolean;
   inputStyle: React.CSSProperties;
@@ -558,10 +619,14 @@ function WeaponRow({
   const damageValue = weapon ? (showSmallDamage ? weapon.damageSmall : weapon.damageMedium) : '';
   const mat = weapon?.material ? MATERIALS[weapon.material as MaterialKey] : undefined;
   const effectiveWeight = weapon ? applyWeightMultiplier(weapon.weight, mat?.weightMultiplier ?? 1) : '—';
-  const parsedBab = Number(bab);
+  const parsedBab = Number(baseAttackBonus);
+  const parsedMeleeAtk = Number(meleeAttackBonus);
+  const parsedRangedAtk = Number(rangedAttackBonus);
   const combatMod = Number(weapon?.combatMod ?? 0);
+  const attackClass = weapon ? getWeaponAttackClass(weapon.name, weapon.rangeIncrement) : 'Melee';
+  const primaryAttackBonus = attackClass === 'Ranged' ? parsedRangedAtk : parsedMeleeAtk;
   const iterativeAttack = weapon
-    ? buildIterativeAttackString(parsedBab, Number(weapon.enhancementBonus ?? 0), combatMod)
+    ? buildIterativeAttackString(primaryAttackBonus, parsedBab, Number(weapon.enhancementBonus ?? 0), combatMod)
     : '—';
   return (
     <>
@@ -597,7 +662,16 @@ function WeaponRow({
             disabled={!weapon}
           />
         </td>
-        <td className="inventory-hands-td inventory-hands-atk">{iterativeAttack}</td>
+        <td className="inventory-hands-td inventory-hands-atk">
+          <input
+            type="text"
+            value={weapon ? (weapon.attackOverride || iterativeAttack) : ''}
+            onChange={(e) => onFieldChange('attackOverride', e.target.value)}
+            className="inventory-hands-input inventory-hands-atk-input"
+            aria-label="Iterative attack"
+            disabled={!weapon}
+          />
+        </td>
         <td className="inventory-hands-td">
           <input
             type="text"
@@ -807,6 +881,7 @@ function ShieldRow({
 }) {
   const mat = shield?.material ? MATERIALS[shield.material as MaterialKey] : undefined;
   const effectiveAcp    = shield != null ? applyAcpDelta(shield.armorCheckPenalty, mat?.acpDelta ?? 0) : null;
+  const effectiveAsf    = shield != null ? applyAsfDelta(shield.arcaneSpellFailure, mat?.asfDelta ?? 0) : null;
   const effectiveWeight = shield != null ? applyWeightMultiplier(shield.weight, mat?.weightMultiplier ?? 1) : null;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', alignItems: 'center', marginTop: 4 }}>
@@ -851,6 +926,7 @@ function ShieldRow({
           </span>
           {shield.maxDexBonus !== null && <span className="inventory-hands-stat">Max Dex {shield.maxDexBonus}</span>}
           {effectiveAcp !== null && effectiveAcp !== 0 && <span className="inventory-hands-stat">ACP {effectiveAcp}</span>}
+          <span className="inventory-hands-stat">ASF {effectiveAsf ?? '—'}</span>
           {effectiveWeight && <span className="inventory-hands-stat">Wt {effectiveWeight}</span>}
           <span className="inventory-hands-stat">Total <strong>+{totalArmorBonus(shield)}</strong></span>
           <button

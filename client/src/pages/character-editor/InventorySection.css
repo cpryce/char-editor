@@ -243,6 +243,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+.inventory-hands-atk-input {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 80px;
+}
+
 .inventory-hands-clear {
   border: none;
   background: transparent;

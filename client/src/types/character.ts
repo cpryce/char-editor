@@ -116,6 +116,7 @@ export interface WeaponLoadout {
   damageType: string;
   enhancementBonus: number;
   combatMod?: number;
+  attackOverride?: string;
   special: string;
   /** Special material from d20 SRD (e.g. 'mithral', 'cold-iron'). */
   material?: string;

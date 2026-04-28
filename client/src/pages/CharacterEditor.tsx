@@ -992,6 +992,9 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           <InventorySection
             inventory={draft.inventory}
             combat={draft.combat}
+            derivedBaseAttackBonus={combatStats.bab}
+            derivedMeleeAttackBonus={combatStats.meleeAttack}
+            derivedRangedAttackBonus={combatStats.rangedAttack}
             size={draft.size}
             onChange={(inventory, combat) => {
               setField('inventory', inventory);

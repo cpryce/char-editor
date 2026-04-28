@@ -56,6 +56,7 @@ const weaponLoadoutSchema = new Schema(
     damageType:       { type: String, default: '' },
     enhancementBonus: { type: Number, default: 0 },
     combatMod:        { type: Number, default: 0 },
+    attackOverride:   { type: String, default: '' },
     special:          { type: String, default: '' },
   },
   { _id: false },
@@ -218,13 +219,13 @@ export interface ICharacter extends Document {
       name: string; proficiency: string; handedness: string;
       damageMedium: string; damageSmall: string; critical: string;
       rangeIncrement: string; weight: string; damageType: string;
-      enhancementBonus: number; special: string; combatMod?: number;
+      enhancementBonus: number; special: string; combatMod?: number; attackOverride?: string;
     } | null;
     offHandWeapon: {
       name: string; proficiency: string; handedness: string;
       damageMedium: string; damageSmall: string; critical: string;
       rangeIncrement: string; weight: string; damageType: string;
-      enhancementBonus: number; special: string; combatMod?: number;
+      enhancementBonus: number; special: string; combatMod?: number; attackOverride?: string;
     } | null;
     offHandShield: {
       name: string; category: string; armorBonus: number; enhancementBonus: number;

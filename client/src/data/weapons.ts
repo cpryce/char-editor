@@ -2,6 +2,7 @@
 
 export type WeaponProficiency = 'Simple' | 'Martial' | 'Exotic';
 export type WeaponHandedness = 'Light' | 'One-Handed' | 'Two-Handed';
+export type WeaponAttackClass = 'Melee' | 'Ranged';
 
 export interface WeaponCatalogEntry {
   name: string;
@@ -553,3 +554,40 @@ export const WEAPON_CATALOG: ReadonlyArray<WeaponCatalogEntry> = [
 export const WEAPON_BY_NAME = new Map<string, WeaponCatalogEntry>(
   WEAPON_CATALOG.map((w) => [w.name, w]),
 );
+
+// Based on the SRD Weapons tables' explicit "Ranged Weapons" sections.
+const SRD_RANGED_WEAPON_NAMES = new Set<string>([
+  'crossbow, heavy',
+  'crossbow, light',
+  'dart',
+  'javelin',
+  'sling',
+  'longbow',
+  'longbow, composite',
+  'shortbow',
+  'shortbow, composite',
+  'bolas',
+  'crossbow, hand',
+  'crossbow, repeating heavy',
+  'crossbow, repeating light',
+  'net',
+  'shuriken',
+]);
+
+export function getWeaponAttackClass(name: string, rangeIncrement?: string): WeaponAttackClass {
+  const normalizedName = name.trim().toLowerCase();
+  if (!normalizedName) {
+    return 'Melee';
+  }
+  if (SRD_RANGED_WEAPON_NAMES.has(normalizedName)) {
+    return 'Ranged';
+  }
+
+  // For non-SRD custom names, infer from range increment.
+  if (!WEAPON_BY_NAME.has(name)) {
+    const normalizedRange = (rangeIncrement ?? '').trim();
+    return normalizedRange && normalizedRange !== '—' ? 'Ranged' : 'Melee';
+  }
+
+  return 'Melee';
+}
