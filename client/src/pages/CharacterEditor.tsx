@@ -466,6 +466,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           face:      typeof rawInv.face      === 'string' ? rawInv.face      : '',
           neck:      typeof rawInv.neck      === 'string' ? rawInv.neck      : '',
           shoulders: typeof rawInv.shoulders === 'string' ? rawInv.shoulders : '',
+          bodySlot:  typeof rawInv.bodySlot  === 'string' ? rawInv.bodySlot  : '',
           chest:     typeof rawInv.chest     === 'string' ? rawInv.chest     : '',
           wrists:    typeof rawInv.wrists    === 'string' ? rawInv.wrists    : '',
           hands:     typeof rawInv.hands     === 'string' ? rawInv.hands     : '',

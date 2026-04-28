@@ -560,6 +560,7 @@ export function newCharacterDraft(): CharacterDraft {
     },
     inventory: {
       head: '', face: '', neck: '', shoulders: '',
+      bodySlot: '',
       chest: '', wrists: '', hands: '',
       ringLeft: '', ringRight: '',
       waist: '', feet: '',

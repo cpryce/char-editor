@@ -166,6 +166,43 @@
   vertical-align: middle;
 }
 
+.inventory-hands-subrow .inventory-hands-td {
+  padding-top: 0;
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.inventory-hands-subrow-content {
+  padding-bottom: 8px;
+}
+
+.inventory-hands-detail-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: flex-end;
+}
+
+.inventory-hands-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.inventory-hands-detail-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-fg-muted);
+}
+
+.inventory-hands-detail-value {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  padding: 4px 0;
+  min-width: 48px;
+}
+
 .inventory-hands-label {
   color: var(--color-fg-muted);
   white-space: nowrap;
@@ -196,6 +233,14 @@
   color: var(--color-fg-muted);
   font-size: 11px;
   white-space: nowrap;
+}
+
+.inventory-hands-atk {
+  color: var(--color-fg-default);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .inventory-hands-clear {

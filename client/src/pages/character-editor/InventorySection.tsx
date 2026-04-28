@@ -20,6 +20,17 @@ function totalArmorBonus(loadout: ArmorLoadout | null): number {
   return (loadout.armorBonus ?? 0) + (loadout.enhancementBonus ?? 0);
 }
 
+function buildIterativeAttackString(baseAttackBonus: number, enhancementBonus: number, combatMod: number): string {
+  const bab = Number.isFinite(baseAttackBonus) ? baseAttackBonus : 0;
+  const enh = Number.isFinite(enhancementBonus) ? enhancementBonus : 0;
+  const mod = Number.isFinite(combatMod) ? combatMod : 0;
+  const attackCount = bab >= 16 ? 4 : bab >= 11 ? 3 : bab >= 6 ? 2 : 1;
+  return Array.from({ length: attackCount }, (_, i) => {
+    const total = bab - (i * 5) + enh + mod;
+    return total >= 0 ? `+${total}` : `${total}`;
+  }).join('/');
+}
+
 function newWeaponFromEntry(entry: WeaponCatalogEntry): WeaponLoadout {
   return {
     name:             entry.name,
@@ -32,6 +43,7 @@ function newWeaponFromEntry(entry: WeaponCatalogEntry): WeaponLoadout {
     weight:           entry.weight,
     damageType:       entry.damageType,
     enhancementBonus: 0,
+    combatMod:        0,
     special:          entry.special ?? '',
   };
 }
@@ -48,6 +60,7 @@ function defaultWeapon(name = ''): WeaponLoadout {
     weight: '',
     damageType: '',
     enhancementBonus: 0,
+    combatMod: 0,
     special: '',
   };
 }
@@ -121,6 +134,7 @@ const SLOTS_BEFORE_BODY: Array<{ key: TextSlotKey; label: string }> = [
   { key: 'face',      label: 'Face' },
   { key: 'neck',      label: 'Neck' },
   { key: 'shoulders', label: 'Shoulders' },
+  { key: 'bodySlot',  label: 'Body' },
 ];
 
 const SLOTS_AFTER_BODY: Array<{ key: TextSlotKey; label: string }> = [
@@ -153,6 +167,8 @@ export function InventorySection({
   );
 
   const isTwoHanded = inventory.mainHand?.handedness === 'Two-Handed';
+  const isBodyArmorSelected = Boolean(inventory.body?.name?.trim());
+  const isBodySlotEdited = inventory.bodySlot.trim().length > 0;
   const showSmallDamage = (
     size === 'Small' || size === 'Fine' || size === 'Diminutive' || size === 'Tiny'
   );
@@ -193,12 +209,21 @@ export function InventorySection({
 
   function handleBodySelect(name: string, entry?: ArmorCatalogEntry) {
     if (!name.trim()) { updateInventory({ body: null }); return; }
-    if (entry) { updateInventory({ body: newArmorFromEntry(entry) }); return; }
+    const nextSlotBonuses = { ...(inventory.slotBonuses ?? {}) };
+    delete nextSlotBonuses.bodySlot;
+    const clearBodySlotFields: Pick<Inventory, 'bodySlot' | 'slotBonuses'> = {
+      bodySlot: '',
+      slotBonuses: nextSlotBonuses,
+    };
+    if (entry) {
+      updateInventory({ body: newArmorFromEntry(entry), ...clearBodySlotFields });
+      return;
+    }
     const existing = inventory.body ?? newArmorFromEntry({
       name: '', category: 'Light Armor', armorBonus: 0, maxDexBonus: null,
       armorCheckPenalty: 0, arcaneSpellFailure: '', speed: '', weight: '', armorAdjust: 0,
     });
-    updateInventory({ body: { ...existing, name } });
+    updateInventory({ body: { ...existing, name }, ...clearBodySlotFields });
   }
 
   function updateBodyField(field: keyof ArmorLoadout, value: string | number | null) {
@@ -279,6 +304,7 @@ export function InventorySection({
   // Inline renderer for a slot row (4 grid cells: label | item | type | value)
   function renderSlotRow(key: TextSlotKey, label: string) {
     const bonus = inventory.slotBonuses?.[key];
+    const disableBodySlot = key === 'bodySlot' && isBodyArmorSelected;
     return (
       <Fragment key={key}>
         <label className="inventory-slot-label" htmlFor={`inv-${key}`}>{label}</label>
@@ -288,6 +314,7 @@ export function InventorySection({
           className="inventory-slot-input"
           value={inventory[key] as string}
           onChange={(e) => updateInventory({ [key]: e.target.value })}
+          disabled={disableBodySlot}
           style={inputStyle}
         />
         <select
@@ -299,6 +326,7 @@ export function InventorySection({
             else { updateSlotBonus(key, { type: t as AcBonusType, value: bonus?.value ?? 1 }); }
           }}
           aria-label={`${label} AC bonus type`}
+          disabled={disableBodySlot}
         >
           <option value="">—</option>
           {AC_BONUS_TYPES.map((t) => (
@@ -313,6 +341,7 @@ export function InventorySection({
             value={bonus.value}
             onChange={(e) => updateSlotBonus(key, { ...bonus, value: Number(e.target.value) })}
             aria-label={`${label} AC bonus value`}
+            disabled={disableBodySlot}
           />
         ) : (
           <span />
@@ -340,7 +369,7 @@ export function InventorySection({
             <table className="inventory-hands-table" aria-label="Main-hand weapon">
               <thead className="inventory-hands-thead">
                 <tr>
-                  {['Main Hand', 'Material', 'Handedness', dmgLabel, 'Critical', 'Range', 'Type', 'Enh', 'Wt', ''].map((h) => (
+                  {['Main Hand', 'Weapon Enancement', 'Combat Mod', 'Atk', dmgLabel, 'Critical', ''].map((h) => (
                     <th key={h} className="inventory-hands-th">{h}</th>
                   ))}
                 </tr>
@@ -349,6 +378,7 @@ export function InventorySection({
                 <WeaponRow
                   label=""
                   weapon={mainHand}
+                  bab={combat.baseAttackBonus}
                   rowClass="inventory-hands-row-even"
                   showSmallDamage={showSmallDamage}
                   inputStyle={inputStyle}
@@ -385,7 +415,7 @@ export function InventorySection({
               {isTwoHanded ? (
                 <tbody>
                   <tr className="inventory-hands-row-odd">
-                    <td className="inventory-hands-td" colSpan={10}>
+                    <td className="inventory-hands-td" colSpan={7}>
                       <span className="inventory-two-handed-note">
                         Off-hand unavailable — two-handed weapon in main hand.
                       </span>
@@ -396,7 +426,7 @@ export function InventorySection({
                 <>
                   <thead className="inventory-hands-thead">
                     <tr>
-                      {['Off-Hand', 'Material', 'Handedness', dmgLabel, 'Critical', 'Range', 'Type', 'Enh', 'Wt', ''].map((h) => (
+                      {['Off-Hand', 'Weapon Enancement', 'Combat Mod', 'Atk', dmgLabel, 'Critical', ''].map((h) => (
                         <th key={h} className="inventory-hands-th">{h}</th>
                       ))}
                     </tr>
@@ -405,6 +435,7 @@ export function InventorySection({
                     <WeaponRow
                       label=""
                       weapon={offWeapon}
+                      bab={combat.baseAttackBonus}
                       rowClass="inventory-hands-row-odd"
                       showSmallDamage={showSmallDamage}
                       inputStyle={inputStyle}
@@ -419,7 +450,7 @@ export function InventorySection({
               ) : (
                 <tbody>
                   <tr className="inventory-hands-row-odd">
-                    <td className="inventory-hands-td" colSpan={10}>
+                    <td className="inventory-hands-td" colSpan={7}>
                       {offHandMode === 'shield' ? (
                         <ShieldRow
                           shield={offShield}
@@ -466,6 +497,7 @@ export function InventorySection({
                 onSelect={handleBodySelect}
                 onFieldChange={updateBodyField}
                 onClear={() => updateInventory({ body: null })}
+                disabled={isBodySlotEdited}
               />
             </tbody>
           </table>
@@ -487,15 +519,6 @@ export function InventorySection({
 
           {SLOTS_BEFORE_BODY.map(({ key, label }) => renderSlotRow(key, label))}
 
-          <Fragment key="body">
-            <span className="inventory-slot-label inventory-slot-label--muted">Body</span>
-            <span className="inventory-slot-prefilled">
-              {body?.name || <em className="inventory-slot-empty">— see Armor above —</em>}
-            </span>
-            <span />
-            <span />
-          </Fragment>
-
           {SLOTS_AFTER_BODY.map(({ key, label }) => renderSlotRow(key, label))}
         </div>
       </div>
@@ -509,6 +532,7 @@ export function InventorySection({
 function WeaponRow({
   label,
   weapon,
+  bab,
   rowClass,
   showSmallDamage,
   inputStyle,
@@ -520,6 +544,7 @@ function WeaponRow({
 }: {
   label: string;
   weapon: WeaponLoadout | null;
+  bab: number;
   rowClass: string;
   showSmallDamage: boolean;
   inputStyle: React.CSSProperties;
@@ -529,85 +554,139 @@ function WeaponRow({
   allowTwoHanded?: boolean;
   entries?: ReadonlyArray<WeaponCatalogEntry>;
 }) {
-  const dmg = weapon
-    ? (showSmallDamage ? weapon.damageSmall : weapon.damageMedium)
-    : '—';
+  const damageField: keyof WeaponLoadout = showSmallDamage ? 'damageSmall' : 'damageMedium';
+  const damageValue = weapon ? (showSmallDamage ? weapon.damageSmall : weapon.damageMedium) : '';
   const mat = weapon?.material ? MATERIALS[weapon.material as MaterialKey] : undefined;
   const effectiveWeight = weapon ? applyWeightMultiplier(weapon.weight, mat?.weightMultiplier ?? 1) : '—';
+  const parsedBab = Number(bab);
+  const combatMod = Number(weapon?.combatMod ?? 0);
+  const iterativeAttack = weapon
+    ? buildIterativeAttackString(parsedBab, Number(weapon.enhancementBonus ?? 0), combatMod)
+    : '—';
   return (
-    <tr className={rowClass}>
-      {label && <td className="inventory-hands-td inventory-hands-label">{label}</td>}
-      <td className="inventory-hands-td">
-        <WeaponAutocomplete
-          value={weapon?.name ?? ''}
-          entries={entries}
-          onSelect={onSelect}
-          placeholder="Select weapon..."
-          ariaLabel={`${label || 'off-hand'} weapon selection`}
-          style={{ ...inputStyle, minWidth: 160 }}
-        />
-      </td>
-      <td className="inventory-hands-td">
-        <select
-          value={weapon?.material ?? ''}
-          onChange={(e) => onFieldChange('material', e.target.value)}
-          className="inventory-hands-input"
-          aria-label="Weapon material"
-          disabled={!weapon}
-          title={mat?.note}
-          style={{ ...inputStyle, minWidth: 120 }}
-        >
-          <option value="">Standard</option>
-          {WEAPON_MATERIAL_KEYS.map((k) => (
-            <option key={k} value={k}>{MATERIALS[k].label}</option>
-          ))}
-        </select>
-      </td>
-      <td className="inventory-hands-td">
-        <select
-          value={weapon?.handedness ?? '—'}
-          onChange={(e) => onFieldChange('handedness', e.target.value)}
-          className="inventory-hands-input"
-          aria-label="Handedness"
-          disabled={!weapon}
-          style={{ ...inputStyle, minWidth: 110 }}
-        >
-          {!weapon && <option value="—">—</option>}
-          {(['Light', 'One-Handed', 'Two-Handed'] as const)
-            .filter((h) => allowTwoHanded || h !== 'Two-Handed')
-            .map((h) => (
-            <option key={h} value={h}>{h}</option>
-          ))}
-        </select>
-      </td>
-      <td className="inventory-hands-td inventory-hands-stat">{dmg}</td>
-      <td className="inventory-hands-td inventory-hands-stat">{weapon?.critical ?? '—'}</td>
-      <td className="inventory-hands-td inventory-hands-stat">{weapon?.rangeIncrement ?? '—'}</td>
-      <td className="inventory-hands-td inventory-hands-stat">{weapon?.damageType ?? '—'}</td>
-      <td className="inventory-hands-td">
-        <input
-          type="number"
-          value={weapon?.enhancementBonus ?? 0}
-          onChange={(e) => onFieldChange('enhancementBonus', Number(e.target.value))}
-          className="inventory-hands-input inventory-hands-input--number"
-          aria-label="Enhancement bonus"
-          disabled={!weapon}
-        />
-      </td>
-      <td className="inventory-hands-td inventory-hands-stat">{effectiveWeight}</td>
-      <td className="inventory-hands-td">
-        {weapon && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="inventory-hands-clear"
-            aria-label="Clear weapon"
-          >
-            Clear
-          </button>
-        )}
-      </td>
-    </tr>
+    <>
+      <tr className={rowClass}>
+        {label && <td className="inventory-hands-td inventory-hands-label">{label}</td>}
+        <td className="inventory-hands-td">
+          <WeaponAutocomplete
+            value={weapon?.name ?? ''}
+            entries={entries}
+            onSelect={onSelect}
+            placeholder="Select weapon..."
+            ariaLabel={`${label || 'off-hand'} weapon selection`}
+            style={{ ...inputStyle, minWidth: 160 }}
+          />
+        </td>
+        <td className="inventory-hands-td">
+          <input
+            type="number"
+            value={weapon?.enhancementBonus ?? 0}
+            onChange={(e) => onFieldChange('enhancementBonus', Number(e.target.value))}
+            className="inventory-hands-input inventory-hands-input--number"
+            aria-label="Enhancement bonus"
+            disabled={!weapon}
+          />
+        </td>
+        <td className="inventory-hands-td">
+          <input
+            type="number"
+            value={weapon?.combatMod ?? 0}
+            onChange={(e) => onFieldChange('combatMod', Number(e.target.value))}
+            className="inventory-hands-input inventory-hands-input--number"
+            aria-label="Combat modifier"
+            disabled={!weapon}
+          />
+        </td>
+        <td className="inventory-hands-td inventory-hands-atk">{iterativeAttack}</td>
+        <td className="inventory-hands-td">
+          <input
+            type="text"
+            value={damageValue}
+            onChange={(e) => onFieldChange(damageField, e.target.value)}
+            className="inventory-hands-input"
+            aria-label="Weapon damage"
+            disabled={!weapon}
+            style={{ ...inputStyle, minWidth: 90 }}
+          />
+        </td>
+        <td className="inventory-hands-td">
+          <input
+            type="text"
+            value={weapon?.critical ?? ''}
+            onChange={(e) => onFieldChange('critical', e.target.value)}
+            className="inventory-hands-input"
+            aria-label="Critical range"
+            disabled={!weapon}
+            style={{ ...inputStyle, minWidth: 90 }}
+          />
+        </td>
+        <td className="inventory-hands-td">
+          {weapon && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="inventory-hands-clear"
+              aria-label="Clear weapon"
+            >
+              Clear
+            </button>
+          )}
+        </td>
+      </tr>
+      <tr className={`${rowClass} inventory-hands-subrow`}>
+        <td className="inventory-hands-td inventory-hands-subrow-content" colSpan={7}>
+          <div className="inventory-hands-detail-fields">
+            <label className="inventory-hands-detail-field">
+              <span className="inventory-hands-detail-label">Material</span>
+              <select
+                value={weapon?.material ?? ''}
+                onChange={(e) => onFieldChange('material', e.target.value)}
+                className="inventory-hands-input"
+                aria-label="Weapon material"
+                disabled={!weapon}
+                title={mat?.note}
+                style={{ ...inputStyle, minWidth: 120 }}
+              >
+                <option value="">Standard</option>
+                {WEAPON_MATERIAL_KEYS.map((k) => (
+                  <option key={k} value={k}>{MATERIALS[k].label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="inventory-hands-detail-field">
+              <span className="inventory-hands-detail-label">Handedness</span>
+              <select
+                value={weapon?.handedness ?? '—'}
+                onChange={(e) => onFieldChange('handedness', e.target.value)}
+                className="inventory-hands-input"
+                aria-label="Handedness"
+                disabled={!weapon}
+                style={{ ...inputStyle, minWidth: 110 }}
+              >
+                {!weapon && <option value="—">—</option>}
+                {(['Light', 'One-Handed', 'Two-Handed'] as const)
+                  .filter((h) => allowTwoHanded || h !== 'Two-Handed')
+                  .map((h) => (
+                  <option key={h} value={h}>{h}</option>
+                ))}
+              </select>
+            </label>
+            <span className="inventory-hands-detail-field">
+              <span className="inventory-hands-detail-label">Range</span>
+              <span className="inventory-hands-detail-value">{weapon?.rangeIncrement ?? '—'}</span>
+            </span>
+            <span className="inventory-hands-detail-field">
+              <span className="inventory-hands-detail-label">Type</span>
+              <span className="inventory-hands-detail-value">{weapon?.damageType ?? '—'}</span>
+            </span>
+            <span className="inventory-hands-detail-field">
+              <span className="inventory-hands-detail-label">Wt</span>
+              <span className="inventory-hands-detail-value">{effectiveWeight}</span>
+            </span>
+          </div>
+        </td>
+      </tr>
+    </>
   );
 }
 
@@ -622,6 +701,7 @@ function ArmorRow({
   onSelect,
   onFieldChange,
   onClear,
+  disabled = false,
 }: {
   label: string;
   armor: ArmorLoadout | null;
@@ -631,6 +711,7 @@ function ArmorRow({
   onSelect: (name: string, entry?: ArmorCatalogEntry) => void;
   onFieldChange: (field: keyof ArmorLoadout, value: string | number | null) => void;
   onClear: () => void;
+  disabled?: boolean;
 }) {
   const mat = armor?.material ? MATERIALS[armor.material as MaterialKey] : undefined;
   const effectiveAcp    = armor != null ? applyAcpDelta(armor.armorCheckPenalty, mat?.acpDelta ?? 0) : null;
@@ -643,7 +724,10 @@ function ArmorRow({
         <ArmorAutocomplete
           value={armor?.name ?? ''}
           entries={entries}
-          onSelect={onSelect}
+          onSelect={(name, entry) => {
+            if (disabled) return;
+            onSelect(name, entry);
+          }}
           placeholder="Select armor..."
           ariaLabel={`${label} armor selection`}
           style={{ ...inputStyle, minWidth: 160 }}
@@ -655,7 +739,7 @@ function ArmorRow({
           onChange={(e) => onFieldChange('material', e.target.value)}
           className="inventory-hands-input"
           aria-label="Armor material"
-          disabled={!armor}
+          disabled={!armor || disabled}
           title={mat?.note}
           style={{ ...inputStyle, minWidth: 120 }}
         >
@@ -675,10 +759,10 @@ function ArmorRow({
           onChange={(e) => onFieldChange('enhancementBonus', Number(e.target.value))}
           className="inventory-hands-input inventory-hands-input--number"
           aria-label="Enhancement bonus"
-          disabled={!armor}
+          disabled={!armor || disabled}
         />
       </td>
-      <td className="inventory-hands-td inventory-hands-stat">
+      <td className="inventory-hands-td inventory-hands-atk">
         {armor != null ? `+${totalArmorBonus(armor)}` : '—'}
       </td>
       <td className="inventory-hands-td inventory-hands-stat">
@@ -691,7 +775,7 @@ function ArmorRow({
       <td className="inventory-hands-td inventory-hands-stat">{armor?.speed || '—'}</td>
       <td className="inventory-hands-td inventory-hands-stat">{effectiveWeight ?? '—'}</td>
       <td className="inventory-hands-td">
-        {armor != null && (
+        {armor != null && !disabled && (
           <button
             type="button"
             onClick={onClear}

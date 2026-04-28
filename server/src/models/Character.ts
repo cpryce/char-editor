@@ -55,6 +55,7 @@ const weaponLoadoutSchema = new Schema(
     weight:           { type: String, default: '' },
     damageType:       { type: String, default: '' },
     enhancementBonus: { type: Number, default: 0 },
+    combatMod:        { type: Number, default: 0 },
     special:          { type: String, default: '' },
   },
   { _id: false },
@@ -200,6 +201,7 @@ export interface ICharacter extends Document {
     face:      string;
     neck:      string;
     shoulders: string;
+    bodySlot:  string;
     chest:     string;
     wrists:    string;
     hands:     string;
@@ -216,13 +218,13 @@ export interface ICharacter extends Document {
       name: string; proficiency: string; handedness: string;
       damageMedium: string; damageSmall: string; critical: string;
       rangeIncrement: string; weight: string; damageType: string;
-      enhancementBonus: number; special: string;
+      enhancementBonus: number; special: string; combatMod?: number;
     } | null;
     offHandWeapon: {
       name: string; proficiency: string; handedness: string;
       damageMedium: string; damageSmall: string; critical: string;
       rangeIncrement: string; weight: string; damageType: string;
-      enhancementBonus: number; special: string;
+      enhancementBonus: number; special: string; combatMod?: number;
     } | null;
     offHandShield: {
       name: string; category: string; armorBonus: number; enhancementBonus: number;
@@ -317,6 +319,7 @@ const characterSchema = new Schema<ICharacter>(
       face:      { type: String, default: '' },
       neck:      { type: String, default: '' },
       shoulders: { type: String, default: '' },
+      bodySlot:  { type: String, default: '' },
       chest:     { type: String, default: '' },
       wrists:    { type: String, default: '' },
       hands:     { type: String, default: '' },

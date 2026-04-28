@@ -80,9 +80,9 @@ export interface SlotAcBonus {
   value: number;
 }
 
-/** Keys of the free-text worn-item slots (excludes the structured body/hand slots). */
+/** Keys of the free-text worn-item slots (includes body worn-slot text entry). */
 export type TextSlotKey =
-  | 'head' | 'face' | 'neck' | 'shoulders' | 'chest'
+  | 'head' | 'face' | 'neck' | 'shoulders' | 'bodySlot' | 'chest'
   | 'wrists' | 'hands' | 'ringLeft' | 'ringRight' | 'waist' | 'feet';
 
 export interface ArmorLoadout {
@@ -115,6 +115,7 @@ export interface WeaponLoadout {
   weight: string;
   damageType: string;
   enhancementBonus: number;
+  combatMod?: number;
   special: string;
   /** Special material from d20 SRD (e.g. 'mithral', 'cold-iron'). */
   material?: string;
@@ -127,6 +128,7 @@ export interface Inventory {
   face:      string;
   neck:      string;
   shoulders: string;
+  bodySlot:  string;
   chest:     string;
   wrists:    string;
   hands:     string;
