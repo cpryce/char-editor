@@ -285,6 +285,17 @@
   color: var(--color-fg-default);
 }
 
+.inventory-offhand-mode-sep {
+  color: var(--color-border-default);
+  user-select: none;
+  margin: 0 2px;
+}
+
+.inventory-offhand-mode-feat-label {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
 .inventory-two-handed-note {
   font-size: 11px;
   color: var(--color-fg-muted);
@@ -300,4 +311,74 @@
 .inventory-help {
   font-size: 12px;
   color: var(--color-fg-muted);
+}
+
+
+.inventory-hands-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Feat inline trigger ── */
+.inventory-feat-trigger {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 3px;
+  padding: 1px 3px;
+  margin: -1px -3px;
+  outline-offset: 2px;
+}
+
+.inventory-feat-trigger:hover .inventory-feat-summary {
+  text-decoration: underline;
+  color: var(--color-fg-default);
+}
+
+.inventory-feat-summary {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  font-style: italic;
+}
+
+.inventory-feat-summary--active {
+  font-style: normal;
+  color: var(--color-accent-fg);
+  font-weight: 500;
+}
+
+/* ── Feat popup panel ── */
+.weapon-feat-popup {
+  z-index: 1000;
+  background: var(--color-canvas-overlay);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+  padding: 6px 4px;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.weapon-feat-popup-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--color-fg-default);
+  user-select: none;
+}
+
+.weapon-feat-popup-item:hover:not(.weapon-feat-popup-item--disabled) {
+  background: var(--color-neutral-subtle);
+}
+
+.weapon-feat-popup-item--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }

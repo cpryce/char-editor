@@ -118,6 +118,8 @@ export interface WeaponLoadout {
   combatMod?: number;
   attackOverride?: string;
   special: string;
+  /** Feats actively applied to this weapon (e.g. 'Weapon Focus', 'Weapon Finesse'). */
+  appliedFeats?: string[];
   /** Special material from d20 SRD (e.g. 'mithral', 'cold-iron'). */
   material?: string;
 }
@@ -148,6 +150,8 @@ export interface Inventory {
   offHandShield: ArmorLoadout | null;
   /** Optional AC bonuses from items in worn text slots. Dodge stacks; all other types take only the best. */
   slotBonuses: Partial<Record<TextSlotKey, SlotAcBonus>>;
+  /** Two-weapon fighting feats applied globally (e.g. 'Two-Weapon Fighting', 'Improved Two-Weapon Fighting'). */
+  twfAppliedFeats?: string[];
 }
 
 // ── Full character form state ─────────────────────────────────────────────────

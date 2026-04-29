@@ -996,6 +996,9 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
             derivedMeleeAttackBonus={combatStats.meleeAttack}
             derivedRangedAttackBonus={combatStats.rangedAttack}
             size={draft.size}
+            feats={draft.feats}
+            classes={draft.classes}
+            dexterity={draft.abilityScores.dexterity.temp ?? abilityTotals.dexterity}
             onChange={(inventory, combat) => {
               setField('inventory', inventory);
               setField('combat', combat);
