@@ -703,6 +703,18 @@ export function InventorySection({
                       applied={twfAppliedFeats}
                       onToggle={toggleTwfFeat}
                     />
+                    {isTwoWeaponFighting && (
+                      <>
+                        <span className="inventory-offhand-mode-sep" aria-hidden>|</span>
+                        <span className="inventory-offhand-mode-twf-summary">
+                          Primary{' '}
+                          <strong>{twfMainPenalty >= 0 ? `+${twfMainPenalty}` : twfMainPenalty}</strong>
+                          {' / '}off-hand{' '}
+                          <strong>{twfOffPenalty >= 0 ? `+${twfOffPenalty}` : twfOffPenalty}</strong>
+                          {offHandIsLight ? '\u00a0(light)' : '\u00a0(one-handed)'}
+                        </span>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -1313,7 +1325,7 @@ function FeatPopupButton({
         onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <span className={`inventory-feat-summary${activeNames.length > 0 ? ' inventory-feat-summary--active' : ''}`}>
+        <span className={`inventory-hands-detail-value inventory-feat-summary${activeNames.length > 0 ? ' inventory-feat-summary--active' : ''}`}>
           {summary}
         </span>
       </span>

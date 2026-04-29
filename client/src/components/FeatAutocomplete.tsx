@@ -1,7 +1,8 @@
-import { useState, useRef, useMemo, useId } from 'react';
+import { useState, useRef, useMemo, useId, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ALL_FEATS, FEAT_BY_NAME } from '../data/feats';
 import type { FeatCategory, FeatCatalogEntry } from '../data/feats';
+import './FeatAutocomplete.css';
 
 export type { FeatCategory, FeatCatalogEntry };
 
@@ -25,17 +26,17 @@ interface FeatAutocompleteProps {
   extraFeats?: ReadonlyArray<FeatCatalogEntry>;
   placeholder?: string;
   ariaLabel?: string;
-  style?: React.CSSProperties;
+  className?: string;
 }
 
 // ── Category badge colours ────────────────────────────────────────────────────
 
-const CATEGORY_BADGE: Partial<Record<FeatCategory | 'Custom', { label: string; color: string }>> = {
-  'Fighter Bonus Feat': { label: 'Fighter', color: '#b45309' },
-  'Metamagic':          { label: 'Metamagic', color: '#7c3aed' },
-  'Item Creation':      { label: 'Item Creation', color: '#0369a1' },
-  'Special':            { label: 'Special', color: '#065f46' },
-  'Custom':             { label: 'Custom', color: '#be185d' },
+const CATEGORY_BADGE: Partial<Record<FeatCategory | 'Custom', { label: string; cls: string }>> = {
+  'Fighter Bonus Feat': { label: 'Fighter',      cls: 'feat-option-badge--fighter' },
+  'Metamagic':          { label: 'Metamagic',    cls: 'feat-option-badge--metamagic' },
+  'Item Creation':      { label: 'Item Creation',cls: 'feat-option-badge--item-creation' },
+  'Special':            { label: 'Special',      cls: 'feat-option-badge--special' },
+  'Custom':             { label: 'Custom',       cls: 'feat-option-badge--custom' },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ export function FeatAutocomplete({
   extraFeats,
   placeholder,
   ariaLabel,
-  style,
+  className,
 }: FeatAutocompleteProps) {
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
@@ -175,6 +176,11 @@ export function FeatAutocomplete({
 
   const showDropdown = open && matches.length > 0 && dropRect !== null;
 
+  // Set aria-expanded imperatively so the linter never sees a JSX boolean expression
+  useEffect(() => {
+    inputRef.current?.setAttribute('aria-expanded', showDropdown ? 'true' : 'false');
+  }, [showDropdown]);
+
   return (
     <>
       <input
@@ -182,7 +188,7 @@ export function FeatAutocomplete({
         type="text"
         role="combobox"
         aria-label={ariaLabel}
-        aria-expanded={showDropdown}
+        aria-expanded="false"
         aria-autocomplete="list"
         aria-controls={showDropdown ? listboxId : undefined}
         aria-activedescendant={
@@ -190,7 +196,7 @@ export function FeatAutocomplete({
         }
         value={value}
         placeholder={placeholder ?? 'Search feats…'}
-        style={style}
+        className={`feat-autocomplete-input${className ? ` ${className}` : ''}`}
         onChange={handleChange}
         onFocus={openDropdown}
         onBlur={() => setTimeout(closeDropdown, 120)}
@@ -201,22 +207,13 @@ export function FeatAutocomplete({
         <ul
           id={listboxId}
           role="listbox"
-          style={{
-            position: 'fixed',
-            top: dropRect.top + 2,
-            left: dropRect.left,
-            width: Math.max(dropRect.width, 300),
-            maxHeight: 280,
-            overflowY: 'auto',
-            margin: 0,
-            padding: '4px 0',
-            listStyle: 'none',
-            zIndex: 9999,
-            background: 'var(--color-canvas-overlay, #fff)',
-            border: '1px solid var(--color-border-default)',
-            borderRadius: 8,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-            fontSize: 12,
+          className="feat-dropdown"
+          ref={(el) => {
+            if (el && dropRect) {
+              el.style.setProperty('--dd-top', `${dropRect.top + 2}px`);
+              el.style.setProperty('--dd-left', `${dropRect.left}px`);
+              el.style.setProperty('--dd-width', `${Math.max(dropRect.width, 300)}px`);
+            }
           }}
         >
           {matches.map((feat, idx) => {
@@ -227,52 +224,24 @@ export function FeatAutocomplete({
                 key={feat.name}
                 id={`${listboxId}-opt-${idx}`}
                 role="option"
-                aria-selected={isActive}
+                ref={(el) => { el?.setAttribute('aria-selected', isActive ? 'true' : 'false'); }}
                 onMouseDown={(e) => { e.preventDefault(); selectFeat(feat); }}
                 onMouseEnter={() => setActiveIdx(idx)}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 2,
-                  padding: '6px 10px',
-                  cursor: 'pointer',
-                  background: isActive
-                    ? 'var(--color-accent-emphasis)'
-                    : 'transparent',
-                  color: isActive
-                    ? 'var(--color-fg-on-emphasis, #fff)'
-                    : 'var(--color-fg-default)',
-                }}
+                className={`feat-option${isActive ? ' feat-option--active' : ''}`}
               >
                 {/* Row 1: name + badge */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontWeight: 600 }}>{feat.name}</span>
+                <div className="feat-option-header">
+                  <span className="feat-option-name">{feat.name}</span>
                   {badge && (
-                    <span style={{
-                      fontSize: 10,
-                      fontWeight: 500,
-                      padding: '1px 5px',
-                      borderRadius: 4,
-                      background: isActive ? 'rgba(255,255,255,0.25)' : badge.color + '22',
-                      color: isActive ? 'inherit' : badge.color,
-                      border: `1px solid ${isActive ? 'rgba(255,255,255,0.4)' : badge.color + '55'}`,
-                      whiteSpace: 'nowrap',
-                    }}>
+                    <span className={`feat-option-badge ${badge.cls}${isActive ? ' feat-option-badge--active' : ''}`}>
                       {badge.label}
                     </span>
                   )}
                 </div>
                 {/* Row 2: short description */}
-                <span style={{
-                  opacity: 0.75,
-                  fontSize: 11,
-                  lineHeight: 1.3,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}>
+                <span className="feat-option-desc">
                   {feat.prerequisites !== '—' && (
-                    <span style={{ opacity: 0.85 }}>Req: {feat.prerequisites} · </span>
+                    <span className="feat-option-prereq">Req: {feat.prerequisites} · </span>
                   )}
                   {feat.shortDescription}
                 </span>

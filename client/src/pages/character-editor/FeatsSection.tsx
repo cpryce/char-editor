@@ -131,7 +131,6 @@ function SelectableFeatsSection({
                           ? 'Choose metamagic / item creation feat…'
                           : 'Search feats…'
                     }
-                    style={{ ...inputStyle, width: '100%', minWidth: 180 }}
                   />
                 </td>
                 <td className="px-3 py-1" style={{ color: 'var(--color-fg-muted)', fontSize: 11 }}>

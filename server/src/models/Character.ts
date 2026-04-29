@@ -58,6 +58,8 @@ const weaponLoadoutSchema = new Schema(
     combatMod:        { type: Number, default: 0 },
     attackOverride:   { type: String, default: '' },
     special:          { type: String, default: '' },
+    material:         { type: String },
+    appliedFeats:     [{ type: String }],
   },
   { _id: false },
 );
@@ -220,12 +222,14 @@ export interface ICharacter extends Document {
       damageMedium: string; damageSmall: string; critical: string;
       rangeIncrement: string; weight: string; damageType: string;
       enhancementBonus: number; special: string; combatMod?: number; attackOverride?: string;
+      material?: string; appliedFeats?: string[];
     } | null;
     offHandWeapon: {
       name: string; proficiency: string; handedness: string;
       damageMedium: string; damageSmall: string; critical: string;
       rangeIncrement: string; weight: string; damageType: string;
       enhancementBonus: number; special: string; combatMod?: number; attackOverride?: string;
+      material?: string; appliedFeats?: string[];
     } | null;
     offHandShield: {
       name: string; category: string; armorBonus: number; enhancementBonus: number;
@@ -233,6 +237,7 @@ export interface ICharacter extends Document {
       speed: string; weight: string; armorAdjust: number;
     } | null;
     slotBonuses?: Record<string, { type: string; value: number }>;
+    twfAppliedFeats?: string[];
   };
 
   // Skills, Feats, Equipment, Currency
@@ -333,6 +338,7 @@ const characterSchema = new Schema<ICharacter>(
       offHandWeapon: { type: weaponLoadoutSchema, default: null },
       offHandShield: { type: armorLoadoutSchema,  default: null },
       slotBonuses:   { type: Schema.Types.Mixed,   default: {} },
+      twfAppliedFeats: [{ type: String }],
     },
 
     // Skills, Feats, Equipment, Currency

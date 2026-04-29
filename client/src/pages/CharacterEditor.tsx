@@ -481,6 +481,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           slotBonuses:   (typeof rawInv.slotBonuses === 'object' && rawInv.slotBonuses !== null
             ? rawInv.slotBonuses
             : {}) as Inventory['slotBonuses'],
+          twfAppliedFeats: Array.isArray(rawInv.twfAppliedFeats) ? rawInv.twfAppliedFeats as string[] : undefined,
         };
 
         const loaded: CharacterDraft = {

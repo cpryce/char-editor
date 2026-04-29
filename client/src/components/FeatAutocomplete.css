@@ -1,0 +1,109 @@
+.feat-autocomplete-input {
+  background: var(--color-canvas-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  color: var(--color-fg-default);
+  padding: 4px 8px;
+  font-size: 14px;
+  width: 100%;
+  min-width: 180px;
+}
+
+.feat-dropdown {
+  position: fixed;
+  top: var(--dd-top);
+  left: var(--dd-left);
+  width: var(--dd-width);
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  z-index: 9999;
+  background: var(--color-canvas-overlay, #fff);
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  font-size: 12px;
+}
+
+.feat-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--color-fg-default);
+}
+
+.feat-option--active {
+  background: var(--color-accent-emphasis);
+  color: var(--color-fg-on-emphasis, #fff);
+}
+
+.feat-option-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.feat-option-name {
+  font-weight: 600;
+}
+
+.feat-option-badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.feat-option-badge--fighter {
+  background: #b4530922;
+  color: #b45309;
+  border: 1px solid #b4530955;
+}
+
+.feat-option-badge--metamagic {
+  background: #7c3aed22;
+  color: #7c3aed;
+  border: 1px solid #7c3aed55;
+}
+
+.feat-option-badge--item-creation {
+  background: #0369a122;
+  color: #0369a1;
+  border: 1px solid #0369a155;
+}
+
+.feat-option-badge--special {
+  background: #065f4622;
+  color: #065f46;
+  border: 1px solid #065f4655;
+}
+
+.feat-option-badge--custom {
+  background: #be185d22;
+  color: #be185d;
+  border: 1px solid #be185d55;
+}
+
+.feat-option-badge--active {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: inherit !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.feat-option-desc {
+  opacity: 0.75;
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feat-option-prereq {
+  opacity: 0.85;
+}
