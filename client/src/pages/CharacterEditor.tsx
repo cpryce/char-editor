@@ -970,7 +970,6 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
             feats={draft.feats}
             onFeatsChange={(feats) => setField('feats', feats)}
             extraFeats={filteredCustomFeats}
-            inputStyle={inputStyle}
           />
         </Accordion>
 

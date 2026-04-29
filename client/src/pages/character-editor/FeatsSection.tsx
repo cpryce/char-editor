@@ -61,12 +61,10 @@ function SelectableFeatsSection({
   feats,
   onChange,
   extraFeats,
-  inputStyle,
 }: {
   feats: FeatSlot[];
   onChange: (feats: FeatSlot[]) => void;
   extraFeats?: ReadonlyArray<FeatCatalogEntry>;
-  inputStyle: React.CSSProperties;
 }) {
   const takenNames = new Set(feats.map((f) => f.name).filter(Boolean));
 
@@ -189,13 +187,11 @@ export function FeatsSection({
   feats,
   onFeatsChange,
   extraFeats,
-  inputStyle,
 }: {
   classFeatures: DerivedClassFeature[];
   feats: CharacterDraft['feats'];
   onFeatsChange: (feats: CharacterDraft['feats']) => void;
   extraFeats?: ReadonlyArray<FeatCatalogEntry>;
-  inputStyle: React.CSSProperties;
 }) {
   return (
     <>
@@ -217,7 +213,6 @@ export function FeatsSection({
         feats={feats}
         onChange={onFeatsChange}
         extraFeats={extraFeats}
-        inputStyle={inputStyle}
       />
     </>
   );
