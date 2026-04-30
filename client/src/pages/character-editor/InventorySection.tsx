@@ -402,50 +402,122 @@ export function InventorySection({
     };
   }
 
-  function stampComputedAttacks(nextInv: Inventory): Inventory {
+  function attackCalcContext(inv: Inventory) {
     const melee = Number(derivedMeleeAttackBonus);
     const ranged = Number(derivedRangedAttackBonus);
     const bab = Number(derivedBaseAttackBonus);
-
-    const isTH = nextInv.mainHand?.handedness === 'Two-Handed';
-    const hasMain = Boolean(nextInv.mainHand?.name?.trim());
-    const hasOff = Boolean(nextInv.offHandWeapon?.name?.trim());
+    const isTH = inv.mainHand?.handedness === 'Two-Handed';
+    const hasMain = Boolean(inv.mainHand?.name?.trim());
+    const hasOff = Boolean(inv.offHandWeapon?.name?.trim());
     const isTWF = !isTH && hasMain && hasOff;
-    const offIsLight = nextInv.offHandWeapon?.handedness === 'Light';
-    const twfFeats = nextInv.twfAppliedFeats ?? [];
+    const offIsLight = inv.offHandWeapon?.handedness === 'Light';
+    const twfFeats = inv.twfAppliedFeats ?? [];
     const twfFeat = twfFeats.includes('Two-Weapon Fighting');
     const itwf = twfFeats.includes('Improved Two-Weapon Fighting');
     const gtwf = twfFeats.includes('Greater Two-Weapon Fighting');
-    const mainPenalty = isTWF ? (offIsLight ? -4 : -6) + (twfFeat ? 2 : 0) : 0;
-    const offPenalty = isTWF ? (offIsLight ? -8 : -10) + (twfFeat ? 6 : 0) : 0;
-    const offMaxAttacks = hasMain ? (gtwf ? 3 : itwf ? 2 : 1) : undefined;
+    return {
+      melee,
+      ranged,
+      bab,
+      mainPenalty: isTWF ? (offIsLight ? -4 : -6) + (twfFeat ? 2 : 0) : 0,
+      offPenalty: isTWF ? (offIsLight ? -8 : -10) + (twfFeat ? 6 : 0) : 0,
+      offMaxAttacks: hasMain ? (gtwf ? 3 : itwf ? 2 : 1) : undefined,
+    };
+  }
 
-    function computeFor(weapon: WeaponLoadout | null, twfPenalty: number, maxAtks?: number): WeaponLoadout | null {
-      if (!weapon?.name?.trim()) return weapon;
-      const atk = getWeaponAttackClass(weapon.name, weapon.rangeIncrement);
-      const isRanged = atk === 'Ranged';
-      const applied = weapon.appliedFeats ?? [];
-      const finesse = !isRanged && (weapon.handedness === 'Light' || weapon.special?.includes('Weapon Finesse eligible')) && applied.includes('Weapon Finesse');
-      const rapidShot = isRanged && applied.includes('Rapid Shot');
-      const primaryBonus = isRanged ? ranged : (finesse ? ranged : melee);
-      const featBonus = (applied.includes('Weapon Focus') ? 1 : 0) + (applied.includes('Greater Weapon Focus') ? 1 : 0);
-      const computedAttack = buildIterativeAttackString(
-        primaryBonus, bab,
-        Number(weapon.enhancementBonus ?? 0), Number(weapon.combatMod ?? 0),
-        maxAtks, twfPenalty, featBonus, rapidShot,
-      );
-      return { ...weapon, computedAttack };
+  function weaponAttackSignature(
+    weapon: WeaponLoadout | null,
+    ctx: ReturnType<typeof attackCalcContext>,
+    twfPenalty: number,
+    maxAtks?: number,
+  ): string {
+    if (!weapon?.name?.trim()) return '';
+    return JSON.stringify({
+      name: weapon.name,
+      handedness: weapon.handedness,
+      rangeIncrement: weapon.rangeIncrement,
+      special: weapon.special,
+      enhancementBonus: Number(weapon.enhancementBonus ?? 0),
+      combatMod: Number(weapon.combatMod ?? 0),
+      appliedFeats: [...(weapon.appliedFeats ?? [])].sort(),
+      twfPenalty,
+      maxAtks,
+      bab: ctx.bab,
+      melee: ctx.melee,
+      ranged: ctx.ranged,
+    });
+  }
+
+  function computeWeaponAttack(
+    weapon: WeaponLoadout,
+    ctx: ReturnType<typeof attackCalcContext>,
+    twfPenalty: number,
+    maxAtks?: number,
+  ): string {
+    const atk = getWeaponAttackClass(weapon.name, weapon.rangeIncrement);
+    const isRanged = atk === 'Ranged';
+    const applied = weapon.appliedFeats ?? [];
+    const finesse = !isRanged && (weapon.handedness === 'Light' || weapon.special?.includes('Weapon Finesse eligible')) && applied.includes('Weapon Finesse');
+    const rapidShot = isRanged && applied.includes('Rapid Shot');
+    const primaryBonus = isRanged ? ctx.ranged : (finesse ? ctx.ranged : ctx.melee);
+    const featBonus = (applied.includes('Weapon Focus') ? 1 : 0) + (applied.includes('Greater Weapon Focus') ? 1 : 0);
+    return buildIterativeAttackString(
+      primaryBonus,
+      ctx.bab,
+      Number(weapon.enhancementBonus ?? 0),
+      Number(weapon.combatMod ?? 0),
+      maxAtks,
+      twfPenalty,
+      featBonus,
+      rapidShot,
+    );
+  }
+
+  function stampComputedAttacks(previousInv: Inventory, nextInv: Inventory, forceRecompute = false): Inventory {
+    const prevCtx = attackCalcContext(previousInv);
+    const nextCtx = attackCalcContext(nextInv);
+
+    function applyToWeapon(
+      prevWeapon: WeaponLoadout | null,
+      nextWeapon: WeaponLoadout | null,
+      prevTwfPenalty: number,
+      nextTwfPenalty: number,
+      prevMaxAtks?: number,
+      nextMaxAtks?: number,
+    ): WeaponLoadout | null {
+      if (!nextWeapon?.name?.trim()) return nextWeapon;
+      const hasStored = Boolean(nextWeapon.computedAttack?.trim());
+      const prevSig = weaponAttackSignature(prevWeapon, prevCtx, prevTwfPenalty, prevMaxAtks);
+      const nextSig = weaponAttackSignature(nextWeapon, nextCtx, nextTwfPenalty, nextMaxAtks);
+      const shouldRecompute = forceRecompute || !hasStored || prevSig !== nextSig;
+      if (!shouldRecompute) return nextWeapon;
+      return { ...nextWeapon, computedAttack: computeWeaponAttack(nextWeapon, nextCtx, nextTwfPenalty, nextMaxAtks) };
     }
 
     return {
       ...nextInv,
-      mainHand: computeFor(nextInv.mainHand, mainPenalty),
-      offHandWeapon: computeFor(nextInv.offHandWeapon, offPenalty, offMaxAttacks),
+      mainHand: applyToWeapon(
+        previousInv.mainHand,
+        nextInv.mainHand,
+        prevCtx.mainPenalty,
+        nextCtx.mainPenalty,
+        undefined,
+        undefined,
+      ),
+      offHandWeapon: applyToWeapon(
+        previousInv.offHandWeapon,
+        nextInv.offHandWeapon,
+        prevCtx.offPenalty,
+        nextCtx.offPenalty,
+        prevCtx.offMaxAttacks,
+        nextCtx.offMaxAttacks,
+      ),
     };
   }
 
-  function updateInventory(partial: Partial<Inventory>) {
-    const nextInv = stampComputedAttacks({ ...inventory, ...partial });
+  function updateInventory(partial: Partial<Inventory>, options?: { forceRecompute?: boolean }) {
+    const merged = { ...inventory, ...partial };
+    const nextInv = stampComputedAttacks(inventory, merged, options?.forceRecompute === true);
     onChange(nextInv, syncArmorClass(nextInv, combat));
   }
 
@@ -493,9 +565,6 @@ export function InventorySection({
   function updateMainHandField(field: keyof WeaponLoadout, value: string | number) {
     const base = inventory.mainHand ?? defaultWeapon();
     const next = { ...base, [field]: value } as WeaponLoadout;
-    if (field === 'enhancementBonus' || field === 'combatMod') {
-      next.attackOverride = '';
-    }
     if (field === 'name' && typeof value === 'string' && !value.trim()) {
       updateInventory({ mainHand: null }); return;
     }
@@ -525,9 +594,6 @@ export function InventorySection({
   function updateOffHandWeaponField(field: keyof WeaponLoadout, value: string | number) {
     const base = inventory.offHandWeapon ?? defaultWeapon();
     const next = { ...base, [field]: value } as WeaponLoadout;
-    if (field === 'enhancementBonus' || field === 'combatMod') {
-      next.attackOverride = '';
-    }
     if (field === 'name' && typeof value === 'string' && !value.trim()) { updateInventory({ offHandWeapon: null }); return; }
     updateInventory({ offHandWeapon: next });
   }
@@ -552,19 +618,7 @@ export function InventorySection({
     }
     previousDerivedRef.current = next;
 
-    const nextPartial: Partial<Inventory> = {};
-    let changed = false;
-    if (inventory.mainHand?.attackOverride) {
-      nextPartial.mainHand = { ...inventory.mainHand, attackOverride: '' };
-      changed = true;
-    }
-    if (inventory.offHandWeapon?.attackOverride) {
-      nextPartial.offHandWeapon = { ...inventory.offHandWeapon, attackOverride: '' };
-      changed = true;
-    }
-    if (changed) {
-      updateInventory(nextPartial);
-    }
+    updateInventory({}, { forceRecompute: true });
   }, [derivedBaseAttackBonus, derivedMeleeAttackBonus, derivedRangedAttackBonus]);
 
   function handleOffHandShieldSelect(name: string, entry?: ArmorCatalogEntry) {
@@ -993,8 +1047,8 @@ function WeaponRow({
         <td className="inventory-hands-td inventory-hands-atk">
           <input
             type="text"
-            value={weapon ? (weapon.attackOverride || iterativeAttack) : ''}
-            onChange={(e) => onFieldChange('attackOverride', e.target.value)}
+            value={weapon ? (weapon.computedAttack || iterativeAttack) : ''}
+            onChange={(e) => onFieldChange('computedAttack', e.target.value)}
             className="inventory-hands-input inventory-hands-atk-input"
             aria-label="Iterative attack"
             disabled={!weapon}

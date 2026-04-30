@@ -5,6 +5,7 @@ import {
   newCharacterDraft,
   abilityModifier,
   totalScore,
+  buildIterativeAttackString,
   computeSkillBonus,
   RACIAL_ABILITY_ADJUSTMENTS,
   RACIAL_SIZES,
@@ -23,6 +24,7 @@ import {
   mergeSelectableFeats,
 } from '../utils/characterHelpers';
 import { FEAT_BY_NAME } from '../data/feats';
+import { getWeaponAttackClass } from '../data/weapons';
 import type { FeatCatalogEntry } from '../components/FeatAutocomplete';
 import type { CustomFeat } from '../types/customFeat';
 import { IdentitySection } from './character-editor/IdentitySection';
@@ -321,6 +323,71 @@ function deriveCombatStats({
   };
 }
 
+function stampComputedAttacksForSave(
+  inventory: CharacterDraft['inventory'],
+  baseAttackBonus: number,
+  meleeAttackBonus: number,
+  rangedAttackBonus: number,
+): CharacterDraft['inventory'] {
+  const mainHand = inventory.mainHand;
+  const offHandWeapon = inventory.offHandWeapon;
+
+  const isTwoHanded = mainHand?.handedness === 'Two-Handed';
+  const isTwoWeaponFighting = !isTwoHanded
+    && Boolean(mainHand?.name?.trim())
+    && Boolean(offHandWeapon?.name?.trim());
+  const offHandIsLight = offHandWeapon?.handedness === 'Light';
+  const twfAppliedFeats = inventory.twfAppliedFeats ?? [];
+  const twfFeatApplied = twfAppliedFeats.includes('Two-Weapon Fighting');
+  const itwfApplied = twfAppliedFeats.includes('Improved Two-Weapon Fighting');
+  const gtwfApplied = twfAppliedFeats.includes('Greater Two-Weapon Fighting');
+  const twfMainPenalty = isTwoWeaponFighting ? (offHandIsLight ? -4 : -6) + (twfFeatApplied ? 2 : 0) : 0;
+  const twfOffPenalty = isTwoWeaponFighting ? (offHandIsLight ? -8 : -10) + (twfFeatApplied ? 6 : 0) : 0;
+  const offHandMaxAttacks = mainHand ? (gtwfApplied ? 3 : itwfApplied ? 2 : 1) : undefined;
+
+  function withComputedAttack(
+    weapon: CharacterDraft['inventory']['mainHand'],
+    twoWeaponPenalty = 0,
+    maxAttacks?: number,
+  ): CharacterDraft['inventory']['mainHand'] {
+    if (!weapon?.name?.trim()) return weapon;
+    if (weapon.computedAttack?.trim()) return weapon;
+    if (weapon.attackOverride?.trim()) return { ...weapon, computedAttack: weapon.attackOverride.trim() };
+    const attackClass = getWeaponAttackClass(weapon.name, weapon.rangeIncrement);
+    const isRangedWeapon = attackClass === 'Ranged';
+    const appliedFeats = weapon.appliedFeats ?? [];
+    const isFinesseWeapon = !isRangedWeapon
+      && (weapon.handedness === 'Light' || weapon.special?.includes('Weapon Finesse eligible'));
+    const usesFinesse = isFinesseWeapon && appliedFeats.includes('Weapon Finesse');
+    const hasRapidShot = isRangedWeapon && appliedFeats.includes('Rapid Shot');
+    const featBonus =
+      (appliedFeats.includes('Weapon Focus') ? 1 : 0)
+      + (appliedFeats.includes('Greater Weapon Focus') ? 1 : 0);
+    const primaryAttackBonus = isRangedWeapon
+      ? rangedAttackBonus
+      : (usesFinesse ? rangedAttackBonus : meleeAttackBonus);
+
+    const computedAttack = buildIterativeAttackString(
+      primaryAttackBonus,
+      baseAttackBonus,
+      Number(weapon.enhancementBonus ?? 0),
+      Number(weapon.combatMod ?? 0),
+      maxAttacks,
+      twoWeaponPenalty,
+      featBonus,
+      hasRapidShot,
+    );
+
+    return { ...weapon, computedAttack };
+  }
+
+  return {
+    ...inventory,
+    mainHand: withComputedAttack(mainHand, twfMainPenalty),
+    offHandWeapon: withComputedAttack(offHandWeapon, twfOffPenalty, offHandMaxAttacks),
+  };
+}
+
 // ── Main editor ───────────────────────────────────────────────────────────────
 
 interface CharacterEditorProps {
@@ -517,6 +584,9 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
             enhancementBonus: typeof entry.enhancementBonus === 'number' ? entry.enhancementBonus : 0,
             combatMod: typeof entry.combatMod === 'number' ? entry.combatMod : 0,
             attackOverride: typeof entry.attackOverride === 'string' ? entry.attackOverride : '',
+            computedAttack: typeof entry.computedAttack === 'string'
+              ? entry.computedAttack
+              : (typeof entry.attackOverride === 'string' ? entry.attackOverride : ''),
             special: typeof entry.special === 'string' ? entry.special : '',
             material: typeof entry.material === 'string' ? entry.material : undefined,
             appliedFeats: Array.isArray(entry.appliedFeats)
@@ -744,8 +814,15 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
         setSaving(true);
         setError(null);
         try {
+          const inventoryWithComputedAttacks = stampComputedAttacksForSave(
+            draft.inventory,
+            combatStats.bab,
+            combatStats.meleeAttack,
+            combatStats.rangedAttack,
+          );
           const body = {
             ...draft,
+            inventory: inventoryWithComputedAttacks,
             age: draft.age ? Number(draft.age) : undefined,
             languages: draft.languages ? draft.languages.split(',').map((s) => s.trim()).filter(Boolean) : [],
             hitPoints: isEdit
