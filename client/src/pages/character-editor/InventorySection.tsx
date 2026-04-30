@@ -715,7 +715,6 @@ export function InventorySection({
                   meleeAttackBonus={derivedMeleeAttackBonus}
                   rangedAttackBonus={derivedRangedAttackBonus}
                   rowClass="inventory-hands-row-even"
-                  showSmallDamage={showSmallDamage}
                   inputStyle={inputStyle}
                   onSelect={handleMainHandSelect}
                   onFieldChange={updateMainHandField}
@@ -800,7 +799,6 @@ export function InventorySection({
                       meleeAttackBonus={derivedMeleeAttackBonus}
                       rangedAttackBonus={derivedRangedAttackBonus}
                       rowClass="inventory-hands-row-odd"
-                      showSmallDamage={showSmallDamage}
                       inputStyle={inputStyle}
                       onSelect={handleOffHandWeaponSelect}
                       onFieldChange={updateOffHandWeaponField}
@@ -904,7 +902,6 @@ function WeaponRow({
   meleeAttackBonus,
   rangedAttackBonus,
   rowClass,
-  showSmallDamage,
   inputStyle,
   onSelect,
   onFieldChange,
@@ -922,7 +919,6 @@ function WeaponRow({
   meleeAttackBonus: number;
   rangedAttackBonus: number;
   rowClass: string;
-  showSmallDamage: boolean;
   inputStyle: React.CSSProperties;
   onSelect: (name: string, entry?: WeaponCatalogEntry) => void;
   onFieldChange: (field: keyof WeaponLoadout, value: string | number) => void;
