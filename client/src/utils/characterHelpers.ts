@@ -519,6 +519,33 @@ export function applyClassAndRacialSkillRules(
   });
 }
 
+export function buildIterativeAttackString(
+  primaryAttackBonus: number,
+  baseAttackBonus: number,
+  enhancementBonus: number,
+  combatMod: number,
+  maxAttacks?: number,
+  twoWeaponPenalty: number = 0,
+  featBonus: number = 0,
+  rapidShot: boolean = false,
+): string {
+  const primary = Number.isFinite(primaryAttackBonus) ? primaryAttackBonus : 0;
+  const bab = Number.isFinite(baseAttackBonus) ? baseAttackBonus : 0;
+  const enh = Number.isFinite(enhancementBonus) ? enhancementBonus : 0;
+  const mod = Number.isFinite(combatMod) ? combatMod : 0;
+  const twf = Number.isFinite(twoWeaponPenalty) ? twoWeaponPenalty : 0;
+  const fb  = Number.isFinite(featBonus) ? featBonus : 0;
+  const naturalCount = bab >= 16 ? 4 : bab >= 11 ? 3 : bab >= 6 ? 2 : 1;
+  const baseCount    = maxAttacks !== undefined ? Math.min(naturalCount, maxAttacks) : naturalCount;
+  const attackCount  = rapidShot ? baseCount + 1 : baseCount;
+  const rsOffset     = rapidShot ? -2 : 0;
+  return Array.from({ length: attackCount }, (_, i) => {
+    const iterPenalty = rapidShot ? (i > 0 ? (i - 1) * 5 : 0) : i * 5;
+    const total = primary - iterPenalty + enh + mod + twf + fb + rsOffset;
+    return total >= 0 ? `+${total}` : `${total}`;
+  }).join('/');
+}
+
 export function newCharacterDraft(): CharacterDraft {
   return {
     name: '',
@@ -559,16 +586,24 @@ export function newCharacterDraft(): CharacterDraft {
       grappleBonus: 0,
     },
     inventory: {
-      head: '', face: '', neck: '', shoulders: '',
-      bodySlot: '',
-      chest: '', wrists: '', hands: '',
-      ringLeft: '', ringRight: '',
-      waist: '', feet: '',
+      wornSlots: {
+        head:      { item: '', acType: '', acBonus: 0 },
+        face:      { item: '', acType: '', acBonus: 0 },
+        neck:      { item: '', acType: '', acBonus: 0 },
+        shoulders: { item: '', acType: '', acBonus: 0 },
+        bodySlot:  { item: '', acType: '', acBonus: 0 },
+        chest:     { item: '', acType: '', acBonus: 0 },
+        wrists:    { item: '', acType: '', acBonus: 0 },
+        hands:     { item: '', acType: '', acBonus: 0 },
+        ringLeft:  { item: '', acType: '', acBonus: 0 },
+        ringRight: { item: '', acType: '', acBonus: 0 },
+        waist:     { item: '', acType: '', acBonus: 0 },
+        feet:      { item: '', acType: '', acBonus: 0 },
+      },
       body: null,
       mainHand: null,
       offHandWeapon: null,
       offHandShield: null,
-      slotBonuses: {},
     },
     skills: SKILL_DEFS.map((def) => ({
       name: def.name,

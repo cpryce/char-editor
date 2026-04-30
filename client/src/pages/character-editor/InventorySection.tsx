@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { createPortal } from 'react-dom';
-import type { CharacterDraft, ArmorLoadout, WeaponLoadout, Inventory, AcBonusType, SlotAcBonus, TextSlotKey, FeatSlot, ClassEntry } from '../../types/character';
+import type { CharacterDraft, ArmorLoadout, WeaponLoadout, Inventory, AcBonusType, WornSlot, WornSlotKey, FeatSlot, ClassEntry } from '../../types/character';
 import { ArmorAutocomplete } from '../../components/ArmorAutocomplete';
 import { WeaponAutocomplete } from '../../components/WeaponAutocomplete';
 import type { ArmorCatalogEntry } from '../../data/armor';
 import { ARMOR_ENTRIES, SHIELD_ENTRIES } from '../../data/armor';
 import type { WeaponCatalogEntry } from '../../data/weapons';
 import { WEAPON_CATALOG, getWeaponAttackClass } from '../../data/weapons';
+import { buildIterativeAttackString } from '../../utils/characterHelpers';
 
 /** Weapons usable in the off-hand: Light and One-Handed only. */
 const OFF_HAND_WEAPON_CATALOG = WEAPON_CATALOG.filter((w) => w.handedness !== 'Two-Handed');
@@ -182,42 +183,14 @@ function totalArmorBonus(loadout: ArmorLoadout | null): number {
   return (loadout.armorBonus ?? 0) + (loadout.enhancementBonus ?? 0);
 }
 
-function buildIterativeAttackString(
-  primaryAttackBonus: number,
-  baseAttackBonus: number,
-  enhancementBonus: number,
-  combatMod: number,
-  maxAttacks?: number,
-  twoWeaponPenalty: number = 0,
-  featBonus: number = 0,
-  rapidShot: boolean = false,
-): string {
-  const primary = Number.isFinite(primaryAttackBonus) ? primaryAttackBonus : 0;
-  const bab = Number.isFinite(baseAttackBonus) ? baseAttackBonus : 0;
-  const enh = Number.isFinite(enhancementBonus) ? enhancementBonus : 0;
-  const mod = Number.isFinite(combatMod) ? combatMod : 0;
-  const twf = Number.isFinite(twoWeaponPenalty) ? twoWeaponPenalty : 0;
-  const fb  = Number.isFinite(featBonus) ? featBonus : 0;
-  const naturalCount = bab >= 16 ? 4 : bab >= 11 ? 3 : bab >= 6 ? 2 : 1;
-  const baseCount    = maxAttacks !== undefined ? Math.min(naturalCount, maxAttacks) : naturalCount;
-  // Rapid Shot adds one extra attack; all attacks take -2 penalty
-  const attackCount  = rapidShot ? baseCount + 1 : baseCount;
-  const rsOffset     = rapidShot ? -2 : 0;
-  return Array.from({ length: attackCount }, (_, i) => {
-    // Extra RS shot (i=0) and first regular (i=1) share the highest bonus; iteratives start at i=2
-    const iterPenalty = rapidShot ? (i > 0 ? (i - 1) * 5 : 0) : i * 5;
-    const total = primary - iterPenalty + enh + mod + twf + fb + rsOffset;
-    return total >= 0 ? `+${total}` : `${total}`;
-  }).join('/');
-}
+
 
 function newWeaponFromEntry(entry: WeaponCatalogEntry): WeaponLoadout {
   return {
     name:             entry.name,
     proficiency:      entry.proficiency,
     handedness:       entry.handedness,
-    damageMedium:     entry.damageMedium,
-    damageSmall:      entry.damageSmall,
+    damage:           entry.damageMedium,
     critical:         entry.critical,
     rangeIncrement:   entry.rangeIncrement,
     weight:           entry.weight,
@@ -233,8 +206,7 @@ function defaultWeapon(name = ''): WeaponLoadout {
     name,
     proficiency: 'Simple',
     handedness: 'One-Handed',
-    damageMedium: '—',
-    damageSmall: '—',
+    damage: '—',
     critical: '×2',
     rangeIncrement: '—',
     weight: '',
@@ -245,7 +217,19 @@ function defaultWeapon(name = ''): WeaponLoadout {
   };
 }
 
-function newShieldFromEntry(entry: ArmorCatalogEntry): ArmorLoadout {
+function getArmorSpeedForSize(
+  category: ArmorCatalogEntry['category'] | ArmorLoadout['category'],
+  size: CharacterDraft['size'],
+): string {
+  if (category === 'Shield') return '-';
+  const isSmallMovement = size === 'Small' || size === 'Fine' || size === 'Diminutive' || size === 'Tiny';
+  if (category === 'Light Armor') {
+    return isSmallMovement ? '20 ft.' : '30 ft.';
+  }
+  return isSmallMovement ? '15 ft.' : '20 ft.';
+}
+
+function newShieldFromEntry(entry: ArmorCatalogEntry, size: CharacterDraft['size']): ArmorLoadout {
   return {
     name:              entry.name,
     category:          entry.category,
@@ -254,7 +238,7 @@ function newShieldFromEntry(entry: ArmorCatalogEntry): ArmorLoadout {
     maxDexBonus:       entry.maxDexBonus,
     armorCheckPenalty: entry.armorCheckPenalty,
     arcaneSpellFailure: entry.arcaneSpellFailure,
-    speed:             entry.speed,
+    speed:             getArmorSpeedForSize(entry.category, size),
     weight:            entry.weight,
     armorAdjust:       entry.armorAdjust,
   };
@@ -275,7 +259,7 @@ function defaultShield(name = ''): ArmorLoadout {
   };
 }
 
-function newArmorFromEntry(entry: ArmorCatalogEntry): ArmorLoadout {
+function newArmorFromEntry(entry: ArmorCatalogEntry, size: CharacterDraft['size']): ArmorLoadout {
   return {
     name:              entry.name,
     category:          entry.category,
@@ -284,7 +268,7 @@ function newArmorFromEntry(entry: ArmorCatalogEntry): ArmorLoadout {
     maxDexBonus:       entry.maxDexBonus,
     armorCheckPenalty: entry.armorCheckPenalty,
     arcaneSpellFailure: entry.arcaneSpellFailure,
-    speed:             entry.speed,
+    speed:             getArmorSpeedForSize(entry.category, size),
     weight:            entry.weight,
     armorAdjust:       entry.armorAdjust,
   };
@@ -309,7 +293,7 @@ const AC_TYPE_LABEL: Record<AcBonusType, string> = {
   profane:    'Profane',
 };
 
-const SLOTS_BEFORE_BODY: Array<{ key: TextSlotKey; label: string }> = [
+const SLOTS_BEFORE_BODY: Array<{ key: WornSlotKey; label: string }> = [
   { key: 'head',      label: 'Head' },
   { key: 'face',      label: 'Face' },
   { key: 'neck',      label: 'Neck' },
@@ -317,7 +301,7 @@ const SLOTS_BEFORE_BODY: Array<{ key: TextSlotKey; label: string }> = [
   { key: 'bodySlot',  label: 'Body' },
 ];
 
-const SLOTS_AFTER_BODY: Array<{ key: TextSlotKey; label: string }> = [
+const SLOTS_AFTER_BODY: Array<{ key: WornSlotKey; label: string }> = [
   { key: 'chest',     label: 'Chest' },
   { key: 'wrists',    label: 'Wrists' },
   { key: 'hands',     label: 'Hands' },
@@ -387,7 +371,7 @@ export function InventorySection({
   const twfFeatOptions = getTwfFeatOptions({ characterFeats: feats, bab: derivedBaseAttackBonus, rangerLevel, twfApplied: twfFeatApplied, itwfApplied, dexterity });
 
   const isBodyArmorSelected = Boolean(inventory.body?.name?.trim());
-  const isBodySlotEdited = inventory.bodySlot.trim().length > 0;
+  const isBodySlotEdited = inventory.wornSlots.bodySlot.item.trim().length > 0;
   const showSmallDamage = (
     size === 'Small' || size === 'Fine' || size === 'Diminutive' || size === 'Tiny'
   );
@@ -398,10 +382,9 @@ export function InventorySection({
     nextInv: Inventory,
     nextCombat: CharacterDraft['combat'],
   ): CharacterDraft['combat'] {
-    const slotBonusEntries = Object.values(nextInv.slotBonuses ?? {})
-      .filter((b): b is SlotAcBonus => b != null);
+    const slotEntries = Object.values(nextInv.wornSlots);
     const bestSlot = (t: string) =>
-      slotBonusEntries.reduce((best, b) => (b.type === t ? Math.max(best, b.value) : best), 0);
+      slotEntries.reduce((best, b) => (b.acType === t ? Math.max(best, b.acBonus) : best), 0);
     return {
       ...nextCombat,
       armorClass: {
@@ -419,8 +402,50 @@ export function InventorySection({
     };
   }
 
+  function stampComputedAttacks(nextInv: Inventory): Inventory {
+    const melee = Number(derivedMeleeAttackBonus);
+    const ranged = Number(derivedRangedAttackBonus);
+    const bab = Number(derivedBaseAttackBonus);
+
+    const isTH = nextInv.mainHand?.handedness === 'Two-Handed';
+    const hasMain = Boolean(nextInv.mainHand?.name?.trim());
+    const hasOff = Boolean(nextInv.offHandWeapon?.name?.trim());
+    const isTWF = !isTH && hasMain && hasOff;
+    const offIsLight = nextInv.offHandWeapon?.handedness === 'Light';
+    const twfFeats = nextInv.twfAppliedFeats ?? [];
+    const twfFeat = twfFeats.includes('Two-Weapon Fighting');
+    const itwf = twfFeats.includes('Improved Two-Weapon Fighting');
+    const gtwf = twfFeats.includes('Greater Two-Weapon Fighting');
+    const mainPenalty = isTWF ? (offIsLight ? -4 : -6) + (twfFeat ? 2 : 0) : 0;
+    const offPenalty = isTWF ? (offIsLight ? -8 : -10) + (twfFeat ? 6 : 0) : 0;
+    const offMaxAttacks = hasMain ? (gtwf ? 3 : itwf ? 2 : 1) : undefined;
+
+    function computeFor(weapon: WeaponLoadout | null, twfPenalty: number, maxAtks?: number): WeaponLoadout | null {
+      if (!weapon?.name?.trim()) return weapon;
+      const atk = getWeaponAttackClass(weapon.name, weapon.rangeIncrement);
+      const isRanged = atk === 'Ranged';
+      const applied = weapon.appliedFeats ?? [];
+      const finesse = !isRanged && (weapon.handedness === 'Light' || weapon.special?.includes('Weapon Finesse eligible')) && applied.includes('Weapon Finesse');
+      const rapidShot = isRanged && applied.includes('Rapid Shot');
+      const primaryBonus = isRanged ? ranged : (finesse ? ranged : melee);
+      const featBonus = (applied.includes('Weapon Focus') ? 1 : 0) + (applied.includes('Greater Weapon Focus') ? 1 : 0);
+      const computedAttack = buildIterativeAttackString(
+        primaryBonus, bab,
+        Number(weapon.enhancementBonus ?? 0), Number(weapon.combatMod ?? 0),
+        maxAtks, twfPenalty, featBonus, rapidShot,
+      );
+      return { ...weapon, computedAttack };
+    }
+
+    return {
+      ...nextInv,
+      mainHand: computeFor(nextInv.mainHand, mainPenalty),
+      offHandWeapon: computeFor(nextInv.offHandWeapon, offPenalty, offMaxAttacks),
+    };
+  }
+
   function updateInventory(partial: Partial<Inventory>) {
-    const nextInv = { ...inventory, ...partial };
+    const nextInv = stampComputedAttacks({ ...inventory, ...partial });
     onChange(nextInv, syncArmorClass(nextInv, combat));
   }
 
@@ -428,20 +453,19 @@ export function InventorySection({
 
   function handleBodySelect(name: string, entry?: ArmorCatalogEntry) {
     if (!name.trim()) { updateInventory({ body: null }); return; }
-    const nextSlotBonuses = { ...(inventory.slotBonuses ?? {}) };
-    delete nextSlotBonuses.bodySlot;
-    const clearBodySlotFields: Pick<Inventory, 'bodySlot' | 'slotBonuses'> = {
-      bodySlot: '',
-      slotBonuses: nextSlotBonuses,
+    const nextWornSlots = { ...inventory.wornSlots };
+    nextWornSlots.bodySlot = { item: '', acType: '', acBonus: 0 };
+    const clearBodySlotFields: Pick<Inventory, 'wornSlots'> = {
+      wornSlots: nextWornSlots,
     };
     if (entry) {
-      updateInventory({ body: newArmorFromEntry(entry), ...clearBodySlotFields });
+      updateInventory({ body: newArmorFromEntry(entry, size), ...clearBodySlotFields });
       return;
     }
     const existing = inventory.body ?? newArmorFromEntry({
       name: '', category: 'Light Armor', armorBonus: 0, maxDexBonus: null,
       armorCheckPenalty: 0, arcaneSpellFailure: '', speed: '', weight: '', armorAdjust: 0,
-    });
+    }, size);
     updateInventory({ body: { ...existing, name }, ...clearBodySlotFields });
   }
 
@@ -458,7 +482,9 @@ export function InventorySection({
 
   function handleMainHandSelect(name: string, entry?: WeaponCatalogEntry) {
     if (!name.trim()) { updateInventory({ mainHand: null }); return; }
-    const weapon = entry ? newWeaponFromEntry(entry) : { ...(inventory.mainHand ?? defaultWeapon()), name };
+    const weapon = entry
+      ? { ...newWeaponFromEntry(entry), damage: showSmallDamage ? entry.damageSmall : entry.damageMedium }
+      : { ...(inventory.mainHand ?? defaultWeapon()), name };
     const isTH = weapon.handedness === 'Two-Handed';
     if (isTH) setOffHandModeState('none');
     updateInventory({ mainHand: weapon, ...(isTH ? { offHandWeapon: null, offHandShield: null } : {}) });
@@ -489,7 +515,11 @@ export function InventorySection({
 
   function handleOffHandWeaponSelect(name: string, entry?: WeaponCatalogEntry) {
     if (!name.trim()) { updateInventory({ offHandWeapon: null }); return; }
-    updateInventory({ offHandWeapon: entry ? newWeaponFromEntry(entry) : { ...(inventory.offHandWeapon ?? defaultWeapon()), name } });
+    updateInventory({
+      offHandWeapon: entry
+        ? { ...newWeaponFromEntry(entry), damage: showSmallDamage ? entry.damageSmall : entry.damageMedium }
+        : { ...(inventory.offHandWeapon ?? defaultWeapon()), name },
+    });
   }
 
   function updateOffHandWeaponField(field: keyof WeaponLoadout, value: string | number) {
@@ -539,8 +569,33 @@ export function InventorySection({
 
   function handleOffHandShieldSelect(name: string, entry?: ArmorCatalogEntry) {
     if (!name.trim()) { updateInventory({ offHandShield: null }); return; }
-    updateInventory({ offHandShield: entry ? newShieldFromEntry(entry) : { ...(inventory.offHandShield ?? defaultShield()), name } });
+    updateInventory({ offHandShield: entry ? newShieldFromEntry(entry, size) : { ...(inventory.offHandShield ?? defaultShield()), name } });
   }
+
+  useEffect(() => {
+    const nextPartial: Partial<Inventory> = {};
+    let changed = false;
+
+    if (inventory.body?.name) {
+      const expectedSpeed = getArmorSpeedForSize(inventory.body.category, size);
+      if (inventory.body.speed !== expectedSpeed) {
+        nextPartial.body = { ...inventory.body, speed: expectedSpeed };
+        changed = true;
+      }
+    }
+
+    if (inventory.offHandShield?.name) {
+      const expectedSpeed = getArmorSpeedForSize(inventory.offHandShield.category, size);
+      if (inventory.offHandShield.speed !== expectedSpeed) {
+        nextPartial.offHandShield = { ...inventory.offHandShield, speed: expectedSpeed };
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      updateInventory(nextPartial);
+    }
+  }, [size]);
 
   function updateOffHandShieldField(field: keyof ArmorLoadout, value: string | number | null) {
     const base = inventory.offHandShield ?? defaultShield();
@@ -571,21 +626,17 @@ export function InventorySection({
     updateInventory({ twfAppliedFeats: next });
   }
 
-  // ── Slot AC bonuses ────────────────────────────────────────────────────────
+  // ── Worn slot updates ──────────────────────────────────────────────────────
 
-  function updateSlotBonus(slot: TextSlotKey, bonus: SlotAcBonus | undefined) {
-    const next = { ...(inventory.slotBonuses ?? {}) };
-    if (bonus !== undefined) {
-      next[slot] = bonus;
-    } else {
-      delete next[slot];
-    }
-    updateInventory({ slotBonuses: next });
+  function updateWornSlot(slot: WornSlotKey, partial: Partial<WornSlot>) {
+    const next = { ...inventory.wornSlots };
+    next[slot] = { ...next[slot], ...partial };
+    updateInventory({ wornSlots: next });
   }
 
   // Inline renderer for a slot row (4 grid cells: label | item | type | value)
-  function renderSlotRow(key: TextSlotKey, label: string) {
-    const bonus = inventory.slotBonuses?.[key];
+  function renderSlotRow(key: WornSlotKey, label: string) {
+    const slot = inventory.wornSlots[key];
     const disableBodySlot = key === 'bodySlot' && isBodyArmorSelected;
     return (
       <Fragment key={key}>
@@ -594,18 +645,18 @@ export function InventorySection({
           id={`inv-${key}`}
           type="text"
           className="inventory-slot-input"
-          value={inventory[key] as string}
-          onChange={(e) => updateInventory({ [key]: e.target.value })}
+          value={slot.item}
+          onChange={(e) => updateWornSlot(key, { item: e.target.value })}
           disabled={disableBodySlot}
           style={inputStyle}
         />
         <select
           className="inventory-slot-bonus-type"
-          value={bonus?.type ?? ''}
+          value={slot.acType}
           onChange={(e) => {
             const t = e.target.value;
-            if (!t) { updateSlotBonus(key, undefined); }
-            else { updateSlotBonus(key, { type: t as AcBonusType, value: bonus?.value ?? 1 }); }
+            if (!t) { updateWornSlot(key, { acType: '', acBonus: 0 }); }
+            else { updateWornSlot(key, { acType: t as AcBonusType, acBonus: slot.acBonus || 1 }); }
           }}
           aria-label={`${label} AC bonus type`}
           disabled={disableBodySlot}
@@ -615,13 +666,13 @@ export function InventorySection({
             <option key={t} value={t}>{AC_TYPE_LABEL[t]}</option>
           ))}
         </select>
-        {bonus ? (
+        {slot.acType ? (
           <input
             type="number"
             min={0}
             className="inventory-slot-bonus-value"
-            value={bonus.value}
-            onChange={(e) => updateSlotBonus(key, { ...bonus, value: Number(e.target.value) })}
+            value={slot.acBonus}
+            onChange={(e) => updateWornSlot(key, { acBonus: Number(e.target.value) })}
             aria-label={`${label} AC bonus value`}
             disabled={disableBodySlot}
           />
@@ -883,8 +934,7 @@ function WeaponRow({
   featOptions?: FeatOption[];
   onToggleFeat?: (name: string) => void;
 }) {
-  const damageField: keyof WeaponLoadout = showSmallDamage ? 'damageSmall' : 'damageMedium';
-  const damageValue = weapon ? (showSmallDamage ? weapon.damageSmall : weapon.damageMedium) : '';
+  const damageValue = weapon?.damage ?? '';
   const mat = weapon?.material ? MATERIALS[weapon.material as MaterialKey] : undefined;
   const effectiveWeight = weapon ? applyWeightMultiplier(weapon.weight, mat?.weightMultiplier ?? 1) : '—';
   const parsedBab = Number(baseAttackBonus);
@@ -958,7 +1008,7 @@ function WeaponRow({
           <input
             type="text"
             value={damageValue}
-            onChange={(e) => onFieldChange(damageField, e.target.value)}
+            onChange={(e) => onFieldChange('damage', e.target.value)}
             className="inventory-hands-input"
             aria-label="Weapon damage"
             disabled={!weapon}

@@ -48,8 +48,7 @@ const weaponLoadoutSchema = new Schema(
     name:             { type: String, required: true },
     proficiency:      { type: String, required: true }, // 'Simple' | 'Martial' | 'Exotic'
     handedness:       { type: String, required: true }, // 'Light' | 'One-Handed' | 'Two-Handed'
-    damageMedium:     { type: String, default: '—' },
-    damageSmall:      { type: String, default: '—' },
+    damage:           { type: String, default: '—' },
     critical:         { type: String, default: '×2' },
     rangeIncrement:   { type: String, default: '—' },
     weight:           { type: String, default: '' },
@@ -57,6 +56,7 @@ const weaponLoadoutSchema = new Schema(
     enhancementBonus: { type: Number, default: 0 },
     combatMod:        { type: Number, default: 0 },
     attackOverride:   { type: String, default: '' },
+    computedAttack:   { type: String, default: '' },
     special:          { type: String, default: '' },
     material:         { type: String },
     appliedFeats:     [{ type: String }],
@@ -200,18 +200,7 @@ export interface ICharacter extends Document {
 
   // Inventory
   inventory: {
-    head:      string;
-    face:      string;
-    neck:      string;
-    shoulders: string;
-    bodySlot:  string;
-    chest:     string;
-    wrists:    string;
-    hands:     string;
-    ringLeft:  string;
-    ringRight: string;
-    waist:     string;
-    feet:      string;
+    wornSlots: Record<string, { item: string; acType: string; acBonus: number }>;
     body: {
       name: string; category: string; armorBonus: number; enhancementBonus: number;
       maxDexBonus: string | null; armorCheckPenalty: number; arcaneSpellFailure: string;
@@ -219,16 +208,16 @@ export interface ICharacter extends Document {
     } | null;
     mainHand: {
       name: string; proficiency: string; handedness: string;
-      damageMedium: string; damageSmall: string; critical: string;
+      damage: string; critical: string;
       rangeIncrement: string; weight: string; damageType: string;
-      enhancementBonus: number; special: string; combatMod?: number; attackOverride?: string;
+      enhancementBonus: number; special: string; combatMod?: number; attackOverride?: string; computedAttack?: string;
       material?: string; appliedFeats?: string[];
     } | null;
     offHandWeapon: {
       name: string; proficiency: string; handedness: string;
-      damageMedium: string; damageSmall: string; critical: string;
+      damage: string; critical: string;
       rangeIncrement: string; weight: string; damageType: string;
-      enhancementBonus: number; special: string; combatMod?: number; attackOverride?: string;
+      enhancementBonus: number; special: string; combatMod?: number; attackOverride?: string; computedAttack?: string;
       material?: string; appliedFeats?: string[];
     } | null;
     offHandShield: {
@@ -236,7 +225,6 @@ export interface ICharacter extends Document {
       maxDexBonus: string | null; armorCheckPenalty: number; arcaneSpellFailure: string;
       speed: string; weight: string; armorAdjust: number;
     } | null;
-    slotBonuses?: Record<string, { type: string; value: number }>;
     twfAppliedFeats?: string[];
   };
 
@@ -321,23 +309,11 @@ const characterSchema = new Schema<ICharacter>(
 
     // Inventory
     inventory: {
-      head:      { type: String, default: '' },
-      face:      { type: String, default: '' },
-      neck:      { type: String, default: '' },
-      shoulders: { type: String, default: '' },
-      bodySlot:  { type: String, default: '' },
-      chest:     { type: String, default: '' },
-      wrists:    { type: String, default: '' },
-      hands:     { type: String, default: '' },
-      ringLeft:  { type: String, default: '' },
-      ringRight: { type: String, default: '' },
-      waist:     { type: String, default: '' },
-      feet:      { type: String, default: '' },
+      wornSlots:     { type: Schema.Types.Mixed, default: {} },
       body:          { type: armorLoadoutSchema,  default: null },
       mainHand:      { type: weaponLoadoutSchema, default: null },
       offHandWeapon: { type: weaponLoadoutSchema, default: null },
       offHandShield: { type: armorLoadoutSchema,  default: null },
-      slotBonuses:   { type: Schema.Types.Mixed,   default: {} },
       twfAppliedFeats: [{ type: String }],
     },
 

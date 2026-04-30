@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import type { CharacterDraft, AbilityScore, FeatSlot, Inventory, SlotAcBonus } from '../types/character';
+import type { CharacterDraft, AbilityScore, FeatSlot, WornSlot, WornSlotKey } from '../types/character';
 import { HIT_DIE_BY_CLASS } from '../types/character';
 import {
   newCharacterDraft,
@@ -227,12 +227,14 @@ function deriveAbilityTotals(scores: CharacterDraft['abilityScores']): Record<Ab
 function deriveCombatStats({
   combat,
   inventory,
+  feats,
   classes,
   size,
   abilityMods,
 }: {
   combat: CharacterDraft['combat'];
   inventory: CharacterDraft['inventory'];
+  feats: CharacterDraft['feats'];
   classes: CharacterDraft['classes'];
   size: CharacterDraft['size'];
   abilityMods: Record<AbilityKey, number>;
@@ -266,11 +268,12 @@ function deriveCombatStats({
     ? dexMod
     : (maxDexCap === null ? dexMod : Math.min(dexMod, maxDexCap));
 
-  // Slot dodge bonuses stack on top of the manually-entered dodge value.
-  const slotBonusEntries = Object.values(inventory.slotBonuses ?? {})
-    .filter((b): b is SlotAcBonus => b != null);
-  const slotDodge = slotBonusEntries.reduce((acc, b) => (b.type === 'dodge' ? acc + b.value : acc), 0);
-  const acDodge = safeCombatNumber(combat.armorClass.dodge) + slotDodge;
+  // Slot and feat dodge bonuses stack on top of the manually-entered dodge value.
+  const slotDodge = Object.values(inventory.wornSlots).reduce(
+    (acc, b) => (b.acType === 'dodge' ? acc + b.acBonus : acc), 0,
+  );
+  const dodgeFeatBonus = feats.some((f) => f.name.trim().toLowerCase() === 'dodge') ? 1 : 0;
+  const acDodge = safeCombatNumber(combat.armorClass.dodge) + slotDodge + dodgeFeatBonus;
 
   const totalAC = 10 + acArmor + acShield + acDexMod + sizeMod + acDodge + acNatural + acDeflection + acMisc;
   const touchAC = 10 + acDexMod + sizeMod + acDodge + acDeflection + acMisc;
@@ -373,6 +376,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
   const combatStats = deriveCombatStats({
     combat: draft.combat,
     inventory: draft.inventory,
+    feats: draft.feats,
     classes: draft.classes,
     size: draft.size,
     abilityMods,
@@ -459,29 +463,75 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           },
         };
 
-        const rawInv = (data.inventory as CharacterDraft['inventory'] | undefined) ?? base.inventory;
+        const rawInv = (data.inventory as Record<string, unknown> | undefined) ?? base.inventory;
+        const rawInvRecord = rawInv as Record<string, unknown>;
+        const WORN_SLOT_KEYS: WornSlotKey[] = ['head', 'face', 'neck', 'shoulders', 'bodySlot', 'chest', 'wrists', 'hands', 'ringLeft', 'ringRight', 'waist', 'feet'];
+        const defaultWornSlot: WornSlot = { item: '', acType: '', acBonus: 0 };
+        let normalizedWornSlots: Record<WornSlotKey, WornSlot>;
+        if (typeof rawInv.wornSlots === 'object' && rawInv.wornSlots !== null) {
+          // New format
+          const raw = rawInv.wornSlots as Record<string, unknown>;
+          normalizedWornSlots = Object.fromEntries(
+            WORN_SLOT_KEYS.map((key) => {
+              const s = raw[key];
+              if (typeof s === 'object' && s !== null) {
+                const e = s as Record<string, unknown>;
+                return [key, {
+                  item:    typeof e.item    === 'string' ? e.item    : '',
+                  acType:  typeof e.acType  === 'string' ? e.acType  : '',
+                  acBonus: typeof e.acBonus === 'number' ? e.acBonus : 0,
+                }];
+              }
+              return [key, defaultWornSlot];
+            }),
+          ) as Record<WornSlotKey, WornSlot>;
+        } else {
+          // Migrate old flat-field + slotBonuses format
+          const oldBonuses = (typeof rawInvRecord.slotBonuses === 'object' && rawInvRecord.slotBonuses !== null)
+            ? rawInvRecord.slotBonuses as Record<string, Record<string, unknown>>
+            : {};
+          normalizedWornSlots = Object.fromEntries(
+            WORN_SLOT_KEYS.map((key) => {
+              const item    = typeof rawInvRecord[key] === 'string' ? rawInvRecord[key] as string : '';
+              const bonus   = oldBonuses[key];
+              return [key, {
+                item,
+                acType:  typeof bonus?.type  === 'string' ? bonus.type  as string : '',
+                acBonus: typeof bonus?.value === 'number' ? bonus.value as number : 0,
+              }];
+            }),
+          ) as Record<WornSlotKey, WornSlot>;
+        }
+        const normalizeWeaponLoadout = (raw: unknown): CharacterDraft['inventory']['mainHand'] => {
+          if (typeof raw !== 'object' || raw == null) return null;
+          const entry = raw as Record<string, unknown>;
+          return {
+            name: typeof entry.name === 'string' ? entry.name : '',
+            proficiency: entry.proficiency === 'Martial' || entry.proficiency === 'Exotic' ? entry.proficiency : 'Simple',
+            handedness: entry.handedness === 'Light' || entry.handedness === 'Two-Handed' ? entry.handedness : 'One-Handed',
+            damage: typeof entry.damage === 'string' ? entry.damage : '—',
+            critical: typeof entry.critical === 'string' ? entry.critical : '×2',
+            rangeIncrement: typeof entry.rangeIncrement === 'string' ? entry.rangeIncrement : '—',
+            weight: typeof entry.weight === 'string' ? entry.weight : '',
+            damageType: typeof entry.damageType === 'string' ? entry.damageType : '',
+            enhancementBonus: typeof entry.enhancementBonus === 'number' ? entry.enhancementBonus : 0,
+            combatMod: typeof entry.combatMod === 'number' ? entry.combatMod : 0,
+            attackOverride: typeof entry.attackOverride === 'string' ? entry.attackOverride : '',
+            special: typeof entry.special === 'string' ? entry.special : '',
+            material: typeof entry.material === 'string' ? entry.material : undefined,
+            appliedFeats: Array.isArray(entry.appliedFeats)
+              ? entry.appliedFeats.filter((feat): feat is string => typeof feat === 'string')
+              : undefined,
+          };
+        };
         const normalizedInventory: CharacterDraft['inventory'] = {
           ...base.inventory,
-          head:      typeof rawInv.head      === 'string' ? rawInv.head      : '',
-          face:      typeof rawInv.face      === 'string' ? rawInv.face      : '',
-          neck:      typeof rawInv.neck      === 'string' ? rawInv.neck      : '',
-          shoulders: typeof rawInv.shoulders === 'string' ? rawInv.shoulders : '',
-          bodySlot:  typeof rawInv.bodySlot  === 'string' ? rawInv.bodySlot  : '',
-          chest:     typeof rawInv.chest     === 'string' ? rawInv.chest     : '',
-          wrists:    typeof rawInv.wrists    === 'string' ? rawInv.wrists    : '',
-          hands:     typeof rawInv.hands     === 'string' ? rawInv.hands     : '',
-          ringLeft:  typeof rawInv.ringLeft  === 'string' ? rawInv.ringLeft  : '',
-          ringRight: typeof rawInv.ringRight === 'string' ? rawInv.ringRight : '',
-          waist:     typeof rawInv.waist     === 'string' ? rawInv.waist     : '',
-          feet:      typeof rawInv.feet      === 'string' ? rawInv.feet      : '',
-          body:          rawInv.body          ? { ...rawInv.body }          : null,
-          mainHand:      rawInv.mainHand      ? { ...rawInv.mainHand }      : null,
-          offHandWeapon: rawInv.offHandWeapon ? { ...rawInv.offHandWeapon } : null,
-          offHandShield: rawInv.offHandShield ? { ...rawInv.offHandShield } : null,
-          slotBonuses:   (typeof rawInv.slotBonuses === 'object' && rawInv.slotBonuses !== null
-            ? rawInv.slotBonuses
-            : {}) as Inventory['slotBonuses'],
-          twfAppliedFeats: Array.isArray(rawInv.twfAppliedFeats) ? rawInv.twfAppliedFeats as string[] : undefined,
+          wornSlots:     normalizedWornSlots,
+          body:          rawInvRecord.body          ? { ...(rawInvRecord.body as NonNullable<CharacterDraft['inventory']['body']>) } : null,
+          mainHand:      normalizeWeaponLoadout(rawInvRecord.mainHand),
+          offHandWeapon: normalizeWeaponLoadout(rawInvRecord.offHandWeapon),
+          offHandShield: rawInvRecord.offHandShield ? { ...(rawInvRecord.offHandShield as NonNullable<CharacterDraft['inventory']['offHandShield']>) } : null,
+          twfAppliedFeats: Array.isArray(rawInvRecord.twfAppliedFeats) ? rawInvRecord.twfAppliedFeats as string[] : undefined,
         };
 
         const loaded: CharacterDraft = {

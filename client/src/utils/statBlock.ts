@@ -1,4 +1,5 @@
 import type { CharacterDraft } from '../types/character';
+import { getWeaponAttackClass } from '../data/weapons';
 import {
   totalScore,
   abilityModifier,
@@ -7,6 +8,7 @@ import {
   totalCharacterLevel,
   deriveAutoFeats,
   deriveClassFeatures,
+  buildIterativeAttackString,
 } from './characterHelpers';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -63,14 +65,56 @@ const RACE_TYPE: Record<CharacterDraft['race'], string> = {
   'Half-Orc': 'Humanoid (Human, Orc)',
 };
 
-// ── Attack progression ────────────────────────────────────────────────────────
+// ── Attack helpers ────────────────────────────────────────────────────────────
 
-function attackProgression(primaryBonus: number, bab: number): string {
-  const attacks = [primaryBonus];
-  if (bab >= 6)  attacks.push(primaryBonus - 5);
-  if (bab >= 11) attacks.push(primaryBonus - 10);
-  if (bab >= 16) attacks.push(primaryBonus - 15);
-  return attacks.map(signed).join('/');
+/**
+ * Computes the full iterative attack string for a weapon using the same logic
+ * as WeaponRow in InventorySection — uses the shared buildIterativeAttackString.
+ * If the user has set an attackOverride, that takes priority.
+ */
+function weaponAttackString(
+  weapon: NonNullable<CharacterDraft['inventory']['mainHand']>,
+  meleeBonus: number,
+  rangedBonus: number,
+  bab: number,
+  twoWeaponPenalty = 0,
+  maxAttacks?: number,
+  firstOnly = false,
+): string {
+  // User's manual override takes priority; persisted computed value is next.
+  const stored = (weapon.attackOverride?.trim() || weapon.computedAttack?.trim()) ?? '';
+  if (stored) {
+    if (!firstOnly) return stored;
+    const [first] = stored.split('/');
+    return first?.trim() || stored;
+  }
+  // Fallback: recompute (handles characters saved before computedAttack was added)
+  const attackClass = getWeaponAttackClass(weapon.name, weapon.rangeIncrement);
+  const isRanged = attackClass === 'Ranged';
+  const appliedFeats = weapon.appliedFeats ?? [];
+  const isFinesseWeapon = !isRanged && (weapon.handedness === 'Light' || weapon.special?.includes('Weapon Finesse eligible'));
+  const usesFinesse = isFinesseWeapon && appliedFeats.includes('Weapon Finesse');
+  const hasRapidShot = isRanged && appliedFeats.includes('Rapid Shot');
+  const primaryBonus = isRanged ? rangedBonus : (usesFinesse ? rangedBonus : meleeBonus);
+  const featBonus =
+    (appliedFeats.includes('Weapon Focus') ? 1 : 0) +
+    (appliedFeats.includes('Greater Weapon Focus') ? 1 : 0);
+  const full = buildIterativeAttackString(
+    primaryBonus, bab,
+    safe(weapon.enhancementBonus), safe(weapon.combatMod),
+    maxAttacks, twoWeaponPenalty, featBonus, hasRapidShot,
+  );
+  if (!firstOnly) return full;
+  const [first] = full.split('/');
+  return first?.trim() || full;
+}
+
+function formatWeaponAttack(
+  weapon: NonNullable<CharacterDraft['inventory']['mainHand']>,
+  bonusText: string,
+): string {
+  const damage = weapon.damage?.trim() || '—';
+  return `${weapon.name} ${bonusText} (${damage})`;
 }
 
 // ── HD expression ─────────────────────────────────────────────────────────────
@@ -133,6 +177,37 @@ export function generateStatBlock(draft: CharacterDraft): StatBlockData {
   const grapple     = bab + strMod + sizeGrappleMod;
   const meleeBonus  = bab + strMod + sizeACMod;
   const rangedBonus = bab + dexMod + sizeACMod;
+  const mainHandWeapon = draft.inventory.mainHand?.name?.trim() ? draft.inventory.mainHand : null;
+  const offHandWeapon = draft.inventory.offHandWeapon?.name?.trim() ? draft.inventory.offHandWeapon : null;
+
+  // TWF penalties — mirror InventorySection logic
+  const isTwoHanded = mainHandWeapon?.handedness === 'Two-Handed';
+  const isTwoWeaponFighting = !isTwoHanded && Boolean(mainHandWeapon) && Boolean(offHandWeapon);
+  const offHandIsLight = offHandWeapon?.handedness === 'Light';
+  const twfAppliedFeats = draft.inventory.twfAppliedFeats ?? [];
+  const twfFeatApplied  = twfAppliedFeats.includes('Two-Weapon Fighting');
+  const itwfApplied     = twfAppliedFeats.includes('Improved Two-Weapon Fighting');
+  const gtwfApplied     = twfAppliedFeats.includes('Greater Two-Weapon Fighting');
+  const twfMainPenalty  = isTwoWeaponFighting ? (offHandIsLight ? -4 : -6) + (twfFeatApplied ? 2 : 0) : 0;
+  const twfOffPenalty   = isTwoWeaponFighting ? (offHandIsLight ? -8 : -10) + (twfFeatApplied ? 6 : 0) : 0;
+  const offHandMaxAttacks = mainHandWeapon ? (gtwfApplied ? 3 : itwfApplied ? 2 : 1) : undefined;
+
+  const atkText = mainHandWeapon
+    ? formatWeaponAttack(mainHandWeapon, weaponAttackString(mainHandWeapon, meleeBonus, rangedBonus, bab, twfMainPenalty, undefined, true))
+    : `${buildIterativeAttackString(meleeBonus, bab, 0, 0)} melee or ${buildIterativeAttackString(rangedBonus, bab, 0, 0)} ranged (by weapon)`;
+
+  let fullAtkText = atkText;
+  if (mainHandWeapon) {
+    fullAtkText = formatWeaponAttack(mainHandWeapon, weaponAttackString(mainHandWeapon, meleeBonus, rangedBonus, bab, twfMainPenalty));
+    if (offHandWeapon) {
+      fullAtkText = `${fullAtkText}; ${formatWeaponAttack(
+        offHandWeapon,
+        weaponAttackString(offHandWeapon, meleeBonus, rangedBonus, bab, twfOffPenalty, offHandMaxAttacks),
+      )}`;
+    }
+  } else if (offHandWeapon) {
+    fullAtkText = formatWeaponAttack(offHandWeapon, weaponAttackString(offHandWeapon, meleeBonus, rangedBonus, bab));
+  }
 
   // Speed
   const speedFeet = Math.max(0, safe(draft.combat.speed.base) + safe(draft.combat.speed.armorAdjust));
@@ -181,8 +256,8 @@ export function generateStatBlock(draft: CharacterDraft): StatBlockData {
     { bold: ' AC',         normal: ` ${totalAC}, touch ${touchAC}, flat-footed ${flatFootedAC};` },
     { bold: ' Base Atk',   normal: ` ${signed(bab)};` },
     { bold: ' Grp',        normal: ` ${signed(grapple)}` },
-    { bold: ' Atk',        normal: ` ${attackProgression(meleeBonus, bab)} melee or ${attackProgression(rangedBonus, bab)} ranged (by weapon)` },
-    { bold: ' Full Atk',   normal: ` ${attackProgression(meleeBonus, bab)} melee or ${attackProgression(rangedBonus, bab)} ranged (by weapon)` },
+    { bold: ' Atk',        normal: ` ${atkText}` },
+    { bold: ' Full Atk',   normal: ` ${fullAtkText}` },
     { bold: ' SA',         normal: ' —' },
     { bold: ' SQ',         normal: specialQualities.length > 0 ? ` ${specialQualities.join(', ')}` : ' —' },
     { bold: ' AL',         normal: ` ${alAbbr};` },

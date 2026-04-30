@@ -74,16 +74,17 @@ export type AcBonusType =
   | 'armor' | 'shield' | 'deflection' | 'dodge'
   | 'natural' | 'insight' | 'luck' | 'sacred' | 'profane';
 
-/** An AC bonus granted by an item in a named inventory slot. */
-export interface SlotAcBonus {
-  type: AcBonusType;
-  value: number;
-}
-
-/** Keys of the free-text worn-item slots (includes body worn-slot text entry). */
-export type TextSlotKey =
+/** Keys of the named worn-item slots. */
+export type WornSlotKey =
   | 'head' | 'face' | 'neck' | 'shoulders' | 'bodySlot' | 'chest'
   | 'wrists' | 'hands' | 'ringLeft' | 'ringRight' | 'waist' | 'feet';
+
+/** A single worn slot entry: the item name, AC bonus type, and AC bonus value. */
+export interface WornSlot {
+  item: string;
+  acType: string;
+  acBonus: number;
+}
 
 export interface ArmorLoadout {
   name: string;
@@ -104,10 +105,8 @@ export interface WeaponLoadout {
   name: string;
   proficiency: 'Simple' | 'Martial' | 'Exotic';
   handedness: 'Light' | 'One-Handed' | 'Two-Handed';
-  /** Damage for a Medium character. */
-  damageMedium: string;
-  /** Damage for a Small character. */
-  damageSmall: string;
+  /** Editable damage value stored with the equipped weapon. */
+  damage: string;
   /** e.g. "19-20/×2" */
   critical: string;
   /** "—" for melee-only, otherwise e.g. "30 ft." */
@@ -117,6 +116,8 @@ export interface WeaponLoadout {
   enhancementBonus: number;
   combatMod?: number;
   attackOverride?: string;
+  /** Computed iterative attack string, stamped on every save. Read by the stat block. */
+  computedAttack?: string;
   special: string;
   /** Feats actively applied to this weapon (e.g. 'Weapon Focus', 'Weapon Finesse'). */
   appliedFeats?: string[];
@@ -126,19 +127,8 @@ export interface WeaponLoadout {
 
 /** All equipment slots on a character. */
 export interface Inventory {
-  // Named worn slots (free-text item name)
-  head:      string;
-  face:      string;
-  neck:      string;
-  shoulders: string;
-  bodySlot:  string;
-  chest:     string;
-  wrists:    string;
-  hands:     string;
-  ringLeft:  string;
-  ringRight: string;
-  waist:     string;
-  feet:      string;
+  // Named worn slots — each entry stores the item name and optional AC bonus
+  wornSlots: Record<WornSlotKey, WornSlot>;
   // Complex slots with structured loadouts
   /** Body slot — holds armor. Syncs to combat.armorClass.armor. */
   body:          ArmorLoadout | null;
@@ -148,8 +138,6 @@ export interface Inventory {
   offHandWeapon: WeaponLoadout | null;
   /** Off-hand shield. Mutually exclusive with offHandWeapon. Null when mainHand is Two-Handed. Syncs to combat.armorClass.shield. */
   offHandShield: ArmorLoadout | null;
-  /** Optional AC bonuses from items in worn text slots. Dodge stacks; all other types take only the best. */
-  slotBonuses: Partial<Record<TextSlotKey, SlotAcBonus>>;
   /** Two-weapon fighting feats applied globally (e.g. 'Two-Weapon Fighting', 'Improved Two-Weapon Fighting'). */
   twfAppliedFeats?: string[];
 }
