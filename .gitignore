@@ -40,6 +40,9 @@ coverage/
 *.sln
 *.sw?
 
+# ── Assets ────────────────────────────────────────────────────
+server/src/assets/blank.pdf.bak
+
 # ── macOS ─────────────────────────────────────────────────────
 .DS_Store
 .DS_Store?
