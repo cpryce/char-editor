@@ -139,6 +139,7 @@ const equipmentSchema = new Schema(
 export interface ICharacter extends Document {
   // Identity
   name: string;
+  player?: string;
   owner?: Types.ObjectId;
   gender: 'male' | 'female' | 'other';
   race: string;
@@ -251,6 +252,7 @@ const characterSchema = new Schema<ICharacter>(
   {
     // Identity
     name:        { type: String, required: true },
+    player:      { type: String },
     owner:       { type: Schema.Types.ObjectId, ref: 'User', default: null },
     gender:      { type: String, enum: ['male', 'female', 'other'], required: true },
     race:        { type: String, enum: RACES, required: true },

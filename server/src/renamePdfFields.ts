@@ -90,6 +90,7 @@ const RENAMES: Record<string, string> = {
   '0_33':                   'RANGED_ATTACK',
 
   // ── Weapons ───────────────────────────────────────────────────────────────
+  'mainHand.combatMod':     'mainHand.attackMod',
   'ATTACK  WEAPON 1':       'WEAPON1_ATTACK',
   'ATTACK  WEAPON 2':       'WEAPON2_ATTACK',
   'ATTACK  WEAPON 3':       'WEAPON3_ATTACK',

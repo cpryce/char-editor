@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "seed": "ts-node-dev --transpile-only src/seed.ts",
+    "test-fill": "ts-node --transpile-only src/testFillPdf.ts",
     "inspect-pdf": "ts-node --transpile-only src/inspectPdf.ts",
     "rename-pdf-fields": "ts-node --transpile-only src/renamePdfFields.ts",
     "build": "tsc && mkdir -p dist/assets && cp src/assets/blank.pdf dist/assets/blank.pdf",

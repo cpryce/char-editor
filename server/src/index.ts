@@ -170,7 +170,8 @@ app.post('/api/characters', async (req, res) => {
   }
   const u = req.user as { _id: mongoose.Types.ObjectId };
   try {
-    const character = await Character.create({ ...req.body, owner: u._id });
+    const owner = await User.findById(u._id);
+    const character = await Character.create({ ...req.body, owner: u._id, player: owner?.name ?? '' });
     res.status(201).json(character);
   } catch (err: unknown) {
     if (err instanceof mongoose.Error.ValidationError) {

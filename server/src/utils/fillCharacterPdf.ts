@@ -93,7 +93,7 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
 
   // Identity
   safeSet(form, 'name',   character.name);
-  safeSet(form, 'player', '');                   // not stored on character model
+  safeSet(form, 'player', character.player ?? '');
 
   // Classes (indices 0–3)
   for (let i = 0; i < 4; i++) {
@@ -191,6 +191,25 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
     safeSet(form, `combat.saves.${save}.misc`,  sv.misc  || '');
     safeSet(form, `combat.saves.${save}.total`, signed(total));
   }
+
+  // ── Main-hand weapon ──────────────────────────────────────────────────────
+  const mh = character.inventory?.mainHand ?? null;
+  safeSet(form, 'mainHand.name',           mh?.name            ?? '');
+  safeSet(form, 'mainHand.damage',         mh?.damage          ?? '');
+  safeSet(form, 'mainHand.critical',       mh?.critical        ?? '');
+  const mhAttackMod = (mh?.combatMod ?? 0) + (mh?.enhancementBonus ?? 0);
+  safeSet(form, 'mainHand.attackMod',      mhAttackMod !== 0 ? signed(mhAttackMod) : '');
+  safeSet(form, 'mainHand.computedAttack', mh?.computedAttack  ?? '');
+  safeSet(form, 'mainHand.notes',          mh?.special         ?? '');
+
+  // ── Off-hand weapon ───────────────────────────────────────────────────────
+  const oh = character.inventory?.offHandWeapon ?? null;
+  safeSet(form, 'offHandWeapon.name',           oh?.name            ?? '');
+  safeSet(form, 'offHandWeapon.damage',         oh?.damage          ?? '');
+  safeSet(form, 'offHandWeapon.critical',       oh?.critical        ?? '');
+  const ohAttackMod = (oh?.combatMod ?? 0) + (oh?.enhancementBonus ?? 0);
+  safeSet(form, 'offHandWeapon.attackMod',      ohAttackMod !== 0 ? signed(ohAttackMod) : '');
+  safeSet(form, 'offHandWeapon.computedAttack', oh?.computedAttack  ?? '');
 
   // ── Acrobat JavaScript calculations (Adobe Acrobat/Reader only) ──────────
   // Attaches a Calculate (AA.C) JS action to each derived field and sets the

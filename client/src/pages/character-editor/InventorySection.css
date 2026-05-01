@@ -178,6 +178,31 @@
   padding: 7px 12px;
 }
 
+.inventory-shield-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.inventory-shield-material-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.inventory-shield-material-label .inventory-hands-stat {
+  font-weight: normal;
+}
+
+.inventory-shield-ac-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-fg-default);
+  white-space: nowrap;
+}
+
 .inventory-hands-table {
   width: 100%;
   border-collapse: collapse;
@@ -266,6 +291,15 @@
 .inventory-hands-input--number {
   min-width: 56px;
   max-width: 68px;
+}
+
+.inventory-hands-input--material {
+  min-width: 120px;
+}
+
+.inventory-hands-input--inline {
+  display: inline;
+  vertical-align: middle;
 }
 
 .inventory-hands-input--readonly {
@@ -364,6 +398,10 @@
   color: var(--color-fg-muted);
 }
 
+.inventory-help--mt {
+  margin-top: 8px;
+}
+
 
 .inventory-hands-actions {
   display: flex;
@@ -401,6 +439,7 @@
 
 /* ── Feat popup panel ── */
 .weapon-feat-popup {
+  position: fixed;
   z-index: 1000;
   background: var(--color-canvas-overlay);
   border: 1px solid var(--color-border-default);

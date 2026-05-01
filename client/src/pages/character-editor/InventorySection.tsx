@@ -778,7 +778,6 @@ export function InventorySection({
           value={slot.item}
           onChange={(e) => updateWornSlot(key, { item: e.target.value })}
           disabled={disableBodySlot}
-          style={inputStyle}
         />
         <select
           className="inventory-slot-bonus-type"
@@ -967,7 +966,7 @@ export function InventorySection({
             )}
           />
         ))}
-        <p className="inventory-help" style={{ marginTop: 8 }}>
+        <p className="inventory-help inventory-help--mt">
           Light and one-handed weapons may be used in either hand.
           Off-hand is unavailable when wielding a two-handed weapon.
         </p>
@@ -1073,11 +1072,10 @@ function ArmorRow({
         <select
           value={armor?.material ?? ''}
           onChange={(e) => onFieldChange('material', e.target.value)}
-          className="inventory-hands-input"
+          className="inventory-hands-input inventory-hands-input--material"
           aria-label="Armor material"
           disabled={!armor || disabled}
           title={mat?.note}
-          style={{ ...inputStyle, minWidth: 120 }}
         >
           <option value="">Standard</option>
           {ARMOR_MATERIAL_KEYS.map((k) => (
@@ -1146,7 +1144,7 @@ function ShieldRow({
   const effectiveAsf    = shield != null ? applyAsfDelta(shield.arcaneSpellFailure, mat?.asfDelta ?? 0) : null;
   const effectiveWeight = shield != null ? applyWeightMultiplier(shield.weight, mat?.weightMultiplier ?? 1) : null;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', alignItems: 'center', marginTop: 4 }}>
+    <div className="inventory-shield-row">
       <ArmorAutocomplete
         value={shield?.name ?? ''}
         entries={SHIELD_ENTRIES}
@@ -1155,16 +1153,15 @@ function ShieldRow({
         ariaLabel="Off-hand shield selection"
         style={{ ...inputStyle, minWidth: 160 }}
       />
-      <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <span className="inventory-hands-stat" style={{ fontWeight: 'normal' }}>Material</span>
+      <label className="inventory-shield-material-label">
+        <span className="inventory-hands-stat">Material</span>
         <select
           value={shield?.material ?? ''}
           onChange={(e) => onFieldChange('material', e.target.value)}
-          className="inventory-hands-input"
+          className="inventory-hands-input inventory-hands-input--material"
           aria-label="Shield material"
           disabled={!shield}
           title={mat?.note}
-          style={{ ...inputStyle, minWidth: 120 }}
         >
           <option value="">Standard</option>
           {ARMOR_MATERIAL_KEYS.map((k) => (
@@ -1180,13 +1177,12 @@ function ShieldRow({
               type="number"
               value={shield.enhancementBonus}
               onChange={(e) => onFieldChange('enhancementBonus', Number(e.target.value))}
-              className="inventory-hands-input inventory-hands-input--number"
+              className="inventory-hands-input inventory-hands-input--number inventory-hands-input--inline"
               aria-label="Shield enhancement bonus"
-              style={{ display: 'inline', verticalAlign: 'middle' }}
             />
           </span>
           <span className="inventory-hands-stat">AC:</span>
-          <span className="inventory-hands-stat" style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-fg-default)' }}>
+          <span className="inventory-shield-ac-value">
             +{totalArmorBonus(shield)}
           </span>
           {shield.maxDexBonus !== null && <span className="inventory-hands-stat">Max Dex {shield.maxDexBonus}</span>}
@@ -1223,12 +1219,12 @@ function FeatPopup({
   anchorEl: HTMLElement | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
-    if (anchorEl) {
+    if (anchorEl && ref.current) {
       const rect = anchorEl.getBoundingClientRect();
-      setPos({ top: rect.bottom + 4, left: rect.left });
+      ref.current.style.top = `${rect.bottom + 4}px`;
+      ref.current.style.left = `${rect.left}px`;
     }
   }, [anchorEl]);
 
@@ -1246,7 +1242,6 @@ function FeatPopup({
     <div
       ref={ref}
       className="weapon-feat-popup"
-      style={{ position: 'fixed', top: pos.top, left: pos.left }}
     >
       {options.map((opt) => (
         <label
@@ -1293,7 +1288,7 @@ function FeatPopupButton({
         className="inventory-feat-trigger"
         onClick={() => setOpen((v) => !v)}
         onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setOpen((v) => !v)}
-        aria-expanded={open}
+        aria-expanded={open ? 'true' : 'false'}
       >
         <span className={`inventory-hands-detail-value inventory-feat-summary${activeNames.length > 0 ? ' inventory-feat-summary--active' : ''}`}>
           {summary}
