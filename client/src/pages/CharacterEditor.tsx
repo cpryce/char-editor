@@ -602,6 +602,12 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           offHandWeapon: normalizeWeaponLoadout(rawInvRecord.offHandWeapon),
           offHandShield: rawInvRecord.offHandShield ? { ...(rawInvRecord.offHandShield as NonNullable<CharacterDraft['inventory']['offHandShield']>) } : null,
           twfAppliedFeats: Array.isArray(rawInvRecord.twfAppliedFeats) ? rawInvRecord.twfAppliedFeats as string[] : undefined,
+          backupWeapons: Array.isArray(rawInvRecord.backupWeapons)
+            ? (rawInvRecord.backupWeapons as Array<Record<string, unknown>>).map((slot) => ({
+                label: typeof slot.label === 'string' ? slot.label : 'Weapon',
+                weapon: normalizeWeaponLoadout(slot.weapon),
+              }))
+            : [],
         };
 
         const loaded: CharacterDraft = {

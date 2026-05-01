@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import type { CharacterDraft, ArmorLoadout, WeaponLoadout, Inventory, AcBonusType, WornSlot, WornSlotKey, FeatSlot, ClassEntry } from '../../types/character';
 import { ArmorAutocomplete } from '../../components/ArmorAutocomplete';
-import { WeaponAutocomplete } from '../../components/WeaponAutocomplete';
+import { WeaponSelector } from '../../components/WeaponSelector';
 import type { ArmorCatalogEntry } from '../../data/armor';
 import { ARMOR_ENTRIES, SHIELD_ENTRIES } from '../../data/armor';
 import type { WeaponCatalogEntry } from '../../data/weapons';
@@ -12,7 +12,7 @@ import { buildIterativeAttackString } from '../../utils/characterHelpers';
 /** Weapons usable in the off-hand: Light and One-Handed only. */
 const OFF_HAND_WEAPON_CATALOG = WEAPON_CATALOG.filter((w) => w.handedness !== 'Two-Handed');
 import type { MaterialKey } from '../../data/materials';
-import { MATERIALS, ARMOR_MATERIAL_KEYS, WEAPON_MATERIAL_KEYS, applyWeightMultiplier, applyAcpDelta, applyAsfDelta, applyMaxDexDelta } from '../../data/materials';
+import { MATERIALS, ARMOR_MATERIAL_KEYS, applyWeightMultiplier, applyAcpDelta, applyAsfDelta, applyMaxDexDelta } from '../../data/materials';
 import './InventorySection.css';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -368,6 +368,10 @@ export function InventorySection({
   const rangerLevel  = getRangerLevel(classes);
   const mainHandFeatOptions = getAllWeaponFeatOptions(inventory.mainHand, feats, fighterLevel, rangerLevel, dexterity);
   const offHandFeatOptions  = getAllWeaponFeatOptions(inventory.offHandWeapon, feats, fighterLevel, rangerLevel, dexterity);
+  const backupWeapons = inventory.backupWeapons ?? [];
+  const backupWeaponFeatOptions = backupWeapons.map((slot) =>
+    getAllWeaponFeatOptions(slot.weapon, feats, fighterLevel, rangerLevel, dexterity),
+  );
   const twfFeatOptions = getTwfFeatOptions({ characterFeats: feats, bab: derivedBaseAttackBonus, rangerLevel, twfApplied: twfFeatApplied, itwfApplied, dexterity });
 
   const isBodyArmorSelected = Boolean(inventory.body?.name?.trim());
@@ -512,6 +516,17 @@ export function InventorySection({
         prevCtx.offMaxAttacks,
         nextCtx.offMaxAttacks,
       ),
+      backupWeapons: (nextInv.backupWeapons ?? []).map((slot, idx) => ({
+        ...slot,
+        weapon: applyToWeapon(
+          previousInv.backupWeapons?.[idx]?.weapon ?? null,
+          slot.weapon,
+          0,
+          0,
+          undefined,
+          undefined,
+        ),
+      })),
     };
   }
 
@@ -596,6 +611,67 @@ export function InventorySection({
     const next = { ...base, [field]: value } as WeaponLoadout;
     if (field === 'name' && typeof value === 'string' && !value.trim()) { updateInventory({ offHandWeapon: null }); return; }
     updateInventory({ offHandWeapon: next });
+  }
+
+  function addBackupWeapon() {
+    if (backupWeapons.length >= 3) return;
+    updateInventory({
+      backupWeapons: [
+        ...backupWeapons,
+        { label: 'Weapon', weapon: null },
+      ],
+    });
+  }
+
+  function removeBackupWeapon(index: number) {
+    updateInventory({
+      backupWeapons: backupWeapons.filter((_, idx) => idx !== index),
+    });
+  }
+
+  function updateBackupWeaponLabel(index: number, label: string) {
+    updateInventory({
+      backupWeapons: backupWeapons.map((slot, idx) => (
+        idx === index ? { ...slot, label } : slot
+      )),
+    });
+  }
+
+  function handleBackupWeaponSelect(index: number, name: string, entry?: WeaponCatalogEntry) {
+    const nextWeapon = !name.trim()
+      ? null
+      : entry
+        ? { ...newWeaponFromEntry(entry), damage: showSmallDamage ? entry.damageSmall : entry.damageMedium }
+        : { ...(backupWeapons[index]?.weapon ?? defaultWeapon()), name };
+
+    updateInventory({
+      backupWeapons: backupWeapons.map((slot, idx) => (
+        idx === index ? { ...slot, weapon: nextWeapon } : slot
+      )),
+    });
+  }
+
+  function updateBackupWeaponField(index: number, field: keyof WeaponLoadout, value: string | number) {
+    const base = backupWeapons[index]?.weapon ?? defaultWeapon();
+    const next = { ...base, [field]: value } as WeaponLoadout;
+    const nextWeapon = (field === 'name' && typeof value === 'string' && !value.trim()) ? null : next;
+    updateInventory({
+      backupWeapons: backupWeapons.map((slot, idx) => (
+        idx === index ? { ...slot, weapon: nextWeapon } : slot
+      )),
+    });
+  }
+
+  function toggleBackupWeaponFeat(index: number, featName: string) {
+    const weapon = backupWeapons[index]?.weapon;
+    if (!weapon) return;
+    const cur = weapon.appliedFeats ?? [];
+    const next = cur.includes(featName) ? cur.filter((f) => f !== featName) : [...cur, featName];
+    updateInventory({
+      backupWeapons: backupWeapons.map((slot, idx) => (
+        idx === index ? { ...slot, weapon: { ...weapon, appliedFeats: next } } : slot
+      )),
+    });
   }
 
   const previousDerivedRef = useRef<{ bab: number; melee: number; ranged: number } | null>(null);
@@ -743,7 +819,6 @@ export function InventorySection({
   const mainHand = inventory.mainHand;
   const offWeapon = inventory.offHandWeapon;
   const offShield = inventory.offHandShield;
-  const dmgLabel = `Dmg\u00a0(${showSmallDamage ? 'S' : 'M'})`;
 
   return (
     <div className="inventory-section">
@@ -751,36 +826,26 @@ export function InventorySection({
       {/* ── 1. Weapons ── */}
       <div>
         <p className="inventory-section-title">Weapons</p>
-        <div className="inventory-weapon-selector">
-          <div className="inventory-hands-wrap">
-            <table className="inventory-hands-table" aria-label="Main-hand weapon">
-              <thead className="inventory-hands-thead">
-                <tr>
-                  {['Main Hand', 'Weapon Enancement', 'Combat Mod', 'Atk', dmgLabel, 'Critical', ''].map((h) => (
-                    <th key={h} className="inventory-hands-th">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <WeaponRow
-                  label=""
-                  weapon={mainHand}
-                  baseAttackBonus={derivedBaseAttackBonus}
-                  meleeAttackBonus={derivedMeleeAttackBonus}
-                  rangedAttackBonus={derivedRangedAttackBonus}
-                  rowClass="inventory-hands-row-even"
-                  inputStyle={inputStyle}
-                  onSelect={handleMainHandSelect}
-                  onFieldChange={updateMainHandField}
-                  onClear={() => updateInventory({ mainHand: null })}
-                  twoWeaponPenalty={twfMainPenalty}
-                  featOptions={mainHandFeatOptions}
-                  onToggleFeat={toggleMainHandFeat}
-                />
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <WeaponSelector
+          title="Main Hand"
+          weapon={mainHand}
+          baseAttackBonus={derivedBaseAttackBonus}
+          meleeAttackBonus={derivedMeleeAttackBonus}
+          rangedAttackBonus={derivedRangedAttackBonus}
+          rowClass="inventory-hands-row-even"
+          inputStyle={inputStyle}
+          onSelect={handleMainHandSelect}
+          onFieldChange={updateMainHandField}
+          onClear={() => updateInventory({ mainHand: null })}
+          twoWeaponPenalty={twfMainPenalty}
+          featControl={(
+            <FeatPopupButton
+              options={mainHandFeatOptions}
+              applied={mainHand?.appliedFeats ?? []}
+              onToggle={toggleMainHandFeat}
+            />
+          )}
+        />
 
         <div className="inventory-weapon-selector">
           <div className="inventory-weapon-selector-header">
@@ -824,70 +889,84 @@ export function InventorySection({
               </div>
             )}
           </div>
-          <div className="inventory-hands-wrap">
-            <table className="inventory-hands-table" aria-label="Weapon slots">
-              {isTwoHanded ? (
-                <tbody>
-                  <tr className="inventory-hands-row-odd">
-                    <td className="inventory-hands-td" colSpan={7}>
-                      <span className="inventory-two-handed-note">
-                        Off-hand unavailable — two-handed weapon in main hand.
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              ) : offHandMode === 'weapon' ? (
-                <>
-                  <thead className="inventory-hands-thead">
-                    <tr>
-                      {['Off-Hand', 'Weapon Enancement', 'Combat Mod', 'Atk', dmgLabel, 'Critical', ''].map((h) => (
-                        <th key={h} className="inventory-hands-th">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <WeaponRow
-                      label=""
-                      weapon={offWeapon}
-                      baseAttackBonus={derivedBaseAttackBonus}
-                      meleeAttackBonus={derivedMeleeAttackBonus}
-                      rangedAttackBonus={derivedRangedAttackBonus}
-                      rowClass="inventory-hands-row-odd"
-                      inputStyle={inputStyle}
-                      onSelect={handleOffHandWeaponSelect}
-                      onFieldChange={updateOffHandWeaponField}
-                      onClear={() => updateInventory({ offHandWeapon: null })}
-                      allowTwoHanded={false}
-                      entries={OFF_HAND_WEAPON_CATALOG}
-                      maxAttacks={offHandMaxAttacks}
-                      twoWeaponPenalty={twfOffPenalty}
-                      featOptions={offHandFeatOptions}
-                      onToggleFeat={toggleOffHandFeat}
-                    />
-                  </tbody>
-                </>
-              ) : (
-                <tbody>
-                  <tr className="inventory-hands-row-odd">
-                    <td className="inventory-hands-td" colSpan={7}>
-                      {offHandMode === 'shield' ? (
-                        <ShieldRow
-                          shield={offShield}
-                          inputStyle={inputStyle}
-                          onSelect={handleOffHandShieldSelect}
-                          onFieldChange={updateOffHandShieldField}
-                          onClear={() => updateInventory({ offHandShield: null })}
-                        />
-                      ) : (
-                        <span className="inventory-help">No off-hand item selected.</span>
-                      )}
-                    </td>
-                  </tr>
-                </tbody>
+          {isTwoHanded ? (
+            <span className="inventory-two-handed-note">
+              Off-hand unavailable — two-handed weapon in main hand.
+            </span>
+          ) : offHandMode === 'weapon' ? (
+            <WeaponSelector
+              title="Off-Hand"
+              weapon={offWeapon}
+              baseAttackBonus={derivedBaseAttackBonus}
+              meleeAttackBonus={derivedMeleeAttackBonus}
+              rangedAttackBonus={derivedRangedAttackBonus}
+              rowClass="inventory-hands-row-odd"
+              inputStyle={inputStyle}
+              onSelect={handleOffHandWeaponSelect}
+              onFieldChange={updateOffHandWeaponField}
+              onClear={() => updateInventory({ offHandWeapon: null })}
+              allowTwoHanded={false}
+              entries={OFF_HAND_WEAPON_CATALOG}
+              maxAttacks={offHandMaxAttacks}
+              twoWeaponPenalty={twfOffPenalty}
+              featControl={(
+                <FeatPopupButton
+                  options={offHandFeatOptions}
+                  applied={offWeapon?.appliedFeats ?? []}
+                  onToggle={toggleOffHandFeat}
+                />
               )}
-            </table>
-          </div>
+            />
+          ) : offHandMode === 'shield' ? (
+            <div className="inventory-shield-selector">
+              <ShieldRow
+                shield={offShield}
+                inputStyle={inputStyle}
+                onSelect={handleOffHandShieldSelect}
+                onFieldChange={updateOffHandShieldField}
+                onClear={() => updateInventory({ offHandShield: null })}
+              />
+            </div>
+          ) : (
+            <span className="inventory-help">No off-hand item selected.</span>
+          )}
         </div>
+        <div className="inventory-backup-actions">
+          <button
+            type="button"
+            className="inventory-add-weapon-btn"
+            onClick={addBackupWeapon}
+            disabled={backupWeapons.length >= 3}
+          >
+            Add Weapon
+          </button>
+          <span className="inventory-help">{backupWeapons.length}/3 backup weapons</span>
+        </div>
+        {backupWeapons.map((slot, idx) => (
+          <WeaponSelector
+            key={`backup-weapon-${idx}`}
+            title={slot.label}
+            editableTitle
+            onTitleChange={(nextTitle) => updateBackupWeaponLabel(idx, nextTitle)}
+            weapon={slot.weapon}
+            baseAttackBonus={derivedBaseAttackBonus}
+            meleeAttackBonus={derivedMeleeAttackBonus}
+            rangedAttackBonus={derivedRangedAttackBonus}
+            rowClass={idx % 2 === 0 ? 'inventory-hands-row-even' : 'inventory-hands-row-odd'}
+            inputStyle={inputStyle}
+            onSelect={(name, entry) => handleBackupWeaponSelect(idx, name, entry)}
+            onFieldChange={(field, value) => updateBackupWeaponField(idx, field, value)}
+            onClear={() => handleBackupWeaponSelect(idx, '')}
+            onRemove={() => removeBackupWeapon(idx)}
+            featControl={(
+              <FeatPopupButton
+                options={backupWeaponFeatOptions[idx] ?? []}
+                applied={slot.weapon?.appliedFeats ?? []}
+                onToggle={(name) => toggleBackupWeaponFeat(idx, name)}
+              />
+            )}
+          />
+        ))}
         <p className="inventory-help" style={{ marginTop: 8 }}>
           Light and one-handed weapons may be used in either hand.
           Off-hand is unavailable when wielding a two-handed weapon.
@@ -944,217 +1023,6 @@ export function InventorySection({
       </div>
 
     </div>
-  );
-}
-
-// ── WeaponRow sub-component ────────────────────────────────────────────────────
-
-function WeaponRow({
-  label,
-  weapon,
-  baseAttackBonus,
-  meleeAttackBonus,
-  rangedAttackBonus,
-  rowClass,
-  inputStyle,
-  onSelect,
-  onFieldChange,
-  onClear,
-  allowTwoHanded = true,
-  entries = WEAPON_CATALOG,
-  maxAttacks,
-  twoWeaponPenalty = 0,
-  featOptions = [],
-  onToggleFeat,
-}: {
-  label: string;
-  weapon: WeaponLoadout | null;
-  baseAttackBonus: number;
-  meleeAttackBonus: number;
-  rangedAttackBonus: number;
-  rowClass: string;
-  inputStyle: React.CSSProperties;
-  onSelect: (name: string, entry?: WeaponCatalogEntry) => void;
-  onFieldChange: (field: keyof WeaponLoadout, value: string | number) => void;
-  onClear: () => void;
-  allowTwoHanded?: boolean;
-  entries?: ReadonlyArray<WeaponCatalogEntry>;
-  maxAttacks?: number;
-  twoWeaponPenalty?: number;
-  featOptions?: FeatOption[];
-  onToggleFeat?: (name: string) => void;
-}) {
-  const damageValue = weapon?.damage ?? '';
-  const mat = weapon?.material ? MATERIALS[weapon.material as MaterialKey] : undefined;
-  const effectiveWeight = weapon ? applyWeightMultiplier(weapon.weight, mat?.weightMultiplier ?? 1) : '—';
-  const parsedBab = Number(baseAttackBonus);
-  const parsedMeleeAtk = Number(meleeAttackBonus);
-  const parsedRangedAtk = Number(rangedAttackBonus);
-  const combatMod = Number(weapon?.combatMod ?? 0);
-  const attackClass = weapon ? getWeaponAttackClass(weapon.name, weapon.rangeIncrement) : 'Melee';
-  const isRangedWeapon = attackClass === 'Ranged';
-
-  // Feat-based attack modifiers
-  const appliedFeats = weapon?.appliedFeats ?? [];
-  const featBonus =
-    (appliedFeats.includes('Weapon Focus') ? 1 : 0) +
-    (appliedFeats.includes('Greater Weapon Focus') ? 1 : 0);
-  // Weapon Finesse: light melee or Finesse-eligible (e.g. Rapier) → use Dex-based attack bonus
-  const isFinesseWeapon = !isRangedWeapon && (weapon?.handedness === 'Light' || weapon?.special?.includes('Weapon Finesse eligible'));
-  const usesFinesse  = isFinesseWeapon && appliedFeats.includes('Weapon Finesse');
-  const hasRapidShot = isRangedWeapon && appliedFeats.includes('Rapid Shot');
-
-  const primaryAttackBonus = isRangedWeapon
-    ? parsedRangedAtk
-    : (usesFinesse ? parsedRangedAtk : parsedMeleeAtk);
-  const iterativeAttack = weapon
-    ? buildIterativeAttackString(primaryAttackBonus, parsedBab, Number(weapon.enhancementBonus ?? 0), combatMod, maxAttacks, twoWeaponPenalty, featBonus, hasRapidShot)
-    : '—';
-  return (
-    <>
-      <tr className={rowClass}>
-        {label && <td className="inventory-hands-td inventory-hands-label">{label}</td>}
-        <td className="inventory-hands-td">
-          <WeaponAutocomplete
-            value={weapon?.name ?? ''}
-            entries={entries}
-            onSelect={onSelect}
-            placeholder="Select weapon..."
-            ariaLabel={`${label || 'off-hand'} weapon selection`}
-            style={{ ...inputStyle, minWidth: 160 }}
-          />
-        </td>
-        <td className="inventory-hands-td">
-          <input
-            type="number"
-            value={weapon?.enhancementBonus ?? 0}
-            onChange={(e) => onFieldChange('enhancementBonus', Number(e.target.value))}
-            className="inventory-hands-input inventory-hands-input--number"
-            aria-label="Enhancement bonus"
-            disabled={!weapon}
-          />
-        </td>
-        <td className="inventory-hands-td">
-          <input
-            type="number"
-            value={weapon?.combatMod ?? 0}
-            onChange={(e) => onFieldChange('combatMod', Number(e.target.value))}
-            className="inventory-hands-input inventory-hands-input--number"
-            aria-label="Combat modifier"
-            disabled={!weapon}
-          />
-        </td>
-        <td className="inventory-hands-td inventory-hands-atk">
-          <input
-            type="text"
-            value={weapon ? (weapon.computedAttack || iterativeAttack) : ''}
-            onChange={(e) => onFieldChange('computedAttack', e.target.value)}
-            className="inventory-hands-input inventory-hands-atk-input"
-            aria-label="Iterative attack"
-            disabled={!weapon}
-          />
-        </td>
-        <td className="inventory-hands-td">
-          <input
-            type="text"
-            value={damageValue}
-            onChange={(e) => onFieldChange('damage', e.target.value)}
-            className="inventory-hands-input"
-            aria-label="Weapon damage"
-            disabled={!weapon}
-            style={{ ...inputStyle, minWidth: 90 }}
-          />
-        </td>
-        <td className="inventory-hands-td">
-          <input
-            type="text"
-            value={weapon?.critical ?? ''}
-            onChange={(e) => onFieldChange('critical', e.target.value)}
-            className="inventory-hands-input"
-            aria-label="Critical range"
-            disabled={!weapon}
-            style={{ ...inputStyle, minWidth: 90 }}
-          />
-        </td>
-        <td className="inventory-hands-td">
-          <div className="inventory-hands-actions">
-            {weapon && (
-              <button
-                type="button"
-                onClick={onClear}
-                className="inventory-hands-clear"
-                aria-label="Clear weapon"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </td>
-      </tr>
-      <tr className={`${rowClass} inventory-hands-subrow`}>
-        <td className="inventory-hands-td inventory-hands-subrow-content" colSpan={7}>
-          <div className="inventory-hands-detail-fields">
-            <label className="inventory-hands-detail-field">
-              <span className="inventory-hands-detail-label">Material</span>
-              <select
-                value={weapon?.material ?? ''}
-                onChange={(e) => onFieldChange('material', e.target.value)}
-                className="inventory-hands-input"
-                aria-label="Weapon material"
-                disabled={!weapon}
-                title={mat?.note}
-                style={{ ...inputStyle, minWidth: 120 }}
-              >
-                <option value="">Standard</option>
-                {WEAPON_MATERIAL_KEYS.map((k) => (
-                  <option key={k} value={k}>{MATERIALS[k].label}</option>
-                ))}
-              </select>
-            </label>
-            <label className="inventory-hands-detail-field">
-              <span className="inventory-hands-detail-label">Handedness</span>
-              <select
-                value={weapon?.handedness ?? '—'}
-                onChange={(e) => onFieldChange('handedness', e.target.value)}
-                className="inventory-hands-input"
-                aria-label="Handedness"
-                disabled={!weapon}
-                style={{ ...inputStyle, minWidth: 110 }}
-              >
-                {!weapon && <option value="—">—</option>}
-                {(['Light', 'One-Handed', 'Two-Handed'] as const)
-                  .filter((h) => allowTwoHanded || h !== 'Two-Handed')
-                  .map((h) => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
-            </label>
-            <span className="inventory-hands-detail-field">
-              <span className="inventory-hands-detail-label">Range</span>
-              <span className="inventory-hands-detail-value">{weapon?.rangeIncrement ?? '—'}</span>
-            </span>
-            <span className="inventory-hands-detail-field">
-              <span className="inventory-hands-detail-label">Type</span>
-              <span className="inventory-hands-detail-value">{weapon?.damageType ?? '—'}</span>
-            </span>
-            <span className="inventory-hands-detail-field">
-              <span className="inventory-hands-detail-label">Wt</span>
-              <span className="inventory-hands-detail-value">{effectiveWeight}</span>
-            </span>
-            {weapon && featOptions.length > 0 && onToggleFeat && (
-              <span className="inventory-hands-detail-field">
-                <span className="inventory-hands-detail-label">Feats</span>
-                <FeatPopupButton
-                  options={featOptions}
-                  applied={appliedFeats}
-                  onToggle={onToggleFeat}
-                />
-              </span>
-            )}
-          </div>
-        </td>
-      </tr>
-    </>
   );
 }
 
@@ -1306,7 +1174,6 @@ function ShieldRow({
       </label>
       {shield && (
         <>
-          <span className="inventory-hands-stat">AC <strong>+{shield.armorBonus}</strong></span>
           <span className="inventory-hands-stat">
             Enh&nbsp;
             <input
@@ -1318,11 +1185,14 @@ function ShieldRow({
               style={{ display: 'inline', verticalAlign: 'middle' }}
             />
           </span>
+          <span className="inventory-hands-stat">AC:</span>
+          <span className="inventory-hands-stat" style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-fg-default)' }}>
+            +{totalArmorBonus(shield)}
+          </span>
           {shield.maxDexBonus !== null && <span className="inventory-hands-stat">Max Dex {shield.maxDexBonus}</span>}
           {effectiveAcp !== null && effectiveAcp !== 0 && <span className="inventory-hands-stat">ACP {effectiveAcp}</span>}
           <span className="inventory-hands-stat">ASF {effectiveAsf ?? '—'}</span>
           {effectiveWeight && <span className="inventory-hands-stat">Wt {effectiveWeight}</span>}
-          <span className="inventory-hands-stat">Total <strong>+{totalArmorBonus(shield)}</strong></span>
           <button
             type="button"
             onClick={onClear}

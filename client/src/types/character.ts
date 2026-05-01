@@ -125,6 +125,11 @@ export interface WeaponLoadout {
   material?: string;
 }
 
+export interface BackupWeaponSlot {
+  label: string;
+  weapon: WeaponLoadout | null;
+}
+
 /** All equipment slots on a character. */
 export interface Inventory {
   // Named worn slots — each entry stores the item name and optional AC bonus
@@ -138,6 +143,8 @@ export interface Inventory {
   offHandWeapon: WeaponLoadout | null;
   /** Off-hand shield. Mutually exclusive with offHandWeapon. Null when mainHand is Two-Handed. Syncs to combat.armorClass.shield. */
   offHandShield: ArmorLoadout | null;
+  /** Optional backup weapons shown under main/off-hand selectors. */
+  backupWeapons?: BackupWeaponSlot[];
   /** Two-weapon fighting feats applied globally (e.g. 'Two-Weapon Fighting', 'Improved Two-Weapon Fighting'). */
   twfAppliedFeats?: string[];
 }

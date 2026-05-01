@@ -329,4 +329,152 @@ test.describe('Character Editor', () => {
       await expect(hitPointsInput).toHaveValue('6');
     });
   });
+
+  test.describe('Backup Weapons', () => {
+    async function openInventory(page: Page) {
+      await page.getByRole('button', { name: /Inventory/i }).click();
+      await expect(page.getByRole('button', { name: 'Add Weapon' })).toBeVisible();
+    }
+
+    test('can add up to three backup weapon selectors', async ({ page }) => {
+      await openEditor(page);
+      await openInventory(page);
+
+      const addWeaponButton = page.getByRole('button', { name: 'Add Weapon' });
+      await expect(page.getByText('0/3 backup weapons')).toBeVisible();
+
+      await addWeaponButton.click();
+      await expect(page.getByText('1/3 backup weapons')).toBeVisible();
+
+      await addWeaponButton.click();
+      await expect(page.getByText('2/3 backup weapons')).toBeVisible();
+
+      await addWeaponButton.click();
+      await expect(page.getByText('3/3 backup weapons')).toBeVisible();
+
+      await expect(page.getByRole('textbox', { name: 'Weapon selector name' })).toHaveCount(3);
+      await expect(addWeaponButton).toBeDisabled();
+    });
+
+    test('inline backup weapon label is included in autosave payload', async ({ page }) => {
+      let latestSavedBody: Record<string, unknown> | null = null;
+
+      await mockAuth(page);
+      await page.route('**/api/characters', async (route) => {
+        const method = route.request().method();
+        if (method === 'GET') {
+          await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+          return;
+        }
+
+        if (method === 'POST' || method === 'PUT') {
+          latestSavedBody = await route.request().postDataJSON() as Record<string, unknown>;
+          await route.fulfill({
+            status: method === 'POST' ? 201 : 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ _id: 'backup-test-id', name: 'Backup Tester', classes: [{ name: 'Fighter', level: 1 }], updatedAt: new Date().toISOString() }),
+          });
+          return;
+        }
+
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      });
+
+      await page.goto('/');
+      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByPlaceholder('Character name').fill('Backup Tester');
+      await selectClass(page, 'Fighter');
+      await openInventory(page);
+
+      await page.getByRole('button', { name: 'Add Weapon' }).click();
+      const firstLabelInput = page.getByRole('textbox', { name: 'Weapon selector name' }).first();
+      await firstLabelInput.fill('Main Backup');
+
+      await expect.poll(() => {
+        const inv = latestSavedBody?.inventory as { backupWeapons?: Array<{ label?: string }> } | undefined;
+        return inv?.backupWeapons?.[0]?.label ?? null;
+      }).toBe('Main Backup');
+    });
+
+    test('backup weapon label persists after reopening editor', async ({ page }) => {
+      const characterId = 'char-backup-1';
+      const characters = [
+        {
+          _id: characterId,
+          name: 'Backup Hero',
+          classes: [{ name: 'Fighter', level: 1 }],
+          updatedAt: new Date().toISOString(),
+        },
+      ];
+
+      let storedCharacter: Record<string, unknown> = {
+        _id: characterId,
+        name: 'Backup Hero',
+        classes: [{ name: 'Fighter', level: 1 }],
+        inventory: { backupWeapons: [] },
+        updatedAt: new Date().toISOString(),
+      };
+
+      await mockAuth(page);
+      await page.route('**/api/characters', async (route) => {
+        const method = route.request().method();
+        if (method === 'GET') {
+          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(characters) });
+          return;
+        }
+
+        if (method === 'POST' || method === 'PUT') {
+          const body = await route.request().postDataJSON() as Record<string, unknown>;
+          storedCharacter = {
+            ...storedCharacter,
+            ...body,
+            _id: characterId,
+            updatedAt: new Date().toISOString(),
+          };
+          characters[0] = {
+            ...characters[0],
+            name: typeof body.name === 'string' ? body.name : characters[0].name,
+            classes: Array.isArray(body.classes) ? body.classes as Array<{ name: string; level: number }> : characters[0].classes,
+            updatedAt: new Date().toISOString(),
+          };
+          await route.fulfill({ status: method === 'POST' ? 201 : 200, contentType: 'application/json', body: JSON.stringify(storedCharacter) });
+          return;
+        }
+
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(characters) });
+      });
+
+      await page.route(`**/api/characters/${characterId}`, async (route) => {
+        if (route.request().method() === 'GET') {
+          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(storedCharacter) });
+          return;
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(storedCharacter) });
+      });
+
+      await page.goto('/');
+      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByPlaceholder('Character name').fill('Backup Hero');
+      await selectClass(page, 'Fighter');
+
+      await openInventory(page);
+      await page.getByRole('button', { name: 'Add Weapon' }).click();
+      await page.getByRole('textbox', { name: 'Weapon selector name' }).first().fill('Pack Spear');
+
+      await expect.poll(() => {
+        const inv = storedCharacter.inventory as { backupWeapons?: Array<{ label?: string }> } | undefined;
+        return inv?.backupWeapons?.[0]?.label ?? null;
+      }).toBe('Pack Spear');
+
+      await page.getByRole('button', { name: 'Back to characters' }).click();
+      await expect(page.getByRole('heading', { name: 'Characters', level: 2 })).toBeVisible();
+
+      await page.getByRole('cell', { name: 'Backup Hero' }).click();
+      await expect(page.getByRole('heading', { name: 'Backup Hero', level: 2 })).toBeVisible();
+
+      await openInventory(page);
+      await expect(page.getByRole('textbox', { name: 'Weapon selector name' }).first()).toHaveValue('Pack Spear');
+      await expect(page.getByText('1/3 backup weapons')).toBeVisible();
+    });
+  });
 });

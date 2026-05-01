@@ -225,6 +225,16 @@ export interface ICharacter extends Document {
       maxDexBonus: string | null; armorCheckPenalty: number; arcaneSpellFailure: string;
       speed: string; weight: string; armorAdjust: number;
     } | null;
+    backupWeapons?: {
+      label: string;
+      weapon: {
+        name: string; proficiency: string; handedness: string;
+        damage: string; critical: string;
+        rangeIncrement: string; weight: string; damageType: string;
+        enhancementBonus: number; special: string; combatMod?: number; attackOverride?: string; computedAttack?: string;
+        material?: string; appliedFeats?: string[];
+      } | null;
+    }[];
     twfAppliedFeats?: string[];
   };
 
@@ -314,6 +324,11 @@ const characterSchema = new Schema<ICharacter>(
       mainHand:      { type: weaponLoadoutSchema, default: null },
       offHandWeapon: { type: weaponLoadoutSchema, default: null },
       offHandShield: { type: armorLoadoutSchema,  default: null },
+      backupWeapons: [{
+        _id: false,
+        label: { type: String, default: 'Weapon' },
+        weapon: { type: weaponLoadoutSchema, default: null },
+      }],
       twfAppliedFeats: [{ type: String }],
     },
 

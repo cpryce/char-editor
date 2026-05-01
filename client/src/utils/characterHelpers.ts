@@ -604,6 +604,7 @@ export function newCharacterDraft(): CharacterDraft {
       mainHand: null,
       offHandWeapon: null,
       offHandShield: null,
+      backupWeapons: [],
     },
     skills: SKILL_DEFS.map((def) => ({
       name: def.name,
