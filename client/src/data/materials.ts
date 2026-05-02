@@ -1,6 +1,7 @@
 // Special materials per d20 SRD: https://www.d20srd.org/srd/specialMaterials.htm
 
 export const MATERIAL_KEYS = [
+  'masterwork',
   'adamantine',
   'cold-iron',
   'darkwood',
@@ -31,6 +32,14 @@ export interface MaterialEffect {
  * to armor/shield stats; for weapons only weightMultiplier is relevant.
  */
 export const MATERIALS: Record<MaterialKey, MaterialEffect> = {
+  masterwork: {
+    label: 'Magic/MW',
+    acpDelta: 1,
+    asfDelta: 0,
+    weightMultiplier: 1,
+    maxDexDelta: 0,
+    note: 'Armor/shields: ACP −1. Weapons: counts as +1 enhancement for attack rolls (not damage).',
+  },
   adamantine: {
     label: 'Adamantine',
     acpDelta: 1,
@@ -83,12 +92,12 @@ export const MATERIALS: Record<MaterialKey, MaterialEffect> = {
 
 /** Materials valid for armor and shields. */
 export const ARMOR_MATERIAL_KEYS: ReadonlyArray<MaterialKey> = [
-  'adamantine', 'mithral', 'darkwood', 'dragonhide',
+  'masterwork', 'adamantine', 'mithral', 'darkwood', 'dragonhide',
 ];
 
 /** Materials valid for weapons. */
 export const WEAPON_MATERIAL_KEYS: ReadonlyArray<MaterialKey> = [
-  'adamantine', 'mithral', 'darkwood', 'cold-iron', 'alchemical-silver',
+  'masterwork', 'adamantine', 'mithral', 'darkwood', 'cold-iron', 'alchemical-silver',
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

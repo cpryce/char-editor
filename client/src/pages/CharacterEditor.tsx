@@ -22,8 +22,12 @@ import {
   deriveClassFeatures,
   deriveSelectableFeats,
   mergeSelectableFeats,
+  applyMaxDexCap,
+  computeAcTotals,
 } from '../utils/characterHelpers';
 import { FEAT_BY_NAME } from '../data/feats';
+import { MATERIALS, applyMaxDexDelta } from '../data/materials';
+import type { MaterialKey } from '../data/materials';
 import { getWeaponAttackClass } from '../data/weapons';
 import type { FeatCatalogEntry } from '../components/FeatAutocomplete';
 import type { CustomFeat } from '../types/customFeat';
@@ -250,7 +254,6 @@ function deriveCombatStats({
   const acShield = safeCombatNumber(combat.armorClass.shield);
   const acNatural = safeCombatNumber(combat.armorClass.natural);
   const acDeflection = safeCombatNumber(combat.armorClass.deflection);
-  const acMisc = safeCombatNumber(combat.armorClass.misc);
   const initMisc = safeCombatNumber(combat.initiative.miscBonus);
   const speedBase = safeCombatNumber(combat.speed.base);
   const speedArmorAdjust = safeCombatNumber(combat.speed.armorAdjust);
@@ -261,25 +264,32 @@ function deriveCombatStats({
   const reflexBase = baseSaveBonusFromClasses(classes, 'reflex');
   const willBase = baseSaveBonusFromClasses(classes, 'will');
 
-  const armorMaxDex = parseMaxDexBonus(inventory.body?.maxDexBonus);
-  const shieldMaxDex = parseMaxDexBonus(inventory.offHandShield?.maxDexBonus);
+  const armorMat = inventory.body?.material ? MATERIALS[inventory.body.material as MaterialKey] : undefined;
+  const armorMaxDex = parseMaxDexBonus(applyMaxDexDelta(inventory.body?.maxDexBonus ?? null, armorMat?.maxDexDelta ?? 0));
+  const shieldMat = inventory.offHandShield?.material ? MATERIALS[inventory.offHandShield.material as MaterialKey] : undefined;
+  const shieldMaxDex = parseMaxDexBonus(applyMaxDexDelta(inventory.offHandShield?.maxDexBonus ?? null, shieldMat?.maxDexDelta ?? 0));
   const maxDexCap = [armorMaxDex, shieldMaxDex]
     .filter((cap): cap is number => cap !== null)
     .reduce<number | null>((lowest, cap) => (lowest === null ? cap : Math.min(lowest, cap)), null);
-  const acDexMod = dexMod <= 0
-    ? dexMod
-    : (maxDexCap === null ? dexMod : Math.min(dexMod, maxDexCap));
+  const acDexMod = applyMaxDexCap(dexMod, maxDexCap);
 
-  // Slot and feat dodge bonuses stack on top of the manually-entered dodge value.
+  // Dodge bonus is derived purely from worn-slot dodge bonuses and the Dodge feat.
   const slotDodge = Object.values(inventory.wornSlots).reduce(
     (acc, b) => (b.acType === 'dodge' ? acc + b.acBonus : acc), 0,
   );
   const dodgeFeatBonus = feats.some((f) => f.name.trim().toLowerCase() === 'dodge') ? 1 : 0;
-  const acDodge = safeCombatNumber(combat.armorClass.dodge) + slotDodge + dodgeFeatBonus;
+  const acDodge = slotDodge + dodgeFeatBonus;
 
-  const totalAC = 10 + acArmor + acShield + acDexMod + sizeMod + acDodge + acNatural + acDeflection + acMisc;
-  const touchAC = 10 + acDexMod + sizeMod + acDodge + acDeflection + acMisc;
-  const flatFootedAC = 10 + acArmor + acShield + sizeMod + acNatural + acDeflection + acMisc;
+  // Misc bonus: manual entry + stacking slot bonuses (insight, luck, sacred, profane).
+  const slotMisc = Object.values(inventory.wornSlots).reduce(
+    (acc, b) => (['insight', 'luck', 'sacred', 'profane'].includes(b.acType) ? acc + b.acBonus : acc), 0,
+  );
+  const acMisc = safeCombatNumber(combat.armorClass.misc) + slotMisc;
+
+  const { total: totalAC, touch: touchAC, flatFooted: flatFootedAC } = computeAcTotals({
+    armor: acArmor, shield: acShield, acDexMod,
+    sizeMod, dodge: acDodge, natural: acNatural, deflection: acDeflection, misc: acMisc,
+  });
   const initiativeTotal = dexMod + initMisc;
   const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc);
   const reflexTotal = reflexBase + dexMod + safeCombatNumber(combat.saves.reflex.magic) + safeCombatNumber(combat.saves.reflex.misc);

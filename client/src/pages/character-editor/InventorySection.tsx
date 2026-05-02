@@ -198,6 +198,7 @@ function newWeaponFromEntry(entry: WeaponCatalogEntry): WeaponLoadout {
     enhancementBonus: 0,
     combatMod:        0,
     special:          entry.special ?? '',
+    material:         '',
   };
 }
 
@@ -214,6 +215,7 @@ function defaultWeapon(name = ''): WeaponLoadout {
     enhancementBonus: 0,
     combatMod: 0,
     special: '',
+    material: '',
   };
 }
 
@@ -241,6 +243,7 @@ function newShieldFromEntry(entry: ArmorCatalogEntry, size: CharacterDraft['size
     speed:             getArmorSpeedForSize(entry.category, size),
     weight:            entry.weight,
     armorAdjust:       entry.armorAdjust,
+    material:          '',
   };
 }
 
@@ -256,6 +259,7 @@ function defaultShield(name = ''): ArmorLoadout {
     speed: '',
     weight: '',
     armorAdjust: 0,
+    material: '',
   };
 }
 
@@ -271,6 +275,7 @@ function newArmorFromEntry(entry: ArmorCatalogEntry, size: CharacterDraft['size'
     speed:             getArmorSpeedForSize(entry.category, size),
     weight:            entry.weight,
     armorAdjust:       entry.armorAdjust,
+    material:          '',
   };
 }
 
@@ -397,7 +402,6 @@ export function InventorySection({
         shield:     Math.max(totalArmorBonus(nextInv.offHandShield), bestSlot('shield')),
         deflection: bestSlot('deflection'),
         natural:    bestSlot('natural'),
-        misc:       bestSlot('insight') + bestSlot('luck') + bestSlot('sacred') + bestSlot('profane'),
       },
       speed: {
         ...nextCombat.speed,
@@ -580,6 +584,9 @@ export function InventorySection({
   function updateMainHandField(field: keyof WeaponLoadout, value: string | number) {
     const base = inventory.mainHand ?? defaultWeapon();
     const next = { ...base, [field]: value } as WeaponLoadout;
+    if (field === 'material' && value === 'masterwork' && (base.enhancementBonus ?? 0) === 0) {
+      next.enhancementBonus = 1;
+    }
     if (field === 'name' && typeof value === 'string' && !value.trim()) {
       updateInventory({ mainHand: null }); return;
     }
@@ -609,6 +616,9 @@ export function InventorySection({
   function updateOffHandWeaponField(field: keyof WeaponLoadout, value: string | number) {
     const base = inventory.offHandWeapon ?? defaultWeapon();
     const next = { ...base, [field]: value } as WeaponLoadout;
+    if (field === 'material' && value === 'masterwork' && (base.enhancementBonus ?? 0) === 0) {
+      next.enhancementBonus = 1;
+    }
     if (field === 'name' && typeof value === 'string' && !value.trim()) { updateInventory({ offHandWeapon: null }); return; }
     updateInventory({ offHandWeapon: next });
   }
@@ -654,6 +664,9 @@ export function InventorySection({
   function updateBackupWeaponField(index: number, field: keyof WeaponLoadout, value: string | number) {
     const base = backupWeapons[index]?.weapon ?? defaultWeapon();
     const next = { ...base, [field]: value } as WeaponLoadout;
+    if (field === 'material' && value === 'masterwork' && (base.enhancementBonus ?? 0) === 0) {
+      next.enhancementBonus = 1;
+    }
     const nextWeapon = (field === 'name' && typeof value === 'string' && !value.trim()) ? null : next;
     updateInventory({
       backupWeapons: backupWeapons.map((slot, idx) => (

@@ -2,7 +2,54 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PDFDocument, PDFTextField, PDFName, PDFBool, PDFDict, PDFRef, PDFString, StandardFonts } from 'pdf-lib';
 import type { ICharacter } from '../models/Character';
-import { SIZE_CATEGORIES } from '../rules/coreMechanics';
+import { SIZE_CATEGORIES, applyMaxDexCap, computeAcTotals } from '../rules/coreMechanics';
+
+// ── Material helpers (inline — materials.ts lives in client only) ─────────────
+const MAT_EFFECTS: Record<string, { acpDelta: number; asfDelta: number; weightMultiplier: number; maxDexDelta: number }> = {
+  masterwork:       { acpDelta: 1, asfDelta:   0, weightMultiplier: 1,   maxDexDelta: 0 },
+  adamantine:       { acpDelta: 1, asfDelta:   0, weightMultiplier: 1,   maxDexDelta: 0 },
+  mithral:          { acpDelta: 3, asfDelta: -10, weightMultiplier: 0.5, maxDexDelta: 2 },
+  darkwood:         { acpDelta: 2, asfDelta:   0, weightMultiplier: 0.5, maxDexDelta: 0 },
+  dragonhide:       { acpDelta: 0, asfDelta:   0, weightMultiplier: 1,   maxDexDelta: 0 },
+  'cold-iron':      { acpDelta: 0, asfDelta:   0, weightMultiplier: 1,   maxDexDelta: 0 },
+  'alchemical-silver': { acpDelta: 0, asfDelta: 0, weightMultiplier: 1,  maxDexDelta: 0 },
+};
+
+function matAcp(acp: number, mat?: string): number {
+  return Math.min(0, acp + (MAT_EFFECTS[mat ?? '']?.acpDelta ?? 0));
+}
+
+function matAsf(asf: string, mat?: string): string {
+  const delta = MAT_EFFECTS[mat ?? '']?.asfDelta ?? 0;
+  if (delta === 0 || !asf) return asf;
+  const m = asf.match(/^(\d+)%$/);
+  if (!m || !m[1]) return asf;
+  return `${Math.max(0, parseInt(m[1]) + delta)}%`;
+}
+
+function matWeight(weight: string, mat?: string): string {
+  const mult = MAT_EFFECTS[mat ?? '']?.weightMultiplier ?? 1;
+  if (mult === 1 || !weight || weight === '—') return weight;
+  const m = weight.match(/^([\d.]+)\s*lb\./);
+  if (!m || !m[1]) return weight;
+  return `${Math.round(parseFloat(m[1]) * mult * 2) / 2} lb.`;
+}
+
+/** Parse maxDexBonus string (e.g. "6") to a number, or return null. */
+function parseMaxDex(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Apply material maxDexDelta to a maxDexBonus string, then parse. */
+function matMaxDex(maxDexBonus: string | null | undefined, mat?: string): number | null {
+  const delta = MAT_EFFECTS[mat ?? '']?.maxDexDelta ?? 0;
+  if (!maxDexBonus) return null;
+  const base = parseMaxDex(maxDexBonus);
+  if (base === null) return null;
+  return base + delta;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -154,9 +201,18 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
   }
 
   // Armor class — stored components
+  // Compute the tightest max-dex cap from armor and shield (with material adjustment),
+  // then derive the three AC totals using the shared helpers from coreMechanics.
+  const armorMaxDex  = matMaxDex(character.inventory?.body?.maxDexBonus,         character.inventory?.body?.material);
+  const shieldMaxDex = matMaxDex(character.inventory?.offHandShield?.maxDexBonus, character.inventory?.offHandShield?.material);
+  const maxDexCap = [armorMaxDex, shieldMaxDex]
+    .filter((c): c is number => c !== null)
+    .reduce<number | null>((lowest, c) => (lowest === null ? c : Math.min(lowest, c)), null);
+  const acDexEffMod = applyMaxDexCap(dexEffMod, maxDexCap);
+
   safeSet(form, 'combat.armorClass.armor',       ac.armor);
   safeSet(form, 'combat.armorClass.shield',      ac.shield);
-  safeSet(form, 'combat.armorClass.dexterityMod', signed(dexEffMod));
+  safeSet(form, 'combat.armorClass.dexterityMod', signed(acDexEffMod));
   safeSet(form, 'combat.armorClass.size',        sizeMod || '');
   safeSet(form, 'combat.armorClass.dodge',       ac.dodge       || '');
   safeSet(form, 'combat.armorClass.natural',     ac.natural     || '');
@@ -164,9 +220,10 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
   safeSet(form, 'combat.armorClass.misc',        ac.misc        || '');
 
   // Armor class — derived totals
-  const acTotal      = 10 + ac.armor + ac.shield + dexEffMod + sizeMod + ac.dodge + ac.natural + ac.deflection + ac.misc;
-  const acTouch      = 10 + dexEffMod + sizeMod + ac.dodge + ac.deflection + ac.misc;
-  const acFlatFooted = 10 + ac.armor + ac.shield + sizeMod + ac.natural + ac.deflection + ac.misc;
+  const { total: acTotal, touch: acTouch, flatFooted: acFlatFooted } = computeAcTotals({
+    armor: ac.armor, shield: ac.shield, acDexMod: acDexEffMod,
+    sizeMod, dodge: ac.dodge, natural: ac.natural, deflection: ac.deflection, misc: ac.misc,
+  });
   safeSet(form, 'combat.armorClass.total',      acTotal);
   safeSet(form, 'combat.armorClass.touch',      acTouch);
   safeSet(form, 'combat.armorClass.flatFooted', acFlatFooted);
@@ -210,6 +267,18 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
   const ohAttackMod = (oh?.combatMod ?? 0) + (oh?.enhancementBonus ?? 0);
   safeSet(form, 'offHandWeapon.attackMod',      ohAttackMod !== 0 ? signed(ohAttackMod) : '');
   safeSet(form, 'offHandWeapon.computedAttack', oh?.computedAttack  ?? '');
+  safeSet(form, 'offHandWeapon.notes',          oh?.special         ?? '');
+  safeSet(form, 'offHandWeapon.damageType',     oh?.damageType      ?? '');
+  safeSet(form, 'offHandWeapon.rangeIncrement', oh?.rangeIncrement  ?? '');
+  safeSet(form, 'offHandWeapon.weight',         oh?.weight          ?? '');
+
+  // ── Off-hand shield ───────────────────────────────────────────────────────
+  const os = character.inventory?.offHandShield ?? null;
+  safeSet(form, 'offHandShield.name',             os?.name ?? '');
+  safeSet(form, 'offHandShield.shieldBonus',      os != null ? (os.armorBonus ?? 0) + (os.enhancementBonus ?? 0) : '');
+  safeSet(form, 'offHandShield.armorCheckPenalty', os != null ? matAcp(os.armorCheckPenalty ?? 0, os.material) : '');
+  safeSet(form, 'offHandShield.arcaneSpellFailure', os != null ? matAsf(os.arcaneSpellFailure ?? '', os.material) : '');
+  safeSet(form, 'offHandShield.weight',            os != null ? matWeight(os.weight ?? '', os.material) : '');
 
   // ── Acrobat JavaScript calculations (Adobe Acrobat/Reader only) ──────────
   // Attaches a Calculate (AA.C) JS action to each derived field and sets the

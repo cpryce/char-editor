@@ -619,3 +619,35 @@ export function newCharacterDraft(): CharacterDraft {
     feats: [],
   };
 }
+
+// ── Armor Class Helpers ──────────────────────────────────────────────────────
+
+/**
+ * Apply the tightest max-dex cap from armor and/or shield to the dexterity
+ * modifier.  Negative dex modifiers are always applied in full — the cap only
+ * limits upside.  Pass `null` for maxDexCap when neither piece has a limit.
+ *
+ * Mirrors server/src/rules/coreMechanics.ts — keep the two in sync.
+ */
+export function applyMaxDexCap(dexMod: number, maxDexCap: number | null): number {
+  return dexMod <= 0 ? dexMod : (maxDexCap === null ? dexMod : Math.min(dexMod, maxDexCap));
+}
+
+/**
+ * Derive the three AC totals (total, touch, flat-footed) from the individual
+ * components.  `acDexMod` must already have the max-dex cap applied before
+ * being passed here.
+ *
+ * Mirrors server/src/rules/coreMechanics.ts — keep the two in sync.
+ */
+export function computeAcTotals(c: {
+  armor: number; shield: number; acDexMod: number;
+  sizeMod: number; dodge: number; natural: number;
+  deflection: number; misc: number;
+}): { total: number; touch: number; flatFooted: number } {
+  return {
+    total:      10 + c.armor + c.shield + c.acDexMod + c.sizeMod + c.dodge + c.natural + c.deflection + c.misc,
+    touch:      10 + c.acDexMod + c.sizeMod + c.dodge + c.deflection + c.misc,
+    flatFooted: 10 + c.armor + c.shield + c.sizeMod + c.natural + c.deflection + c.misc,
+  };
+}

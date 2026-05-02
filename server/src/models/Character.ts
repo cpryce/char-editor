@@ -39,6 +39,7 @@ const armorLoadoutSchema = new Schema(
     speed: { type: String, default: '' },
     weight: { type: String, default: '' },
     armorAdjust: { type: Number, default: 0 },
+    material: { type: String },
   },
   { _id: false },
 );
@@ -205,7 +206,7 @@ export interface ICharacter extends Document {
     body: {
       name: string; category: string; armorBonus: number; enhancementBonus: number;
       maxDexBonus: string | null; armorCheckPenalty: number; arcaneSpellFailure: string;
-      speed: string; weight: string; armorAdjust: number;
+      speed: string; weight: string; armorAdjust: number; material?: string;
     } | null;
     mainHand: {
       name: string; proficiency: string; handedness: string;
@@ -224,7 +225,7 @@ export interface ICharacter extends Document {
     offHandShield: {
       name: string; category: string; armorBonus: number; enhancementBonus: number;
       maxDexBonus: string | null; armorCheckPenalty: number; arcaneSpellFailure: string;
-      speed: string; weight: string; armorAdjust: number;
+      speed: string; weight: string; armorAdjust: number; material?: string;
     } | null;
     backupWeapons?: {
       label: string;
