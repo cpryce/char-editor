@@ -35,6 +35,16 @@ function matWeight(weight: string, mat?: string): string {
   return `${Math.round(parseFloat(m[1]) * mult * 2) / 2} lb.`;
 }
 
+/** Abbreviate a damage type string to slash-separated initials: "Piercing or Slashing" → "P/S" */
+function abbrevDamageType(dt: string | null | undefined): string {
+  if (!dt) return '';
+  return dt
+    .split(/\s+(?:and|or)\s+/i)
+    .map((t) => t.trim()[0]?.toUpperCase() ?? '')
+    .filter(Boolean)
+    .join('/');
+}
+
 /** Parse maxDexBonus string (e.g. "6") to a number, or return null. */
 function parseMaxDex(value: string | null | undefined): number | null {
   if (!value) return null;
@@ -256,8 +266,11 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
   safeSet(form, 'mainHand.critical',       mh?.critical        ?? '');
   const mhAttackMod = (mh?.combatMod ?? 0) + (mh?.enhancementBonus ?? 0);
   safeSet(form, 'mainHand.attackMod',      mhAttackMod !== 0 ? signed(mhAttackMod) : '');
-  safeSet(form, 'mainHand.computedAttack', mh?.computedAttack  ?? '');
-  safeSet(form, 'mainHand.notes',          mh?.special         ?? '');
+  safeSet(form, 'mainHand.computedAttack',  mh?.computedAttack  ?? '');
+  safeSet(form, 'mainHand.notes',           mh?.special         ?? '');
+  safeSet(form, 'mainHand.damageType',      abbrevDamageType(mh?.damageType));
+  safeSet(form, 'mainHand.rangeIncrement',  mh?.rangeIncrement  ?? '');
+  safeSet(form, 'mainHand.weight',          mh?.weight          ?? '');
 
   // ── Off-hand weapon ───────────────────────────────────────────────────────
   const oh = character.inventory?.offHandWeapon ?? null;
@@ -268,9 +281,19 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
   safeSet(form, 'offHandWeapon.attackMod',      ohAttackMod !== 0 ? signed(ohAttackMod) : '');
   safeSet(form, 'offHandWeapon.computedAttack', oh?.computedAttack  ?? '');
   safeSet(form, 'offHandWeapon.notes',          oh?.special         ?? '');
-  safeSet(form, 'offHandWeapon.damageType',     oh?.damageType      ?? '');
+  safeSet(form, 'offHandWeapon.damageType',     abbrevDamageType(oh?.damageType));
   safeSet(form, 'offHandWeapon.rangeIncrement', oh?.rangeIncrement  ?? '');
   safeSet(form, 'offHandWeapon.weight',         oh?.weight          ?? '');
+
+  // ── Body armor ────────────────────────────────────────────────────────────
+  const bd = character.inventory?.body ?? null;
+  safeSet(form, 'body.name',              bd?.name ?? '');
+  safeSet(form, 'body.armorBonus',        bd != null ? (bd.armorBonus ?? 0) + (bd.enhancementBonus ?? 0) : '');
+  safeSet(form, 'body.maxDexBonus',       bd?.maxDexBonus ?? '');
+  safeSet(form, 'body.armorCheckPenalty', bd != null ? matAcp(bd.armorCheckPenalty ?? 0, bd.material) : '');
+  safeSet(form, 'body.arcaneSpellFailure', bd != null ? matAsf(bd.arcaneSpellFailure ?? '', bd.material) : '');
+  safeSet(form, 'body.speed',             bd?.speed ?? '');
+  safeSet(form, 'body.weight',            bd != null ? matWeight(bd.weight ?? '', bd.material) : '');
 
   // ── Off-hand shield ───────────────────────────────────────────────────────
   const os = character.inventory?.offHandShield ?? null;
@@ -279,6 +302,25 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
   safeSet(form, 'offHandShield.armorCheckPenalty', os != null ? matAcp(os.armorCheckPenalty ?? 0, os.material) : '');
   safeSet(form, 'offHandShield.arcaneSpellFailure', os != null ? matAsf(os.arcaneSpellFailure ?? '', os.material) : '');
   safeSet(form, 'offHandShield.weight',            os != null ? matWeight(os.weight ?? '', os.material) : '');
+
+  // ── Backup weapons (up to 3 slots) ────────────────────────────────────────
+  const backupWeapons = character.inventory?.backupWeapons ?? [];
+  for (let i = 0; i < 3; i++) {
+    const slot   = backupWeapons[i] ?? null;
+    const bw     = slot?.weapon ?? null;
+    const prefix = `backupWeapons.${i}`;
+    const bwAttackMod = (bw?.combatMod ?? 0) + (bw?.enhancementBonus ?? 0);
+    safeSet(form, `${prefix}.label`,                slot?.label            ?? '');
+    safeSet(form, `${prefix}.weapon.name`,          bw?.name               ?? '');
+    safeSet(form, `${prefix}.weapon.attackMod`,     bwAttackMod !== 0 ? signed(bwAttackMod) : '');
+    safeSet(form, `${prefix}.weapon.computedAttack`, bw?.computedAttack    ?? '');
+    safeSet(form, `${prefix}.weapon.damage`,        bw?.damage             ?? '');
+    safeSet(form, `${prefix}.weapon.critical`,      bw?.critical           ?? '');
+    safeSet(form, `${prefix}.weapon.notes`,         bw?.special            ?? '');
+    safeSet(form, `${prefix}.weapon.damageType`,    abbrevDamageType(bw?.damageType));
+    safeSet(form, `${prefix}.weapon.rangeIncrement`, bw?.rangeIncrement    ?? '');
+    safeSet(form, `${prefix}.weapon.weight`,        bw?.weight             ?? '');
+  }
 
   // ── Acrobat JavaScript calculations (Adobe Acrobat/Reader only) ──────────
   // Attaches a Calculate (AA.C) JS action to each derived field and sets the
