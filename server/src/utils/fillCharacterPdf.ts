@@ -157,6 +157,8 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
     safeSet(form, `classes.${i}.name`,  classes[i]?.name  ?? '');
     safeSet(form, `classes.${i}.level`, classes[i]?.level ?? '');
   }
+  const characterLevel = classes.reduce((sum, c) => sum + (c?.level ?? 0), 0);
+  safeSet(form, 'CHARACTER_LEVEL', characterLevel || '');
 
   // Hit points
   safeSet(form, 'hitPoints.max', character.hitPoints.max);
@@ -258,6 +260,14 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
     safeSet(form, `combat.saves.${save}.misc`,  sv.misc  || '');
     safeSet(form, `combat.saves.${save}.total`, signed(total));
   }
+
+  // Initiative & BAB
+  const initMiscBonus = character.combat.initiative?.miscBonus ?? 0;
+  const initTotal     = dexEffMod + initMiscBonus;
+  safeSet(form, 'combat.initiative.mod',       signed(dexEffMod));
+  safeSet(form, 'combat.initiative.miscBonus', initMiscBonus || '');
+  safeSet(form, 'combat.initiative.total',     signed(initTotal));
+  safeSet(form, 'combat.baseAttackBonus',      character.combat.baseAttackBonus || '');
 
   // ── Main-hand weapon ──────────────────────────────────────────────────────
   const mh = character.inventory?.mainHand ?? null;
