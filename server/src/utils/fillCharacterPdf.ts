@@ -320,7 +320,7 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
     const bw     = slot?.weapon ?? null;
     const prefix = `backupWeapons.${i}`;
     const bwAttackMod = (bw?.combatMod ?? 0) + (bw?.enhancementBonus ?? 0);
-    safeSet(form, `${prefix}.label`,                slot?.label            ?? '');
+    safeSet(form, `${prefix}.label`,                (slot?.label ?? '').toUpperCase());
     safeSet(form, `${prefix}.weapon.name`,          bw?.name               ?? '');
     safeSet(form, `${prefix}.weapon.attackMod`,     bwAttackMod !== 0 ? signed(bwAttackMod) : '');
     safeSet(form, `${prefix}.weapon.computedAttack`, bw?.computedAttack    ?? '');

@@ -22,7 +22,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { PDFDocument, PDFName, PDFString, PDFNumber } from 'pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFString } from 'pdf-lib';
 
 /** Appearance config keyed by the suffix after backupWeapons.<n>. */
 const FIELD_STYLE: Record<string, { da: string; q: number | null }> = {
@@ -37,6 +37,27 @@ const FIELD_STYLE: Record<string, { da: string; q: number | null }> = {
   'weapon.rangeIncrement': { da: '/Helv 6 Tf 0 g', q: 1   },
   'weapon.weight':         { da: '/Helv 6 Tf 0 g', q: 1   },
 };
+
+function clearWidgetChrome(field: { acroField: { getWidgets(): Array<{ dict: PDFDict }> } }, doc: PDFDocument) {
+  for (const widget of field.acroField.getWidgets()) {
+    const widgetDict = widget.dict;
+    const mk = widgetDict.lookup(PDFName.of('MK'), PDFDict);
+
+    if (mk) {
+      mk.delete(PDFName.of('BG'));
+      mk.delete(PDFName.of('BC'));
+    }
+
+    widgetDict.delete(PDFName.of('BS'));
+    widgetDict.delete(PDFName.of('C'));
+
+    const border = PDFArray.withContext(doc.context);
+    border.push(PDFNumber.of(0));
+    border.push(PDFNumber.of(0));
+    border.push(PDFNumber.of(0));
+    widgetDict.set(PDFName.of('Border'), border);
+  }
+}
 
 async function run() {
   const pdfPath = path.join(__dirname, 'assets', 'blank.pdf');
@@ -71,7 +92,9 @@ async function run() {
       dict.delete(PDFName.of('Q'));
     }
 
-    console.log(`  ✓ ${name}  DA="${style.da}"  Q=${style.q ?? '(left/unset)'}`);
+    clearWidgetChrome(field, doc);
+
+    console.log(`  ✓ ${name}  DA="${style.da}"  Q=${style.q ?? '(left/unset)'}  chrome=none`);
     patched++;
   }
 
