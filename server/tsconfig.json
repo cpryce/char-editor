@@ -48,11 +48,17 @@
   "exclude": [
     "src/addBackupWeaponFields.ts",
     "src/addBodyArmorFields.ts",
+    "src/addHiddenTextLayer.ts",
     "src/addWornEquipmentFields.ts",
     "src/fixBackupWeaponFieldAppearance.ts",
+    "src/fixXmpLang.ts",
+    "src/fixXmpTitle.ts",
     "src/inspectFieldPositions.ts",
     "src/inspectPdf.ts",
+    "src/inspectXfa.ts",
+    "src/inspectXmp.ts",
     "src/renamePdfFields.ts",
+    "src/stripLiveCycleMeta.ts",
     "src/testFillPdf.ts",
     "src/optimizePdf.ts"
   ]

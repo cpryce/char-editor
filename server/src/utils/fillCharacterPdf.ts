@@ -458,5 +458,31 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
   pdfDoc.catalog.lookup(PDFName.of('AcroForm'), PDFDict)
     .set(PDFName.of('NeedAppearances'), PDFBool.True);
 
+  // Set document language (catalog + XMP dc:language) so Adobe AI and
+  // accessibility tools recognise this as an English document.
+  // Also set the title to the character name in both XMP and Info dict.
+  pdfDoc.catalog.set(PDFName.of('Lang'), PDFString.of('en'));
+  const metaRef = pdfDoc.catalog.get(PDFName.of('Metadata'));
+  if (metaRef) {
+    const metaStream = pdfDoc.context.lookup(metaRef) as import('pdf-lib').PDFStream;
+    const raw: Uint8Array = (metaStream as any).contents ?? new Uint8Array();
+    let xmp = Buffer.from(raw).toString('utf8');
+    if (!xmp.includes('dc:language')) {
+      xmp = xmp.replace(
+        '</dc:format>',
+        '</dc:format>\n         <dc:language><rdf:Bag><rdf:li>en</rdf:li></rdf:Bag></dc:language>',
+      );
+    }
+    // Replace dc:title value with character name
+    xmp = xmp.replace(
+      /(<rdf:li xml:lang="x-default">)[^<]*/,
+      `$1${character.name}`,
+    );
+    (metaStream as any).contents = Buffer.from(xmp, 'utf8');
+    metaStream.dict.delete(PDFName.of('Length'));
+  }
+  // Also set Info dict /Title for viewers that read it instead of XMP
+  pdfDoc.setTitle(character.name);
+
   return pdfDoc.save();
 }
