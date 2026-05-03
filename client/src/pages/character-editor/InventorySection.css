@@ -7,7 +7,7 @@
 /* ── Worn slots grid ─────────────────────────────────────────────────────── */
 .inventory-slots-grid {
   display: grid;
-  grid-template-columns: max-content minmax(130px, 1fr) 10rem 4rem;
+  grid-template-columns: max-content minmax(130px, 1fr) 5rem 10rem 4rem;
   gap: 4px 8px;
   align-items: center;
 }
@@ -27,6 +27,16 @@
   color: var(--color-fg-default);
   padding: 4px 8px;
   font-size: 13px;
+}
+
+.inventory-slot-weight {
+  width: 100%;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: var(--color-canvas-default);
+  color: var(--color-fg-default);
+  padding: 4px 6px;
+  font-size: 12px;
 }
 
 /* ── Slot AC bonus fields ──────────────────────────────────────────────────── */

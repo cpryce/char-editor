@@ -543,7 +543,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
         const rawInv = (data.inventory as Record<string, unknown> | undefined) ?? base.inventory;
         const rawInvRecord = rawInv as Record<string, unknown>;
         const WORN_SLOT_KEYS: WornSlotKey[] = ['head', 'face', 'neck', 'shoulders', 'bodySlot', 'chest', 'wrists', 'hands', 'ringLeft', 'ringRight', 'waist', 'feet'];
-        const defaultWornSlot: WornSlot = { item: '', acType: '', acBonus: 0 };
+        const defaultWornSlot: WornSlot = { item: '', weight: '', acType: '', acBonus: 0 };
         let normalizedWornSlots: Record<WornSlotKey, WornSlot>;
         if (typeof rawInv.wornSlots === 'object' && rawInv.wornSlots !== null) {
           // New format
@@ -555,6 +555,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
                 const e = s as Record<string, unknown>;
                 return [key, {
                   item:    typeof e.item    === 'string' ? e.item    : '',
+                  weight:  typeof e.weight  === 'string' ? e.weight  : '',
                   acType:  typeof e.acType  === 'string' ? e.acType  : '',
                   acBonus: typeof e.acBonus === 'number' ? e.acBonus : 0,
                 }];
@@ -573,6 +574,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
               const bonus   = oldBonuses[key];
               return [key, {
                 item,
+                weight:  '',
                 acType:  typeof bonus?.type  === 'string' ? bonus.type  as string : '',
                 acBonus: typeof bonus?.value === 'number' ? bonus.value as number : 0,
               }];

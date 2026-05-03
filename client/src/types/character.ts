@@ -79,9 +79,10 @@ export type WornSlotKey =
   | 'head' | 'face' | 'neck' | 'shoulders' | 'bodySlot' | 'chest'
   | 'wrists' | 'hands' | 'ringLeft' | 'ringRight' | 'waist' | 'feet';
 
-/** A single worn slot entry: the item name, AC bonus type, and AC bonus value. */
+/** A single worn slot entry: the item name, weight, AC bonus type, and AC bonus value. */
 export interface WornSlot {
   item: string;
+  weight: string;
   acType: string;
   acBonus: number;
 }

@@ -86,6 +86,23 @@ function effectiveTempMod(score: ICharacter['abilityScores']['strength']): numbe
   return null;
 }
 
+/** Silently set a dropdown if the field exists and the value is a valid option.
+ * Pass `font` to regenerate the appearance stream so static viewers show the selection.
+ */
+function safeSetDropdown(
+  form: ReturnType<PDFDocument['getForm']>,
+  name: string,
+  value: string | null | undefined,
+) {
+  try {
+    const field = form.getDropdown(name);
+    if (value) field.select(value);
+    else field.clear();
+  } catch {
+    // Field not found, wrong type, or value not in options — skip gracefully.
+  }
+}
+
 /** Silently skip a field if it doesn't exist or isn't a text field. */
 function safeSet(
   form: ReturnType<PDFDocument['getForm']>,
@@ -332,6 +349,21 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
     safeSet(form, `${prefix}.weapon.weight`,        bw?.weight             ?? '');
   }
 
+  // ── Worn equipment slots ───────────────────────────────────────────────────
+  const WORN_SLOT_KEYS = [
+    'head', 'face', 'neck', 'shoulders', 'bodySlot', 'chest',
+    'wrists', 'hands', 'ringLeft', 'ringRight', 'waist', 'feet',
+  ] as const;
+  const ws = (character.inventory?.wornSlots ?? {}) as Record<string, { item?: string; weight?: string; acType?: string; acBonus?: number }>;
+  for (const key of WORN_SLOT_KEYS) {
+    const slot   = ws[key] ?? null;
+    const prefix = `wornSlots.${key}`;
+    safeSet(form, `${prefix}.weight`,  slot?.weight  ?? '');
+    safeSet(form, `${prefix}.name`,    slot?.item    ?? '');
+    safeSet(form, `${prefix}.acBonus`, slot?.acBonus != null ? String(slot.acBonus) : '');
+    safeSetDropdown(form, `${prefix}.acType`, slot?.acType ?? '');
+  }
+
   // ── Acrobat JavaScript calculations (Adobe Acrobat/Reader only) ──────────
   // Attaches a Calculate (AA.C) JS action to each derived field and sets the
   // AcroForm CO (Calculation Order) so Acrobat evaluates dependencies in order.
@@ -419,5 +451,12 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
   }
 
   form.updateFieldAppearances(font);
+
+  // Tell conforming readers to regenerate field appearances on open.
+  // This ensures dropdown selected values are visible without relying on
+  // pdf-lib's appearance stream generation for combo boxes.
+  pdfDoc.catalog.lookup(PDFName.of('AcroForm'), PDFDict)
+    .set(PDFName.of('NeedAppearances'), PDFBool.True);
+
   return pdfDoc.save();
 }

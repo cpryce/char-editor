@@ -545,7 +545,7 @@ export function InventorySection({
   function handleBodySelect(name: string, entry?: ArmorCatalogEntry) {
     if (!name.trim()) { updateInventory({ body: null }); return; }
     const nextWornSlots = { ...inventory.wornSlots };
-    nextWornSlots.bodySlot = { item: '', acType: '', acBonus: 0 };
+    nextWornSlots.bodySlot = { item: '', weight: '', acType: '', acBonus: 0 };
     const clearBodySlotFields: Pick<Inventory, 'wornSlots'> = {
       wornSlots: nextWornSlots,
     };
@@ -792,6 +792,15 @@ export function InventorySection({
           onChange={(e) => updateWornSlot(key, { item: e.target.value })}
           disabled={disableBodySlot}
         />
+        <input
+          type="text"
+          className="inventory-slot-weight"
+          value={slot.weight ?? ''}
+          onChange={(e) => updateWornSlot(key, { weight: e.target.value })}
+          aria-label={`${label} weight`}
+          placeholder="—"
+          disabled={disableBodySlot}
+        />
         <select
           className="inventory-slot-bonus-type"
           value={slot.acType}
@@ -1025,6 +1034,7 @@ export function InventorySection({
         <div className="inventory-slots-grid">
           <span className="inventory-slots-col-header" />
           <span className="inventory-slots-col-header">Item</span>
+          <span className="inventory-slots-col-header">Weight</span>
           <span className="inventory-slots-col-header">AC Bonus Type</span>
           <span className="inventory-slots-col-header">Value</span>
 

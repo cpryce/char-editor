@@ -202,7 +202,7 @@ export interface ICharacter extends Document {
 
   // Inventory
   inventory: {
-    wornSlots: Record<string, { item: string; acType: string; acBonus: number }>;
+    wornSlots: Record<string, { item: string; weight: string; acType: string; acBonus: number }>;
     body: {
       name: string; category: string; armorBonus: number; enhancementBonus: number;
       maxDexBonus: string | null; armorCheckPenalty: number; arcaneSpellFailure: string;

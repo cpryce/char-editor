@@ -48,6 +48,7 @@
   "exclude": [
     "src/addBackupWeaponFields.ts",
     "src/addBodyArmorFields.ts",
+    "src/addWornEquipmentFields.ts",
     "src/fixBackupWeaponFieldAppearance.ts",
     "src/inspectFieldPositions.ts",
     "src/inspectPdf.ts",
