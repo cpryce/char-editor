@@ -52,6 +52,7 @@
     "src/inspectFieldPositions.ts",
     "src/inspectPdf.ts",
     "src/renamePdfFields.ts",
-    "src/testFillPdf.ts"
+    "src/testFillPdf.ts",
+    "src/optimizePdf.ts"
   ]
 }

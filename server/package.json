@@ -12,6 +12,7 @@
     "add-backup-weapon-fields": "ts-node --transpile-only src/addBackupWeaponFields.ts",
     "fix-backup-weapon-appearance": "ts-node --transpile-only src/fixBackupWeaponFieldAppearance.ts",
     "add-body-armor-fields": "ts-node --transpile-only src/addBodyArmorFields.ts",
+    "optimize-pdf": "ts-node --transpile-only src/optimizePdf.ts",
     "build": "tsc && mkdir -p dist/assets && cp src/assets/blank.pdf dist/assets/blank.pdf",
     "start": "node dist/index.js"
   },
