@@ -44,5 +44,14 @@
     "ignoreDeprecations": "6.0",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-  }
+  },
+  "exclude": [
+    "src/addBackupWeaponFields.ts",
+    "src/addBodyArmorFields.ts",
+    "src/fixBackupWeaponFieldAppearance.ts",
+    "src/inspectFieldPositions.ts",
+    "src/inspectPdf.ts",
+    "src/renamePdfFields.ts",
+    "src/testFillPdf.ts"
+  ]
 }
