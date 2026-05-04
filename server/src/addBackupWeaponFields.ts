@@ -24,6 +24,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { gcPdfDoc } from './gcPdf';
 
 // ── Layout constants (match offHandWeapon row geometry) ───────────────────────
 
@@ -101,11 +102,12 @@ async function run() {
     }
   }
 
+  gcPdfDoc(doc);
   const saved = await doc.save({ updateFieldAppearances: false });
   fs.writeFileSync(pdfPath, saved);
 
   console.log(`\nDone. ${added} fields added, ${skipped} skipped.`);
-  console.log(`Saved → ${pdfPath}`);
+  console.log(`Saved → ${pdfPath}  (${(saved.length / 1024).toFixed(1)} KB)`);
 }
 
 run().catch((err: unknown) => {

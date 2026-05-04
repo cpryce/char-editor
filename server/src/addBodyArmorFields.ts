@@ -24,6 +24,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { PDFDocument, PDFName, PDFString, rgb, StandardFonts } from 'pdf-lib';
+import { gcPdfDoc } from './gcPdf';
 
 const PAGE_INDEX = 0;
 
@@ -99,11 +100,12 @@ async function run() {
     added++;
   }
 
+  gcPdfDoc(doc);
   const saved = await doc.save({ updateFieldAppearances: false });
   fs.writeFileSync(pdfPath, saved);
 
   console.log(`\nDone. ${added} fields added, ${skipped} skipped.`);
-  console.log(`Saved → ${pdfPath}`);
+  console.log(`Saved → ${pdfPath}  (${(saved.length / 1024).toFixed(1)} KB)`);
 }
 
 run().catch((err: unknown) => {

@@ -21,6 +21,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { gcPdfDoc } from './gcPdf';
 import {
   PDFDocument, PDFName, PDFString,
   PDFNumber, StandardFonts,
@@ -145,6 +146,7 @@ async function run() {
     } else { skipped++; }
   }
 
+  gcPdfDoc(doc);
   const saved = await doc.save({ updateFieldAppearances: false });
   fs.writeFileSync(pdfPath, saved);
 

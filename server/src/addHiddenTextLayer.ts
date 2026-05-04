@@ -9,6 +9,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { gcPdfDoc } from './gcPdf';
 
 const HIDDEN_TEXT = [
   'This is a Pathfinder / AD&D 3.5 Edition character sheet.',
@@ -41,6 +42,7 @@ async function run() {
     lineHeight: 1,
   });
 
+  gcPdfDoc(doc);
   const saved = await doc.save();
   fs.writeFileSync(pdfPath, saved);
   console.log(`Done: ${(saved.length / 1024).toFixed(1)} KB`);
