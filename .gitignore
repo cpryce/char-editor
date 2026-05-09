@@ -41,7 +41,7 @@ coverage/
 *.sw?
 
 # ── Assets ────────────────────────────────────────────────────
-server/src/assets/blank.pdf.bak
+server/src/assets/blank.pdf.bak*
 
 # ── macOS ─────────────────────────────────────────────────────
 .DS_Store

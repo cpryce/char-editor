@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PDFDocument, PDFTextField, PDFName, PDFBool, PDFDict, PDFRef, PDFString, StandardFonts } from 'pdf-lib';
 import type { ICharacter } from '../models/Character';
-import { SIZE_CATEGORIES, applyMaxDexCap, computeAcTotals } from '../rules/coreMechanics';
+import { SIZE_CATEGORIES, applyMaxDexCap, computeAcTotals, RACES } from '../rules/coreMechanics';
 
 // ── Material helpers (inline — materials.ts lives in client only) ─────────────
 const MAT_EFFECTS: Record<string, { acpDelta: number; asfDelta: number; weightMultiplier: number; maxDexDelta: number }> = {
@@ -211,7 +211,25 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
   safeSet(form, 'diety', character.deity ?? '');
   safeSet(form, 'alignment', alignmentInitials(character.alignment));
   safeSet(form, 'size', character.size ?? '');
-  safeSetDropdownOrText(form, 'race', character.race ?? '');
+
+  // Race — dropdown has no pre-set options in the template; populate then select.
+  try {
+    const raceField = form.getDropdown('race');
+    raceField.setOptions([...RACES]);
+    if (character.race) raceField.select(character.race);
+  } catch {
+    safeSet(form, 'race', character.race ?? '');
+  }
+
+  // Gender — map model enum to PDF dropdown option.
+  const genderMap: Record<string, string> = { male: 'Male', female: 'Female', other: 'Gender Neutral' };
+  safeSetDropdown(form, 'gender', genderMap[character.gender] ?? '');
+
+  // Appearance
+  safeSet(form, 'height', character.height ?? '');
+  safeSet(form, 'weight', character.weight ?? '');
+  safeSet(form, 'hair',   character.hair   ?? '');
+  safeSet(form, 'skin',   character.skin   ?? '');
 
   // Classes (indices 0–3)
   for (let i = 0; i < 4; i++) {
