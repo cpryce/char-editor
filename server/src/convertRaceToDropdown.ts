@@ -1,10 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { PDFDocument, PDFDropdown, PDFName, PDFNumber, PDFString, PDFTextField, StandardFonts } from 'pdf-lib';
+import { PDFArray, PDFDocument, PDFDropdown, PDFName, PDFNumber, PDFString, PDFTextField, StandardFonts } from 'pdf-lib';
 import { RACES } from './rules/coreMechanics';
 
 const FIELD_NAME = 'race';
 const COMBO_FLAG = 1 << 17; // AcroForm field flag for Combo box.
+const EDIT_FLAG = 1 << 18;  // AcroForm field flag for Editable combo box (allows typing).
 
 async function run() {
   const pdfPath = path.join(__dirname, 'assets', 'blank.pdf');
@@ -19,10 +20,25 @@ async function run() {
     const existing = new Set(field.getOptions());
     const missing = RACES.filter((race) => !existing.has(race));
     if (missing.length > 0) field.addOptions(missing);
+
+    const acroField = (field as any).acroField;
+    const dict = acroField.dict;
+
+    // Ensure Edit flag is set for editability.
+    const ffObj = dict.get(PDFName.of('Ff')) as any;
+    const currentFlags = typeof ffObj?.asNumber === 'function' ? ffObj.asNumber() : 0;
+    if ((currentFlags & EDIT_FLAG) === 0) {
+      dict.set(PDFName.of('Ff'), PDFNumber.of(currentFlags | EDIT_FLAG));
+    }
+
+    // Clear any pre-set value so the template field starts blank.
+    dict.delete(PDFName.of('V'));
+    dict.delete(PDFName.of('DV'));
+
     form.updateFieldAppearances(font);
     const saved = await pdfDoc.save({ updateFieldAppearances: false });
     fs.writeFileSync(pdfPath, saved);
-    console.log(`Field \"${FIELD_NAME}\" is already a dropdown. Added ${missing.length} missing option(s).`);
+    console.log(`Field \"${FIELD_NAME}\" is already a dropdown. Added ${missing.length} missing option(s) and ensured Edit flag.`);
     console.log(`Saved -> ${pdfPath}`);
     return;
   }
@@ -35,20 +51,19 @@ async function run() {
   const acroField = (field as any).acroField;
   const dict = acroField.dict;
 
-  // Convert field type from text (/Tx) to choice (/Ch), and set combo flag.
+  // Convert field type from text (/Tx) to choice (/Ch), and set combo + edit flags.
   dict.set(PDFName.of('FT'), PDFName.of('Ch'));
   const ffObj = dict.get(PDFName.of('Ff')) as any;
   const currentFlags = typeof ffObj?.asNumber === 'function' ? ffObj.asNumber() : 0;
-  dict.set(PDFName.of('Ff'), PDFNumber.of(currentFlags | COMBO_FLAG));
+  dict.set(PDFName.of('Ff'), PDFNumber.of(currentFlags | COMBO_FLAG | EDIT_FLAG));
 
   // Install canonical race options used across the app.
-  dict.set(PDFName.of('Opt'), pdfDoc.context.obj(RACES));
+  // Must use PDFString (not PDFName) — Acrobat requires string objects in Opt.
+  const optArray = pdfDoc.context.obj(RACES.map((r) => PDFString.of(r))) as PDFArray;
+  dict.set(PDFName.of('Opt'), optArray);
 
-  if (currentValue && RACES.includes(currentValue as (typeof RACES)[number])) {
-    dict.set(PDFName.of('V'), PDFString.of(currentValue));
-  } else {
-    dict.delete(PDFName.of('V'));
-  }
+  // Always clear the value for the template form (should be blank).
+  dict.delete(PDFName.of('V'));
 
   form.updateFieldAppearances(font);
   const saved = await pdfDoc.save({ updateFieldAppearances: false });
