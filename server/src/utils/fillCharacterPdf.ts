@@ -71,6 +71,28 @@ function abilityMod(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
+function alignmentInitials(alignment: string | null | undefined): string {
+  const value = (alignment ?? '').trim();
+  const byName: Record<string, string> = {
+    'Lawful Good': 'LG',
+    'Neutral Good': 'NG',
+    'Chaotic Good': 'CG',
+    'Lawful Neutral': 'LN',
+    'True Neutral': 'NN',
+    'Chaotic Neutral': 'CN',
+    'Lawful Evil': 'LE',
+    'Neutral Evil': 'NE',
+    'Chaotic Evil': 'CE',
+  };
+
+  if (byName[value]) return byName[value];
+
+  // Fallback for unexpected values.
+  const words = value.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return `${words[0][0] ?? ''}${words[1][0] ?? ''}`.toUpperCase();
+  return value.slice(0, 2).toUpperCase();
+}
+
 function totalAbilityScore(score: ICharacter['abilityScores']['strength']): number {
   return score.base + score.racial + score.enhancement + score.misc + (score.levelUp ?? 0);
 }
@@ -101,6 +123,24 @@ function safeSetDropdown(
   } catch {
     // Field not found, wrong type, or value not in options — skip gracefully.
   }
+}
+
+/** Prefer dropdown selection when available; fall back to text fields. */
+function safeSetDropdownOrText(
+  form: ReturnType<PDFDocument['getForm']>,
+  name: string,
+  value: string | null | undefined,
+) {
+  try {
+    const field = form.getDropdown(name);
+    if (value) field.select(value);
+    else field.clear();
+    return;
+  } catch {
+    // Not a dropdown (or field absent); try text fallback.
+  }
+
+  safeSet(form, name, value ?? '');
 }
 
 /** Silently skip a field if it doesn't exist or isn't a text field. */
@@ -168,6 +208,10 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
   // Identity
   safeSet(form, 'name',   character.name);
   safeSet(form, 'player', character.player ?? '');
+  safeSet(form, 'diety', character.deity ?? '');
+  safeSet(form, 'alignment', alignmentInitials(character.alignment));
+  safeSet(form, 'size', character.size ?? '');
+  safeSetDropdownOrText(form, 'race', character.race ?? '');
 
   // Classes (indices 0–3)
   for (let i = 0; i < 4; i++) {
