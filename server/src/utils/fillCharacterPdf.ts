@@ -392,6 +392,14 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
   safeSet(form, 'offHandShield.arcaneSpellFailure', os != null ? matAsf(os.arcaneSpellFailure ?? '', os.material) : '');
   safeSet(form, 'offHandShield.weight',            os != null ? matWeight(os.weight ?? '', os.material) : '');
 
+  // ── Combined ACP / ACF summary fields ────────────────────────────────────
+  const totalAcp = (bd != null ? matAcp(bd.armorCheckPenalty ?? 0, bd.material) : 0)
+                 + (os != null ? matAcp(os.armorCheckPenalty ?? 0, os.material) : 0);
+  const bdAsf = bd != null ? parseInt(matAsf(bd.arcaneSpellFailure ?? '0%', bd.material), 10) || 0 : 0;
+  const osAsf = os != null ? parseInt(matAsf(os.arcaneSpellFailure ?? '0%', os.material), 10) || 0 : 0;
+  safeSet(form, 'ACP', totalAcp !== 0 ? String(totalAcp) : '');
+  safeSet(form, 'ACF', (bdAsf + osAsf) !== 0 ? `${bdAsf + osAsf}%` : '');
+
   // ── Backup weapons (up to 3 slots) ────────────────────────────────────────
   const backupWeapons = character.inventory?.backupWeapons ?? [];
   for (let i = 0; i < 3; i++) {
