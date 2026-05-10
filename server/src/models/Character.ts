@@ -142,7 +142,7 @@ export interface ICharacter extends Document {
   name: string;
   player?: string;
   owner?: Types.ObjectId;
-  gender: 'male' | 'female' | 'other';
+  gender: 'Male' | 'Female' | 'Gender Neutral';
   race: string;
   alignment: string;
   deity?: string;
@@ -154,6 +154,8 @@ export interface ICharacter extends Document {
   skin?: string;
   languages: string[];
   size: string;
+  baseSpeed?: string;
+  speed?: number;
   description?: string;
   backstory?: string;
 
@@ -255,7 +257,7 @@ const characterSchema = new Schema<ICharacter>(
     name:        { type: String, required: true },
     player:      { type: String },
     owner:       { type: Schema.Types.ObjectId, ref: 'User', default: null },
-    gender:      { type: String, enum: ['male', 'female', 'other'], required: true },
+    gender:      { type: String, enum: ['Male', 'Female', 'Gender Neutral'], required: true },
     race:        { type: String, enum: RACES, required: true },
     alignment:   { type: String, enum: ALIGNMENTS, required: true },
     deity:       { type: String },
@@ -267,6 +269,8 @@ const characterSchema = new Schema<ICharacter>(
     skin:        { type: String },
     languages:   [{ type: String }],
     size:        { type: String, enum: Object.keys(SIZE_CATEGORIES), default: 'Medium' },
+    baseSpeed:   { type: String },
+    speed:       { type: Number },
     description: { type: String },
     backstory:   { type: String },
 

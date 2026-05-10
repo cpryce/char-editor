@@ -211,6 +211,8 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
   safeSet(form, 'diety', character.deity ?? '');
   safeSet(form, 'alignment', alignmentInitials(character.alignment));
   safeSet(form, 'size', character.size ?? '');
+  safeSet(form, 'baseSpeed', character.baseSpeed ?? '');
+  safeSet(form, 'speed',     character.speed != null ? String(character.speed) : '');
 
   // Race — dropdown has no pre-set options in the template; populate then select.
   try {
@@ -222,8 +224,7 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
   }
 
   // Gender — map model enum to PDF dropdown option.
-  const genderMap: Record<string, string> = { male: 'Male', female: 'Female', other: 'Gender Neutral' };
-  safeSetDropdown(form, 'gender', genderMap[character.gender] ?? '');
+  safeSetDropdown(form, 'gender', character.gender ?? '');
 
   // Appearance
   safeSet(form, 'height', character.height ?? '');

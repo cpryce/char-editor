@@ -27,6 +27,19 @@ export const RACIAL_SIZES: Readonly<Record<Race, Size>> = {
   'Half-Orc': 'Medium',
 };
 
+/** Default base land speed (ft) by size. Biped humanoid defaults per SRD. */
+export const BASE_SPEED_BY_SIZE: Readonly<Partial<Record<Size, number>>> = {
+  Fine: 5,
+  Diminutive: 10,
+  Tiny: 20,
+  Small: 20,
+  Medium: 30,
+  Large: 30,
+  Huge: 40,
+  Gargantuan: 50,
+  Colossal: 60,
+};
+
 export const CLASS_SKILL_POINTS_PER_LEVEL: Readonly<Record<ClassName, number>> = {
   Barbarian: 4,
   Bard: 6,
@@ -549,10 +562,11 @@ export function buildIterativeAttackString(
 export function newCharacterDraft(): CharacterDraft {
   return {
     name: '',
-    gender: 'male',
+    gender: 'Male',
     race: 'Human',
     alignment: 'True Neutral',
     size: RACIAL_SIZES.Human,
+    baseSpeed: '30',
     deity: '',
     age: '',
     height: '',

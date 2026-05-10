@@ -2,7 +2,7 @@ import type { CharacterDraft } from '../../types/character';
 import { RACES, ALIGNMENTS, GENDERS } from '../../types/character';
 import './IdentitySection.css';
 
-type IdentityTextField = 'deity' | 'age' | 'height' | 'weight' | 'eyes' | 'hair' | 'skin' | 'languages';
+type IdentityTextField = 'deity' | 'age' | 'height' | 'weight' | 'eyes' | 'hair' | 'skin' | 'languages' | 'baseSpeed';
 
 export function IdentitySection({
   draft,
@@ -81,15 +81,29 @@ export function IdentitySection({
           </select>
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium identity-label-text">Size</span>
-          <input
-            type="text"
-            value={draft.size}
-            readOnly
-            className="identity-input identity-input--readonly"
-          />
-        </label>
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-row gap-2">
+            <label className="flex flex-col gap-1 flex-1 min-w-0">
+              <span className="text-xs font-medium identity-label-text">Size</span>
+              <input
+                type="text"
+                value={draft.size}
+                readOnly
+                className="identity-input identity-input--readonly w-full"
+              />
+            </label>
+            <label className="flex flex-col gap-1" style={{ width: '72px', flexShrink: 0 }}>
+              <span className="text-xs font-medium identity-label-text">Speed (ft)</span>
+              <input
+                type="text"
+                value={draft.baseSpeed}
+                onChange={(e) => onTextFieldChange('baseSpeed', e.target.value)}
+                placeholder="30"
+                className="identity-input w-full"
+              />
+            </label>
+          </div>
+        </div>
 
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium identity-label-text">Deity</span>

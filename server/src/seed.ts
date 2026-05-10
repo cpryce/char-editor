@@ -132,7 +132,7 @@ async function seed() {
   // ── Full character ────────────────────────────────────────────────────────
   const aldric = {
     name:      'Aldric Ironforge',
-    gender:    'male' as const,
+    gender:    'Male' as const,
     race:      'Human' as const,
     alignment: 'Lawful Neutral' as const,
     deity:     'Heironeous',

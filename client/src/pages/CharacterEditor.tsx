@@ -24,6 +24,7 @@ import {
   mergeSelectableFeats,
   applyMaxDexCap,
   computeAcTotals,
+  BASE_SPEED_BY_SIZE,
 } from '../utils/characterHelpers';
 import { FEAT_BY_NAME } from '../data/feats';
 import { MATERIALS, applyMaxDexDelta } from '../data/materials';
@@ -237,6 +238,7 @@ function deriveCombatStats({
   classes,
   size,
   abilityMods,
+  baseSpeed,
 }: {
   combat: CharacterDraft['combat'];
   inventory: CharacterDraft['inventory'];
@@ -244,6 +246,7 @@ function deriveCombatStats({
   classes: CharacterDraft['classes'];
   size: CharacterDraft['size'];
   abilityMods: Record<AbilityKey, number>;
+  baseSpeed: string;
 }): CombatDerivedStats {
   const dexMod = abilityMods.dexterity;
   const conMod = abilityMods.constitution;
@@ -255,8 +258,9 @@ function deriveCombatStats({
   const acNatural = safeCombatNumber(combat.armorClass.natural);
   const acDeflection = safeCombatNumber(combat.armorClass.deflection);
   const initMisc = safeCombatNumber(combat.initiative.miscBonus);
-  const speedBase = safeCombatNumber(combat.speed.base);
-  const speedArmorAdjust = safeCombatNumber(combat.speed.armorAdjust);
+  const speedBase = parseInt(baseSpeed) || 30;
+  const armoredSpeedFt = inventory.body?.speed ? parseInt(inventory.body.speed) : NaN;
+  const speedArmorAdjust = inventory.body?.speed && !isNaN(armoredSpeedFt) ? armoredSpeedFt - speedBase : 0;
   const speedFly = safeCombatNumber(combat.speed.fly);
   const speedSwim = safeCombatNumber(combat.speed.swim);
   const bab = baseAttackBonusFromClasses(classes);
@@ -457,6 +461,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
     classes: draft.classes,
     size: draft.size,
     abilityMods,
+    baseSpeed: draft.baseSpeed,
   });
   const combatSummary = `AC ${combatStats.totalAC} · Init ${signed(combatStats.initiativeTotal)} · F/R/W ${signed(combatStats.fortitudeTotal)}/${signed(combatStats.reflexTotal)}/${signed(combatStats.willTotal)}`;
   const inventorySummary = [
@@ -629,6 +634,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           race: (data.race as CharacterDraft['race']) ?? base.race,
           alignment: (data.alignment as CharacterDraft['alignment']) ?? base.alignment,
           size: (data.size as CharacterDraft['size']) ?? base.size,
+          baseSpeed: typeof data.baseSpeed === 'string' ? data.baseSpeed : typeof data.baseSpeed === 'number' ? String(data.baseSpeed) : String(BASE_SPEED_BY_SIZE[(data.size as CharacterDraft['size']) ?? base.size] ?? 30),
           deity: typeof data.deity === 'string' ? data.deity : '',
           age: typeof data.age === 'number' ? String(data.age) : '',
           height: typeof data.height === 'string' ? data.height : '',
@@ -795,7 +801,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
       }));
       const derivedFeats = deriveSelectableFeats(d.classes, race);
       const feats = mergeSelectableFeats(d.feats, derivedFeats);
-      return { ...d, race, size: RACIAL_SIZES[race], abilityScores: newScores, skills, feats };
+      return { ...d, race, size: RACIAL_SIZES[race], baseSpeed: String(BASE_SPEED_BY_SIZE[RACIAL_SIZES[race]] ?? 30), abilityScores: newScores, skills, feats };
     });
   }, []);
 
@@ -840,6 +846,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
           );
           const body = {
             ...draft,
+            speed: combatStats.speedFeet,
             inventory: inventoryWithComputedAttacks,
             age: draft.age ? Number(draft.age) : undefined,
             languages: draft.languages ? draft.languages.split(',').map((s) => s.trim()).filter(Boolean) : [],
@@ -853,6 +860,11 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
             combat: {
               ...draft.combat,
               baseAttackBonus: combatStats.bab,
+              speed: {
+                ...draft.combat.speed,
+                base:        combatStats.speedBase,
+                armorAdjust: combatStats.speedArmorAdjust,
+              },
               saves: {
                 ...draft.combat.saves,
                 fortitude: {

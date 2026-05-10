@@ -10,7 +10,7 @@ export const ALIGNMENTS = [
 ] as const;
 export type Alignment = (typeof ALIGNMENTS)[number];
 
-export const GENDERS = ['male', 'female', 'other'] as const;
+export const GENDERS = ['Male', 'Female', 'Gender Neutral'] as const;
 export type Gender = (typeof GENDERS)[number];
 
 export const SIZES = ['Fine','Diminutive','Tiny','Small','Medium','Large','Huge','Gargantuan','Colossal'] as const;
@@ -158,6 +158,7 @@ export interface CharacterDraft {
   race: Race;
   alignment: Alignment;
   size: Size;
+  baseSpeed: string;
   deity: string;
   age: string;
   height: string;
