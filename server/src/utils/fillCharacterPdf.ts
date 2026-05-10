@@ -462,6 +462,44 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
     } catch { /* field not yet in template — skip */ }
   };
 
+  /** Attach a Validate (on-change) JS action to a field — fires when user commits a new value. */
+  const addOnChange = (fieldName: string, jsCode: string): void => {
+    try {
+      const f = form.getField(fieldName);
+      const fDict = (f as any).acroField.dict as PDFDict;
+      const act = PDFDict.withContext(pdfDoc.context);
+      act.set(PDFName.of('S'), PDFName.of('JavaScript'));
+      act.set(PDFName.of('JS'), PDFString.of(jsCode));
+      // Merge into existing AA dict if present, otherwise create one.
+      let aa = fDict.lookupMaybe(PDFName.of('AA'), PDFDict);
+      if (!aa) { aa = PDFDict.withContext(pdfDoc.context); fDict.set(PDFName.of('AA'), aa); }
+      aa.set(PDFName.of('V'), act);
+    } catch { /* field not yet in template — skip */ }
+  };
+
+  // ── Race change handler ──────────────────────────────────────────────────
+  // When user selects a different race in Acrobat, update: size label,
+  // size bonus to AC, and base land speed.
+  addOnChange('race', [
+    'var rd={',
+    '  "Human":    {z:"Medium",s:30,a:0},',
+    '  "Elf":      {z:"Medium",s:30,a:0},',
+    '  "Dwarf":    {z:"Medium",s:20,a:0},',
+    '  "Gnome":    {z:"Small", s:20,a:1},',
+    '  "Halfling": {z:"Small", s:20,a:1},',
+    '  "Half-Elf": {z:"Medium",s:30,a:0},',
+    '  "Half-Orc": {z:"Medium",s:30,a:0}',
+    '};',
+    'var d=rd[event.value];',
+    'if(d){',
+    '  var f;',
+    '  f=this.getField("size");            if(f)f.value=d.z;',
+    '  f=this.getField("combat.armorClass.size"); if(f)f.value=d.a||"";',
+    '  f=this.getField("body.speed");      if(f&&f.value==="")f.value=d.s+" ft.";',
+    '  f=this.getField("combat.speed.base");if(f)f.value=d.s+" ft.";',
+    '}',
+  ].join('\n'));
+
   // 1. Ability totals: base + racial + enhancement + misc + levelUp
   for (const key of ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma']) {
     const p = `abilityScores.${key}`;
