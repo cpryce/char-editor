@@ -209,8 +209,11 @@ export function generateStatBlock(draft: CharacterDraft): StatBlockData {
     fullAtkText = formatWeaponAttack(offHandWeapon, weaponAttackString(offHandWeapon, meleeBonus, rangedBonus, bab));
   }
 
-  // Speed
-  const speedFeet = Math.max(0, safe(draft.combat.speed.base) + safe(draft.combat.speed.armorAdjust));
+  // Speed — derive from baseSpeed + worn armor, matching CharacterEditor derivation
+  const speedBase = parseInt(draft.baseSpeed ?? '') || 30;
+  const armoredSpeedFt = draft.inventory.body?.speed ? parseInt(draft.inventory.body.speed) : NaN;
+  const speedArmorAdjust = draft.inventory.body?.speed && !isNaN(armoredSpeedFt) ? armoredSpeedFt - speedBase : 0;
+  const speedFeet = Math.max(0, speedBase + speedArmorAdjust);
   const speedFly  = safe(draft.combat.speed.fly);
   const speedSwim = safe(draft.combat.speed.swim);
   const speedParts: string[] = [`${speedFeet} ft.`];
