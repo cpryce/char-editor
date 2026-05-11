@@ -400,7 +400,7 @@ function App() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto" style={{ scrollbarGutter: 'stable' }}>
         <div className="container-xl">
           {section === 'custom-feats' && (
             <CustomFeatsPage />
