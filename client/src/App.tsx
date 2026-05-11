@@ -3,6 +3,7 @@ import { CharactersPage } from './pages/CharactersPage';
 import { CharacterEditor } from './pages/CharacterEditor';
 import { CustomFeatsPage } from './pages/CustomFeatsPage';
 import { InitiativeTrackerPage } from './pages/InitiativeTrackerPage';
+import { NameGeneratorPage } from './pages/NameGeneratorPage';
 import type { ClassName } from './types/character';
 import './App.css';
 
@@ -13,7 +14,7 @@ interface User {
   avatar?: string;
 }
 
-type Section = 'characters' | 'custom-feats' | 'initiative-tracker';
+type Section = 'characters' | 'custom-feats' | 'initiative-tracker' | 'name-generator';
 type View = 'list' | 'new' | 'edit';
 type Theme = 'light' | 'dark';
 
@@ -390,6 +391,7 @@ function App() {
               onNavigate={navigate}
               items={[
                 { id: 'initiative-tracker', label: 'Initiative Tracker' },
+                { id: 'name-generator',     label: 'Name Generator' },
               ]}
             />
             <button type="button" disabled className="nav-placeholder-btn">
@@ -409,6 +411,9 @@ function App() {
           )}
           {section === 'initiative-tracker' && (
             <InitiativeTrackerPage />
+          )}
+          {section === 'name-generator' && (
+            <NameGeneratorPage />
           )}
           {section === 'characters' && view === 'list' && (
             <CharactersPage
