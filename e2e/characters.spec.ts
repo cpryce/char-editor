@@ -26,8 +26,8 @@ test.describe('Characters Page', () => {
   test('renders character names in the table', async ({ page }) => {
     await gotoApp(page);
 
-    await expect(page.getByRole('cell', { name: 'Aldric Stonehammer' })).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Sylara Moonshadow' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'Aldric Stonehammer', exact: true })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'Sylara Moonshadow', exact: true })).toBeVisible();
   });
 
   test('renders class and level for each character', async ({ page }) => {
@@ -64,24 +64,27 @@ test.describe('Characters Page', () => {
     await expect(page.getByRole('heading', { name: 'New Character', level: 2 })).toBeVisible();
   });
 
-  test('Characters sidebar item is active when on the list', async ({ page }) => {
+  test('Characters nav item is reachable from Character Editor menu', async ({ page }) => {
     await gotoApp(page);
 
-    const charactersBtn = page.getByRole('button', { name: 'Characters' });
+    await page.getByRole('button', { name: 'Character Editor' }).click();
+    const charactersBtn = page.getByRole('menuitem', { name: 'Characters' });
     await expect(charactersBtn).toBeVisible();
     await expect(charactersBtn).toBeEnabled();
   });
 
-  test('Custom Skills sidebar item is disabled', async ({ page }) => {
+  test('Custom Skills nav item is disabled', async ({ page }) => {
     await gotoApp(page);
 
-    await expect(page.getByRole('button', { name: 'Custom Skills' })).toBeDisabled();
+    await page.getByRole('button', { name: 'Character Editor' }).click();
+    await expect(page.getByRole('menuitem', { name: 'Custom Skills' })).toBeDisabled();
   });
 
-  test('Custom Feats sidebar item is disabled', async ({ page }) => {
+  test('Custom Feats nav item is enabled', async ({ page }) => {
     await gotoApp(page);
 
-    await expect(page.getByRole('button', { name: 'Custom Feats' })).toBeDisabled();
+    await page.getByRole('button', { name: 'Character Editor' }).click();
+    await expect(page.getByRole('menuitem', { name: 'Custom Feats' })).toBeEnabled();
   });
 
   test('shows an error message when the API request fails', async ({ page }) => {

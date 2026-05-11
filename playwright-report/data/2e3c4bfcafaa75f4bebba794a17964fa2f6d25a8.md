@@ -1,0 +1,295 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: characters.spec.ts >> Characters Page >> "+ Character" button navigates to the editor
+- Location: e2e/characters.spec.ts:53:7
+
+# Error details
+
+```
+Error: expect(locator).toBeVisible() failed
+
+Locator: getByRole('heading', { name: 'New Character', level: 2 })
+Expected: visible
+Timeout: 5000ms
+Error: element(s) not found
+
+Call log:
+  - Expect "toBeVisible" with timeout 5000ms
+  - waiting for getByRole('heading', { name: 'New Character', level: 2 })
+
+```
+
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]: AD&D (3.5e) Tools
+    - button "Test User ▾" [ref=e7] [cursor=pointer]:
+      - generic [ref=e8]: Test User
+      - generic [ref=e9]: ▾
+  - generic [ref=e10]:
+    - navigation [ref=e11]:
+      - generic [ref=e12]:
+        - generic [ref=e13]: Characters
+        - list [ref=e14]:
+          - listitem [ref=e15]:
+            - button "List" [ref=e16] [cursor=pointer]
+          - listitem [ref=e17]:
+            - button "+ New" [ref=e18] [cursor=pointer]
+          - listitem [ref=e19]:
+            - button "Custom Feats" [ref=e20] [cursor=pointer]
+      - generic [ref=e21]:
+        - generic [ref=e22]: Tools
+        - list [ref=e23]:
+          - listitem [ref=e24]:
+            - button "Initiative Tracker" [ref=e25] [cursor=pointer]
+    - main [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - button "Back to characters" [ref=e29] [cursor=pointer]:
+            - img [ref=e30]
+          - img [ref=e33]
+          - heading "Create Character" [level=2] [ref=e37]
+        - generic [ref=e38]:
+          - generic [ref=e39]:
+            - button "Identity" [expanded] [ref=e40] [cursor=pointer]:
+              - img [ref=e41]
+              - generic [ref=e43]: Identity
+            - generic [ref=e44]:
+              - generic [ref=e45]:
+                - generic [ref=e46]:
+                  - generic [ref=e47]: Name*
+                  - textbox "Name*" [ref=e48]:
+                    - /placeholder: Character name
+                - generic [ref=e49]:
+                  - generic [ref=e50]: Gender
+                  - combobox "Gender" [ref=e51]:
+                    - option "Male" [selected]
+                    - option "Female"
+                    - option "Gender Neutral"
+                - generic [ref=e52]:
+                  - generic [ref=e53]: Race
+                  - combobox "Race" [ref=e54]:
+                    - option "Human" [selected]
+                    - option "Elf"
+                    - option "Dwarf"
+                    - option "Gnome"
+                    - option "Halfling"
+                    - option "Half-Elf"
+                    - option "Half-Orc"
+                - generic [ref=e55]:
+                  - generic [ref=e56]: Alignment
+                  - combobox "Alignment" [ref=e57]:
+                    - option "Lawful Good"
+                    - option "Neutral Good"
+                    - option "Chaotic Good"
+                    - option "Lawful Neutral"
+                    - option "True Neutral" [selected]
+                    - option "Chaotic Neutral"
+                    - option "Lawful Evil"
+                    - option "Neutral Evil"
+                    - option "Chaotic Evil"
+                - generic [ref=e59]:
+                  - generic [ref=e60]:
+                    - generic [ref=e61]: Size
+                    - textbox "Size" [ref=e62]: Medium
+                  - generic [ref=e63]:
+                    - generic [ref=e64]: Speed (ft)
+                    - textbox "Speed (ft)" [ref=e65]:
+                      - /placeholder: "30"
+                      - text: "30"
+                - generic [ref=e66]:
+                  - generic [ref=e67]: Deity
+                  - textbox "Deity" [ref=e68]
+                - generic [ref=e69]:
+                  - generic [ref=e70]: Age
+                  - textbox "Age" [ref=e71]:
+                    - /placeholder: e.g. 25
+                - generic [ref=e72]:
+                  - generic [ref=e73]: Height
+                  - textbox "Height" [ref=e74]:
+                    - /placeholder: e.g. 5'10"
+                - generic [ref=e75]:
+                  - generic [ref=e76]: Weight
+                  - textbox "Weight" [ref=e77]:
+                    - /placeholder: e.g. 180 lbs
+                - generic [ref=e78]:
+                  - generic [ref=e79]: Eyes
+                  - textbox "Eyes" [ref=e80]
+                - generic [ref=e81]:
+                  - generic [ref=e82]: Hair
+                  - textbox "Hair" [ref=e83]
+                - generic [ref=e84]:
+                  - generic [ref=e85]: Skin
+                  - textbox "Skin" [ref=e86]
+              - generic [ref=e87]:
+                - generic [ref=e88]: Languages (comma-separated)
+                - textbox "Languages (comma-separated)" [ref=e89]:
+                  - /placeholder: Common, Elvish...
+          - button "Class & Level *" [ref=e91] [cursor=pointer]:
+            - img [ref=e92]
+            - generic [ref=e94]: Class & Level *
+          - button "Ability Scores Str 8Dex 8Con 8Int 8Wis 8Cha 8" [ref=e96] [cursor=pointer]:
+            - img [ref=e97]
+            - generic [ref=e99]: Ability Scores
+            - generic [ref=e100]:
+              - generic [ref=e101]:
+                - strong [ref=e102]: Str
+                - text: "8"
+              - generic [ref=e103]:
+                - strong [ref=e104]: Dex
+                - text: "8"
+              - generic [ref=e105]:
+                - strong [ref=e106]: Con
+                - text: "8"
+              - generic [ref=e107]:
+                - strong [ref=e108]: Int
+                - text: "8"
+              - generic [ref=e109]:
+                - strong [ref=e110]: Wis
+                - text: "8"
+              - generic [ref=e111]:
+                - strong [ref=e112]: Cha
+                - text: "8"
+          - button "Feats 0 features · 0 slots" [ref=e114] [cursor=pointer]:
+            - img [ref=e115]
+            - generic [ref=e117]: Feats
+            - generic [ref=e118]: 0 features · 0 slots
+          - button "Combat AC 9 · Init -1 · F/R/W -1/-1/-1" [ref=e120] [cursor=pointer]:
+            - img [ref=e121]
+            - generic [ref=e123]: Combat
+            - generic [ref=e124]: AC 9 · Init -1 · F/R/W -1/-1/-1
+          - button "Inventory No items equipped" [ref=e126] [cursor=pointer]:
+            - img [ref=e127]
+            - generic [ref=e129]: Inventory
+            - generic [ref=e130]: No items equipped
+          - button "Skills 0 / 0 pts allocated" [ref=e132] [cursor=pointer]:
+            - img [ref=e133]
+            - generic [ref=e135]: Skills
+            - generic [ref=e136]: 0 / 0 pts allocated
+          - button "Background" [ref=e138] [cursor=pointer]:
+            - img [ref=e139]
+            - generic [ref=e141]: Background
+  - complementary [ref=e142]:
+    - generic [ref=e143]:
+      - heading "Settings" [level=3] [ref=e144]
+      - button "Close" [ref=e145] [cursor=pointer]
+    - generic [ref=e147]:
+      - generic [ref=e148]: Theme
+      - switch "Theme toggle" [ref=e149] [cursor=pointer]:
+        - generic [ref=e151]:
+          - generic [ref=e152]: Light
+          - generic [ref=e153]: Dark
+```
+
+# Test source
+
+```ts
+  1  | import { test, expect } from '@playwright/test';
+  2  | import { gotoApp, MOCK_CHARACTERS } from './fixtures';
+  3  | 
+  4  | test.describe('Characters Page', () => {
+  5  |   test('shows the Characters heading', async ({ page }) => {
+  6  |     await gotoApp(page);
+  7  | 
+  8  |     await expect(page.getByRole('heading', { name: 'Characters', level: 2 })).toBeVisible();
+  9  |   });
+  10 | 
+  11 |   test('renders all table column headers', async ({ page }) => {
+  12 |     await gotoApp(page);
+  13 | 
+  14 |     for (const header of ['Name', 'Class', 'Level', 'Last Modified']) {
+  15 |       await expect(page.getByRole('columnheader', { name: header })).toBeVisible();
+  16 |     }
+  17 |   });
+  18 | 
+  19 |   test('shows empty state when no characters exist', async ({ page }) => {
+  20 |     await gotoApp(page, []);
+  21 | 
+  22 |     await expect(page.getByText('No characters yet.')).toBeVisible();
+  23 |     await expect(page.getByRole('button', { name: 'Create a new character' })).toBeVisible();
+  24 |   });
+  25 | 
+  26 |   test('renders character names in the table', async ({ page }) => {
+  27 |     await gotoApp(page);
+  28 | 
+  29 |     await expect(page.getByRole('cell', { name: 'Aldric Stonehammer' })).toBeVisible();
+  30 |     await expect(page.getByRole('cell', { name: 'Sylara Moonshadow' })).toBeVisible();
+  31 |   });
+  32 | 
+  33 |   test('renders class and level for each character', async ({ page }) => {
+  34 |     await gotoApp(page);
+  35 | 
+  36 |     await expect(page.getByRole('cell', { name: 'Fighter' })).toBeVisible();
+  37 |     await expect(page.getByRole('cell', { name: 'Wizard' })).toBeVisible();
+  38 | 
+  39 |     // Levels
+  40 |     const rows = page.getByRole('row');
+  41 |     await expect(rows.nth(1).getByRole('cell').nth(2)).toContainText('3');
+  42 |     await expect(rows.nth(2).getByRole('cell').nth(2)).toContainText('5');
+  43 |   });
+  44 | 
+  45 |   test('renders formatted Last Modified dates', async ({ page }) => {
+  46 |     await gotoApp(page);
+  47 | 
+  48 |     // Dates come from the mock characters — verify at least one date cell is non-empty
+  49 |     const dateCell = page.getByRole('row').nth(1).getByRole('cell').nth(3);
+  50 |     await expect(dateCell).not.toBeEmpty();
+  51 |   });
+  52 | 
+  53 |   test('"+ Character" button navigates to the editor', async ({ page }) => {
+  54 |     await gotoApp(page);
+  55 | 
+  56 |     await page.getByRole('button', { name: '+ Character' }).click();
+> 57 |     await expect(page.getByRole('heading', { name: 'New Character', level: 2 })).toBeVisible();
+     |                                                                                  ^ Error: expect(locator).toBeVisible() failed
+  58 |   });
+  59 | 
+  60 |   test('"Create a new character" link navigates to the editor', async ({ page }) => {
+  61 |     await gotoApp(page, []);
+  62 | 
+  63 |     await page.getByRole('button', { name: 'Create a new character' }).click();
+  64 |     await expect(page.getByRole('heading', { name: 'New Character', level: 2 })).toBeVisible();
+  65 |   });
+  66 | 
+  67 |   test('Characters sidebar item is active when on the list', async ({ page }) => {
+  68 |     await gotoApp(page);
+  69 | 
+  70 |     const charactersBtn = page.getByRole('button', { name: 'Characters' });
+  71 |     await expect(charactersBtn).toBeVisible();
+  72 |     await expect(charactersBtn).toBeEnabled();
+  73 |   });
+  74 | 
+  75 |   test('Custom Skills sidebar item is disabled', async ({ page }) => {
+  76 |     await gotoApp(page);
+  77 | 
+  78 |     await expect(page.getByRole('button', { name: 'Custom Skills' })).toBeDisabled();
+  79 |   });
+  80 | 
+  81 |   test('Custom Feats sidebar item is disabled', async ({ page }) => {
+  82 |     await gotoApp(page);
+  83 | 
+  84 |     await expect(page.getByRole('button', { name: 'Custom Feats' })).toBeDisabled();
+  85 |   });
+  86 | 
+  87 |   test('shows an error message when the API request fails', async ({ page }) => {
+  88 |     await page.route('**/auth/me', (route) =>
+  89 |       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'u1', name: 'Test User', email: 'test@example.com' }) })
+  90 |     );
+  91 |     await page.route('**/api/characters', (route) =>
+  92 |       route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Internal Server Error' }) })
+  93 |     );
+  94 | 
+  95 |     await page.goto('/');
+  96 |     await expect(page.getByText('Failed to load characters')).toBeVisible();
+  97 |   });
+  98 | });
+  99 | 
+```

@@ -14,11 +14,13 @@ interface NavSection {
 
 const NAV_SECTIONS: NavSection[] = [
   {
+    id: 'characters',
     label: 'Characters',
     items: [
       { id: 'characters', label: 'List', sub: true },
       { id: 'characters-new', label: '+ New', sub: true },
       { id: 'custom-feats', label: 'Custom Feats', sub: true },
+      { id: 'custom-skills', label: 'Custom Skills', sub: true, placeholder: true },
     ],
   },
   {

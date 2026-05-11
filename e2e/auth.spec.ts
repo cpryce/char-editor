@@ -19,20 +19,20 @@ test.describe('Authentication', () => {
     ).toHaveAttribute('href', '/auth/google');
   });
 
-  test('sign-in page does not show the sidebar', async ({ page }) => {
+  test('sign-in page does not show the nav menu', async ({ page }) => {
     await mockUnauthenticated(page);
     await page.goto('/');
 
-    await expect(page.getByRole('button', { name: 'Characters' })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Character Editor' })).not.toBeVisible();
   });
 
   test('authenticated user sees full app layout', async ({ page }) => {
     await gotoApp(page);
 
     await expect(page.getByText(MOCK_USER.name)).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Characters' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Character Editor' })).toBeVisible();
     // Header bar brand name (a <span>, not a heading)
-    await expect(page.locator('header').getByText('char-editor')).toBeVisible();
+    await expect(page.locator('header').getByText('AD&D (3.5e) Tools')).toBeVisible();
   });
 
   test('user menu shows email when opened', async ({ page }) => {
@@ -49,7 +49,7 @@ test.describe('Authentication', () => {
     await page.getByRole('button', { name: /Test User/ }).click();
     const settingsBtn = page.getByRole('button', { name: 'Settings' });
     await expect(settingsBtn).toBeVisible();
-    await expect(settingsBtn).toBeDisabled();
+    await expect(settingsBtn).toBeEnabled();
   });
 
   test('sign out calls logout endpoint and returns to sign-in', async ({ page }) => {

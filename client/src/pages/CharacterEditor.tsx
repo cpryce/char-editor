@@ -162,25 +162,16 @@ function Accordion({
 
   return (
     <div>
-      {open ? (
+      <div role="heading" aria-level={3}>
         <button
           type="button"
-          aria-expanded="true"
-          onClick={() => setOpen(false)}
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
           className={buttonClasses}
         >
           {accordionHeader}
         </button>
-      ) : (
-        <button
-          type="button"
-          aria-expanded="false"
-          onClick={() => setOpen(true)}
-          className={buttonClasses}
-        >
-          {accordionHeader}
-        </button>
-      )}
+      </div>
       {open && (
         <div className="flex flex-col gap-4 character-editor-accordion-body">
           {children}
@@ -477,7 +468,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
     && !hasUnselectedClass;
   const headerTitle = isEdit
     ? (draft.name.trim() || 'Edit Character')
-    : (draft.name.trim() && draft.classes[0]?.name?.trim() ? draft.name.trim() : 'Create Character');
+    : 'New Character';
 
   // Custom feats filtered to those available for this character's classes
   const characterClassNames = useMemo(
@@ -1076,6 +1067,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
         <Accordion
           title={<>Class &amp; Level <span className="character-editor-required-star">*</span></>}
           summary={draft.classes.filter((c) => c.name).map((c) => `${c.name} ${c.level}`).join(' / ') || undefined}
+          defaultOpen={!isEdit}
         >
           <ClassLevelSection
             classes={draft.classes}
@@ -1092,6 +1084,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
         {/* ── Ability Scores ── */}
         <Accordion
           title="Ability Scores"
+          defaultOpen={!isEdit}
           summary={(
             <>
               <span className="character-editor-summary-item"><strong>Str</strong> {abilityTotals.strength}</span>
@@ -1168,6 +1161,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
         {/* ── Skills ── */}
         <Accordion
           title="Skills"
+          defaultOpen={!isEdit}
           summary={`${spentPoints} / ${availableSkillPoints} pts allocated`}
         >
           <SkillsSection

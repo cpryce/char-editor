@@ -163,8 +163,120 @@
 .app-topbar {
   border-bottom: 1px solid var(--color-border-default);
   background: var(--color-canvas-subtle);
+  height: 48px;
 }
 
 .app-topbar-title {
   color: var(--color-fg-default);
+}
+
+/* ── Header nav ─────────────────────────────────────────────── */
+
+.nav-dropdown-root {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.nav-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-fg-default);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 80ms ease;
+  white-space: nowrap;
+}
+
+.nav-dropdown-trigger:hover {
+  color: var(--color-fg-default);
+  text-decoration: none;
+  border-bottom-color: var(--color-border-default);
+}
+
+.nav-dropdown-trigger--active {
+  border-bottom: 2px solid var(--fgColor-accent);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.nav-dropdown-chevron {
+  color: var(--color-fg-muted);
+  transition: transform 120ms ease;
+  flex-shrink: 0;
+}
+
+.nav-dropdown-chevron--open {
+  transform: rotate(180deg);
+}
+
+.nav-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 168px;
+  background: var(--color-canvas-overlay);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  overflow: hidden;
+  padding: 4px;
+}
+
+.nav-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-default);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.nav-dropdown-item:hover:not(:disabled) {
+  background: var(--color-neutral-muted);
+}
+
+.nav-dropdown-item--active {
+  font-weight: 600;
+  color: var(--color-accent-fg);
+}
+
+.nav-dropdown-item:disabled {
+  color: var(--color-fg-subtle);
+  cursor: not-allowed;
+}
+
+.nav-divider {
+  color: var(--color-border-default);
+  font-size: 12px;
+  -webkit-user-select: none;
+  user-select: none;
+  padding: 0 2px;
+  align-self: center;
+}
+
+.nav-placeholder-btn {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  padding: 5px 10px;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-fg-subtle);
+  background: transparent;
+  border: none;
+  cursor: not-allowed;
 }

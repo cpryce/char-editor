@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sidebar } from './components/Sidebar';
 import { CharactersPage } from './pages/CharactersPage';
 import { CharacterEditor } from './pages/CharacterEditor';
 import { CustomFeatsPage } from './pages/CustomFeatsPage';
@@ -87,6 +86,84 @@ function UserMenu({ user, onLogout, onOpenSettings }: { user: User; onLogout: ()
   );
 }
 
+// ── Nav dropdown ─────────────────────────────────────────────────────────────
+
+interface NavDropdownItem {
+  id: string;
+  label: string;
+  placeholder?: boolean;
+}
+
+function NavDropdown({
+  label, items, active, onNavigate,
+}: {
+  label: string;
+  items: NavDropdownItem[];
+  active: string;
+  onNavigate: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const hasActiveItem = items.some((i) => !i.placeholder && i.id === active);
+
+  return (
+    <div ref={ref} className="nav-dropdown-root">
+      <a
+        role="button"
+        tabIndex={0}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setOpen((o) => !o)}
+        className={[
+          'nav-dropdown-trigger',
+          hasActiveItem ? 'nav-dropdown-trigger--active' : '',
+        ].join(' ')}
+      >
+        {label}
+        <svg
+          width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true"
+          className={['nav-dropdown-chevron', open ? 'nav-dropdown-chevron--open' : ''].join(' ')}
+        >
+          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </a>
+
+      {open && (
+        <div role="menu" className="nav-dropdown-menu">
+          {items.map((item) => (
+            <button
+              key={item.id}
+              role="menuitem"
+              type="button"
+              disabled={item.placeholder}
+              onClick={() => { onNavigate(item.id); setOpen(false); }}
+              className={[
+                'nav-dropdown-item',
+                item.id === active ? 'nav-dropdown-item--active' : '',
+              ].join(' ')}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Settings flyout ───────────────────────────────────────────────────────────
 function SettingsFlyout({
   open,
   onClose,
@@ -264,29 +341,64 @@ function App() {
     );
   }
 
+  function navigate(id: string) {
+    if (id === 'characters-new') {
+      setSection('characters');
+      setSelectedCharacterId(null);
+      setView('new');
+    } else {
+      setSection(id as Section);
+      setSelectedCharacterId(null);
+      setView('list');
+    }
+  }
+
+  const activeNav = section === 'characters' && view === 'new' ? 'characters-new' : section;
+
   return (
     <div className="flex flex-col h-screen app-root">
       {/* Top bar */}
-      <header className="flex items-center justify-between px-4 py-2 shrink-0 app-topbar">
-        <span className="font-semibold text-base app-topbar-title">
-          AD&D (3.5e) Tools
-        </span>
-        <UserMenu user={user} onLogout={logout} onOpenSettings={() => setSettingsOpen(true)} />
+      <header className="shrink-0 app-topbar">
+        <div className="container-xl flex items-center gap-4 h-full px-4">
+          <span className="font-semibold text-base app-topbar-title mr-4">
+            AD&amp;D (3.5e) Tools
+          </span>
+
+          {/* Primary nav */}
+          <nav className="flex items-stretch self-stretch gap-1 flex-1">
+            <NavDropdown
+              label="Character Editor"
+              active={activeNav}
+              onNavigate={navigate}
+              items={[
+                { id: 'characters',     label: 'Characters' },
+                { id: 'characters-new', label: '+ New Character' },
+                { id: 'custom-feats',   label: 'Custom Feats' },
+                { id: 'custom-skills',  label: 'Custom Skills', placeholder: true },
+              ]}
+            />
+            <span className="nav-divider" aria-hidden="true">|</span>
+            <NavDropdown
+              label="Tools"
+              active={activeNav}
+              onNavigate={navigate}
+              items={[
+                { id: 'initiative-tracker', label: 'Initiative Tracker' },
+              ]}
+            />
+            <span className="nav-divider" aria-hidden="true">|</span>
+            <button type="button" disabled className="nav-placeholder-btn">
+              Campaigns
+            </button>
+          </nav>
+
+          <UserMenu user={user} onLogout={logout} onOpenSettings={() => setSettingsOpen(true)} />
+        </div>
       </header>
 
-      {/* Body: sidebar + content */}
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar active={section === 'characters' && view === 'new' ? 'characters-new' : section} onNavigate={(id) => {
-            if (id === 'characters-new') {
-              setSection('characters');
-              setSelectedCharacterId(null);
-              setView('new');
-            } else {
-              setSection(id as Section);
-              setView('list');
-            }
-          }} />
-        <main className="flex-1 overflow-y-auto pb-6">
+      {/* Main content */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="container-xl">
           {section === 'custom-feats' && (
             <CustomFeatsPage />
           )}
@@ -319,8 +431,8 @@ function App() {
               }}
             />
           )}
-        </main>
-      </div>
+        </div>
+      </main>
 
       <SettingsFlyout
         open={settingsOpen}

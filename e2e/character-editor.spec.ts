@@ -45,7 +45,7 @@ test.describe('Character Editor', () => {
 
       await expect(page.getByRole('heading', { name: /^Hit Points$/i, level: 3 })).toHaveCount(0);
       await expect(page.getByRole('textbox', { name: 'Hit Points' })).toBeVisible();
-      await expect(page.getByRole('textbox', { name: 'Hit Points' })).toHaveValue('');
+      await expect(page.getByRole('textbox', { name: 'Hit Points' })).toHaveValue('0');
     });
 
     test('shows Ability Score rows (STR, DEX, CON, INT, WIS, CHA)', async ({ page }) => {
@@ -65,7 +65,7 @@ test.describe('Character Editor', () => {
       await openEditor(page);
 
       for (const label of ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']) {
-        await expect(abilityRow(page, label).locator('input[type="number"]')).toHaveValue('8');
+        await expect(abilityRow(page, label).locator('input[type="number"]').first()).toHaveValue('8');
       }
 
       await expect(page.getByText('0 / 28 points spent · 28 remaining')).toBeVisible();
@@ -77,64 +77,100 @@ test.describe('Character Editor', () => {
       await expect(page.getByRole('heading', { name: /skills/i, level: 3 })).toBeVisible();
       await expect(page.getByRole('columnheader', { name: 'Skill' })).toBeVisible();
       await expect(page.getByRole('columnheader', { name: 'Ranks' })).toBeVisible();
-      await expect(page.getByRole('columnheader', { name: 'Bonus' })).toBeVisible();
+      await expect(page.getByRole('columnheader', { name: 'Bonus', exact: true })).toBeVisible();
     });
 
     test('shows both Cancel buttons (top and bottom of form)', async ({ page }) => {
       await openEditor(page);
 
-      await expect(page.getByRole('button', { name: 'Cancel' })).toHaveCount(2);
+      await expect(page.getByRole('button', { name: 'Back to characters' })).toBeVisible();
     });
   });
 
   test.describe('Navigation', () => {
-    test('top Cancel button returns to the character list', async ({ page }) => {
+    test('back button returns to the character list', async ({ page }) => {
       await openEditor(page);
 
-      await page.getByRole('button', { name: 'Cancel' }).first().click();
+      await page.getByRole('button', { name: 'Back to characters' }).click();
       await expect(page.getByRole('heading', { name: 'Characters', level: 2 })).toBeVisible();
     });
 
-    test('bottom Cancel button returns to the character list', async ({ page }) => {
+    test('Character Editor nav menu → Characters returns to the character list', async ({ page }) => {
       await openEditor(page);
 
-      await page.getByRole('button', { name: 'Cancel' }).last().click();
+      await page.getByRole('button', { name: 'Character Editor' }).click();
+      await page.getByRole('menuitem', { name: 'Characters' }).click();
       await expect(page.getByRole('heading', { name: 'Characters', level: 2 })).toBeVisible();
     });
   });
 
   test.describe('Form Validation', () => {
-    test('Save Character is disabled when name and class are empty', async ({ page }) => {
-      await openEditor(page);
-
-      await expect(page.getByRole('button', { name: 'Save Character' })).toBeDisabled();
+    test('autosave does not fire when name and class are empty', async ({ page }) => {
+      let postCount = 0;
+      await mockAuth(page);
+      await page.route('**/api/characters', async (route) => {
+        if (route.request().method() === 'POST') { postCount++; }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      });
+      await page.goto('/');
+      await page.getByRole('button', { name: '+ Character' }).click();
+      await expect(page.getByRole('heading', { name: 'New Character', level: 2 })).toBeVisible();
+      await page.waitForTimeout(800);
+      expect(postCount).toBe(0);
     });
 
-    test('Save Character is disabled when name is filled but no class selected', async ({ page }) => {
-      await openEditor(page);
-
+    test('autosave does not fire when name is filled but no class selected', async ({ page }) => {
+      let postCount = 0;
+      await mockAuth(page);
+      await page.route('**/api/characters', async (route) => {
+        if (route.request().method() === 'POST') { postCount++; }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      });
+      await page.goto('/');
+      await page.getByRole('button', { name: '+ Character' }).click();
       await page.getByPlaceholder('Character name').fill('Thorin');
-      await expect(page.getByRole('button', { name: 'Save Character' })).toBeDisabled();
+      await page.waitForTimeout(800);
+      expect(postCount).toBe(0);
     });
 
-    test('Save Character is disabled when class is selected but name is empty', async ({ page }) => {
-      await openEditor(page);
-
+    test('autosave does not fire when class is selected but name is empty', async ({ page }) => {
+      let postCount = 0;
+      await mockAuth(page);
+      await page.route('**/api/characters', async (route) => {
+        if (route.request().method() === 'POST') { postCount++; }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      });
+      await page.goto('/');
+      await page.getByRole('button', { name: '+ Character' }).click();
       await selectClass(page, 'Rogue');
-      await expect(page.getByRole('button', { name: 'Save Character' })).toBeDisabled();
+      await page.waitForTimeout(800);
+      expect(postCount).toBe(0);
     });
 
-    test('Save Character becomes enabled when both name and class are filled', async ({ page }) => {
-      await openEditor(page);
-
+    test('autosave fires when both name and class are filled', async ({ page }) => {
+      await mockAuth(page);
+      await page.route('**/api/characters', async (route) => {
+        if (route.request().method() === 'POST') {
+          await route.fulfill({
+            status: 201,
+            contentType: 'application/json',
+            body: JSON.stringify({ _id: 'new-id', name: 'Thorin', classes: [{ name: 'Fighter', level: 1 }], updatedAt: new Date().toISOString() }),
+          });
+        } else {
+          await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+        }
+      });
+      await page.goto('/');
+      await page.getByRole('button', { name: '+ Character' }).click();
       await page.getByPlaceholder('Character name').fill('Thorin');
       await selectClass(page, 'Fighter');
-      await expect(page.getByRole('button', { name: 'Save Character' })).toBeEnabled();
+      // Export PDF button appears once the first autosave completes
+      await expect(page.getByRole('button', { name: 'Export PDF' })).toBeVisible();
     });
   });
 
   test.describe('Form Submission', () => {
-    test('submitting a valid form POSTs to /api/characters and navigates back', async ({ page }) => {
+    test('filling name and class autosaves to /api/characters', async ({ page }) => {
       let postedBody: Record<string, unknown> | null = null;
 
       await mockAuth(page);
@@ -155,13 +191,16 @@ test.describe('Character Editor', () => {
       await page.getByRole('button', { name: '+ Character' }).click();
       await page.getByPlaceholder('Character name').fill('Thorin');
       await selectClass(page, 'Fighter');
-      await page.getByRole('button', { name: 'Save Character' }).click();
 
+      // Wait for autosave (debounce + request) — Export PDF appears once the first save completes
+      await expect(page.getByRole('button', { name: 'Export PDF' })).toBeVisible();
+      // Navigate back
+      await page.getByRole('button', { name: 'Back to characters' }).click();
       await expect(page.getByRole('heading', { name: 'Characters', level: 2 })).toBeVisible();
       expect(postedBody).toMatchObject({ name: 'Thorin' });
     });
 
-    test('submitted body contains the selected class', async ({ page }) => {
+    test('autosave body contains the selected class', async ({ page }) => {
       let postedBody: Record<string, unknown> | null = null;
 
       await mockAuth(page);
@@ -182,14 +221,14 @@ test.describe('Character Editor', () => {
       await page.getByRole('button', { name: '+ Character' }).click();
       await page.getByPlaceholder('Character name').fill('Lyra');
       await selectClass(page, 'Wizard');
-      await page.getByRole('button', { name: 'Save Character' }).click();
 
+      await expect(page.getByRole('button', { name: 'Export PDF' })).toBeVisible();
       expect(postedBody).toMatchObject({
         classes: [{ name: 'Wizard', level: 1 }],
       });
     });
 
-    test('submitted body contains calculated first-level hit points', async ({ page }) => {
+    test('autosave body contains calculated first-level hit points', async ({ page }) => {
       let postedBody: Record<string, unknown> | null = null;
 
       await mockAuth(page);
@@ -210,15 +249,15 @@ test.describe('Character Editor', () => {
       await page.getByRole('button', { name: '+ Character' }).click();
       await page.getByPlaceholder('Character name').fill('Borin');
       await selectClass(page, 'Fighter');
-      await abilityRow(page, 'CON').locator('input[type="number"]').fill('14');
-      await page.getByRole('button', { name: 'Save Character' }).click();
+      await abilityRow(page, 'CON').locator('input[type="number"]').first().fill('14');
 
+      await expect(page.getByRole('button', { name: 'Export PDF' })).toBeVisible();
       expect(postedBody).toMatchObject({
         hitPoints: { max: 12, current: 12, nonlethal: 0 },
       });
     });
 
-    test('Save button shows "Saving…" while the request is in flight', async ({ page }) => {
+    test('shows saving indicator while autosave is in flight', async ({ page }) => {
       await mockAuth(page);
 
       let resolveSave!: () => void;
@@ -239,15 +278,14 @@ test.describe('Character Editor', () => {
       await page.getByRole('button', { name: '+ Character' }).click();
       await page.getByPlaceholder('Character name').fill('Zara');
       await selectClass(page, 'Rogue');
-      await page.getByRole('button', { name: 'Save Character' }).click();
 
-      await expect(page.getByRole('button', { name: 'Saving…' })).toBeVisible();
+      // While autosave is in flight, saving indicator text appears
+      await expect(page.getByText('Saving...')).toBeVisible();
       resolveSave();
-
-      await expect(page.getByRole('heading', { name: 'Characters', level: 2 })).toBeVisible();
+      await expect(page.getByText('Saving...')).not.toBeVisible();
     });
 
-    test('displays an error message when the API returns an error', async ({ page }) => {
+    test('displays an error message when the autosave API returns an error', async ({ page }) => {
       await mockAuth(page);
       await page.route('**/api/characters', async (route) => {
         if (route.request().method() === 'POST') {
@@ -265,7 +303,6 @@ test.describe('Character Editor', () => {
       await page.getByRole('button', { name: '+ Character' }).click();
       await page.getByPlaceholder('Character name').fill('Oops');
       await selectClass(page, 'Cleric');
-      await page.getByRole('button', { name: 'Save Character' }).click();
 
       await expect(page.getByText('Name is required')).toBeVisible();
       // Should remain on the editor page
@@ -292,7 +329,7 @@ test.describe('Character Editor', () => {
       await page.getByPlaceholder('e.g. 25').fill('30');
       await page.getByPlaceholder("e.g. 5'10\"").fill("6'2\"");
       await page.getByPlaceholder('e.g. 180 lbs').fill('190 lbs');
-      await page.getByPlaceholder('Common, Elvish…').fill('Common, Elvish');
+      await page.getByPlaceholder('Common, Elvish...').fill('Common, Elvish');
 
       // No errors should be visible
       await expect(page.getByText(/failed|error/i)).not.toBeVisible();
@@ -301,12 +338,12 @@ test.describe('Character Editor', () => {
     test('ability scores cannot go below 8 or exceed the remaining point-buy budget', async ({ page }) => {
       await openEditor(page);
 
-      const strengthInput = abilityRow(page, 'STR').locator('input[type="number"]');
+      const strengthInput = abilityRow(page, 'STR').locator('input[type="number"]').first();
       await strengthInput.fill('18');
       await expect(strengthInput).toHaveValue('18');
       await expect(page.getByText('16 / 28 points spent · 12 remaining')).toBeVisible();
 
-      const dexterityInput = abilityRow(page, 'DEX').locator('input[type="number"]');
+      const dexterityInput = abilityRow(page, 'DEX').locator('input[type="number"]').first();
       await dexterityInput.fill('18');
       await expect(dexterityInput).toHaveValue('16');
       await expect(page.getByText('26 / 28 points spent · 2 remaining')).toBeVisible();
@@ -322,7 +359,7 @@ test.describe('Character Editor', () => {
       await selectClass(page, 'Fighter');
       await expect(hitPointsInput).toHaveValue('9');
 
-      await abilityRow(page, 'CON').locator('input[type="number"]').fill('14');
+      await abilityRow(page, 'CON').locator('input[type="number"]').first().fill('14');
       await expect(hitPointsInput).toHaveValue('12');
 
       await selectClass(page, 'Wizard');
@@ -469,7 +506,7 @@ test.describe('Character Editor', () => {
       await page.getByRole('button', { name: 'Back to characters' }).click();
       await expect(page.getByRole('heading', { name: 'Characters', level: 2 })).toBeVisible();
 
-      await page.getByRole('cell', { name: 'Backup Hero' }).click();
+      await page.getByRole('cell', { name: 'Backup Hero', exact: true }).click();
       await expect(page.getByRole('heading', { name: 'Backup Hero', level: 2 })).toBeVisible();
 
       await openInventory(page);
