@@ -143,19 +143,21 @@ function NavDropdown({
       {open && (
         <div role="menu" className="nav-dropdown-menu">
           {items.map((item) => (
-            <button
+            <a
               key={item.id}
               role="menuitem"
-              type="button"
-              disabled={item.placeholder}
-              onClick={() => { onNavigate(item.id); setOpen(false); }}
+              tabIndex={item.placeholder ? -1 : 0}
+              aria-disabled={item.placeholder ? 'true' : undefined}
+              onClick={() => { if (!item.placeholder) { onNavigate(item.id); setOpen(false); } }}
+              onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !item.placeholder) { onNavigate(item.id); setOpen(false); } }}
               className={[
                 'nav-dropdown-item',
                 item.id === active ? 'nav-dropdown-item--active' : '',
+                item.placeholder ? 'nav-dropdown-item--disabled' : '',
               ].join(' ')}
             >
               {item.label}
-            </button>
+            </a>
           ))}
         </div>
       )}
@@ -360,7 +362,10 @@ function App() {
       {/* Top bar */}
       <header className="shrink-0 app-topbar">
         <div className="container-xl flex items-center gap-4 h-full px-4">
-          <span className="font-semibold text-base app-topbar-title mr-4">
+          <span className="font-semibold text-base app-topbar-title mr-4 flex items-center gap-2">
+            <svg fill="currentColor" width="28" height="28" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ paddingBottom: '6px' }}>
+              <path d="M22.933 24.607h3.972v-1.818c1.232-0.436 2.465-1.219 3.697-2.291-1.236-1.094-2.448-1.703-3.697-1.995v-1.856h-14.575v1.269h-5.549c0.998 2.422 3.198 4.083 5.549 4.636v2.056h3.655c-0.869 2.19-2.502 3.935-4.36 5.44h15.985c-2.216-1.505-3.847-3.248-4.677-5.44zM14.855 15.567l3.076-1.385-1.332-4.39-3.483-3.422-1.996 0.899 1.053 3.473-11.095 4.994 0.783 1.739 11.095-4.995zM22.547 15.462l7.927-3.179-4.418-0.123 2.981-4.286-4.584 2.45 1.34-5.963-4.768 7.585-0.516-2.040-1.886 5.552 3.911-1.833z" />
+            </svg>
             AD&amp;D (3.5e) Tools
           </span>
 
@@ -377,7 +382,6 @@ function App() {
                 { id: 'custom-skills',  label: 'Custom Skills', placeholder: true },
               ]}
             />
-            <span className="nav-divider" aria-hidden="true">|</span>
             <NavDropdown
               label="Tools"
               active={activeNav}
@@ -386,7 +390,6 @@ function App() {
                 { id: 'initiative-tracker', label: 'Initiative Tracker' },
               ]}
             />
-            <span className="nav-divider" aria-hidden="true">|</span>
             <button type="button" disabled className="nav-placeholder-btn">
               Campaigns
             </button>

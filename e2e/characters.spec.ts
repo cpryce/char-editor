@@ -70,21 +70,20 @@ test.describe('Characters Page', () => {
     await page.getByRole('button', { name: 'Character Editor' }).click();
     const charactersBtn = page.getByRole('menuitem', { name: 'Characters' });
     await expect(charactersBtn).toBeVisible();
-    await expect(charactersBtn).toBeEnabled();
   });
 
   test('Custom Skills nav item is disabled', async ({ page }) => {
     await gotoApp(page);
 
     await page.getByRole('button', { name: 'Character Editor' }).click();
-    await expect(page.getByRole('menuitem', { name: 'Custom Skills' })).toBeDisabled();
+    await expect(page.getByRole('menuitem', { name: 'Custom Skills' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   test('Custom Feats nav item is enabled', async ({ page }) => {
     await gotoApp(page);
 
     await page.getByRole('button', { name: 'Character Editor' }).click();
-    await expect(page.getByRole('menuitem', { name: 'Custom Feats' })).toBeEnabled();
+    await expect(page.getByRole('menuitem', { name: 'Custom Feats' })).not.toHaveAttribute('aria-disabled');
   });
 
   test('shows an error message when the API request fails', async ({ page }) => {

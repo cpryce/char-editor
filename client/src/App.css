@@ -239,22 +239,23 @@
   font-size: var(--font-size-sm);
   color: var(--color-fg-default);
   background: transparent;
-  border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
   white-space: nowrap;
+  text-decoration: none;
 }
 
-.nav-dropdown-item:hover:not(:disabled) {
+.nav-dropdown-item:hover:not(.nav-dropdown-item--disabled) {
   background: var(--color-neutral-muted);
+  text-decoration: none;
+  color: var(--color-fg-default);
 }
 
 .nav-dropdown-item--active {
-  font-weight: 600;
-  color: var(--color-accent-fg);
+  font-weight: var(--font-weight-semibold, 600);
 }
 
-.nav-dropdown-item:disabled {
+.nav-dropdown-item--disabled {
   color: var(--color-fg-subtle);
   cursor: not-allowed;
 }
