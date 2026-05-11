@@ -50,10 +50,10 @@ test.describe('Characters Page', () => {
     await expect(dateCell).not.toBeEmpty();
   });
 
-  test('"+ Character" button navigates to the editor', async ({ page }) => {
+  test('"+ New" button navigates to the editor', async ({ page }) => {
     await gotoApp(page);
 
-    await page.getByRole('button', { name: '+ Character' }).click();
+    await page.getByRole('button', { name: '+ New' }).click();
     await expect(page.getByRole('heading', { name: 'New Character', level: 2 })).toBeVisible();
   });
 

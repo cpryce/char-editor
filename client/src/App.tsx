@@ -3,6 +3,7 @@ import { CharactersPage } from './pages/CharactersPage';
 import { CharacterEditor } from './pages/CharacterEditor';
 import { CustomFeatsPage } from './pages/CustomFeatsPage';
 import { InitiativeTrackerPage } from './pages/InitiativeTrackerPage';
+import type { ClassName } from './types/character';
 import './App.css';
 
 interface User {
@@ -304,6 +305,7 @@ function App() {
   const [section, setSection] = useState<Section>('characters');
   const [view, setView] = useState<View>('list');
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
+  const [newCharacterClass, setNewCharacterClass] = useState<ClassName | undefined>(undefined);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
@@ -410,7 +412,9 @@ function App() {
           )}
           {section === 'characters' && view === 'list' && (
             <CharactersPage
-              onNewCharacter={() => {
+              userId={user.id}
+              onNewCharacter={(initialClass) => {
+                setNewCharacterClass(initialClass);
                 setSelectedCharacterId(null);
                 setView('new');
               }}
@@ -422,6 +426,7 @@ function App() {
           )}
           {section === 'characters' && view === 'new' && (
             <CharacterEditor
+              initialClass={newCharacterClass}
               onCancel={() => setView('list')}
             />
           )}

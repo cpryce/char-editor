@@ -222,8 +222,11 @@ function defaultWeapon(name = ''): WeaponLoadout {
 function getArmorSpeedForSize(
   category: ArmorCatalogEntry['category'] | ArmorLoadout['category'],
   size: CharacterDraft['size'],
+  race?: CharacterDraft['race'],
 ): string {
   if (category === 'Shield') return '-';
+  // Dwarves move at 20 ft. in all armor — their speed is never reduced by armor.
+  if (race === 'Dwarf') return '20 ft.';
   const isSmallMovement = size === 'Small' || size === 'Fine' || size === 'Diminutive' || size === 'Tiny';
   if (category === 'Light Armor') {
     return isSmallMovement ? '20 ft.' : '30 ft.';
@@ -231,7 +234,7 @@ function getArmorSpeedForSize(
   return isSmallMovement ? '15 ft.' : '20 ft.';
 }
 
-function newShieldFromEntry(entry: ArmorCatalogEntry, size: CharacterDraft['size']): ArmorLoadout {
+function newShieldFromEntry(entry: ArmorCatalogEntry, size: CharacterDraft['size'], race?: CharacterDraft['race']): ArmorLoadout {
   return {
     name:              entry.name,
     category:          entry.category,
@@ -240,7 +243,7 @@ function newShieldFromEntry(entry: ArmorCatalogEntry, size: CharacterDraft['size
     maxDexBonus:       entry.maxDexBonus,
     armorCheckPenalty: entry.armorCheckPenalty,
     arcaneSpellFailure: entry.arcaneSpellFailure,
-    speed:             getArmorSpeedForSize(entry.category, size),
+    speed:             getArmorSpeedForSize(entry.category, size, race),
     weight:            entry.weight,
     armorAdjust:       entry.armorAdjust,
     material:          '',
@@ -263,7 +266,7 @@ function defaultShield(name = ''): ArmorLoadout {
   };
 }
 
-function newArmorFromEntry(entry: ArmorCatalogEntry, size: CharacterDraft['size']): ArmorLoadout {
+function newArmorFromEntry(entry: ArmorCatalogEntry, size: CharacterDraft['size'], race?: CharacterDraft['race']): ArmorLoadout {
   return {
     name:              entry.name,
     category:          entry.category,
@@ -272,7 +275,7 @@ function newArmorFromEntry(entry: ArmorCatalogEntry, size: CharacterDraft['size'
     maxDexBonus:       entry.maxDexBonus,
     armorCheckPenalty: entry.armorCheckPenalty,
     arcaneSpellFailure: entry.arcaneSpellFailure,
-    speed:             getArmorSpeedForSize(entry.category, size),
+    speed:             getArmorSpeedForSize(entry.category, size, race),
     weight:            entry.weight,
     armorAdjust:       entry.armorAdjust,
     material:          '',
@@ -327,6 +330,7 @@ export function InventorySection({
   onChange,
   inputStyle,
   size,
+  race,
   feats,
   classes,
   dexterity,
@@ -339,6 +343,7 @@ export function InventorySection({
   onChange: (inventory: Inventory, combat: CharacterDraft['combat']) => void;
   inputStyle: React.CSSProperties;
   size: CharacterDraft['size'];
+  race: CharacterDraft['race'];
   feats: FeatSlot[];
   classes: ClassEntry[];
   /** Effective dexterity score (temp override if set, otherwise total). */
@@ -550,13 +555,13 @@ export function InventorySection({
       wornSlots: nextWornSlots,
     };
     if (entry) {
-      updateInventory({ body: newArmorFromEntry(entry, size), ...clearBodySlotFields });
+      updateInventory({ body: newArmorFromEntry(entry, size, race), ...clearBodySlotFields });
       return;
     }
     const existing = inventory.body ?? newArmorFromEntry({
       name: '', category: 'Light Armor', armorBonus: 0, maxDexBonus: null,
       armorCheckPenalty: 0, arcaneSpellFailure: '', speed: '', weight: '', armorAdjust: 0,
-    }, size);
+    }, size, race);
     updateInventory({ body: { ...existing, name }, ...clearBodySlotFields });
   }
 
@@ -712,7 +717,7 @@ export function InventorySection({
 
   function handleOffHandShieldSelect(name: string, entry?: ArmorCatalogEntry) {
     if (!name.trim()) { updateInventory({ offHandShield: null }); return; }
-    updateInventory({ offHandShield: entry ? newShieldFromEntry(entry, size) : { ...(inventory.offHandShield ?? defaultShield()), name } });
+    updateInventory({ offHandShield: entry ? newShieldFromEntry(entry, size, race) : { ...(inventory.offHandShield ?? defaultShield()), name } });
   }
 
   useEffect(() => {
@@ -720,7 +725,7 @@ export function InventorySection({
     let changed = false;
 
     if (inventory.body?.name) {
-      const expectedSpeed = getArmorSpeedForSize(inventory.body.category, size);
+      const expectedSpeed = getArmorSpeedForSize(inventory.body.category, size, race);
       if (inventory.body.speed !== expectedSpeed) {
         nextPartial.body = { ...inventory.body, speed: expectedSpeed };
         changed = true;
@@ -728,7 +733,7 @@ export function InventorySection({
     }
 
     if (inventory.offHandShield?.name) {
-      const expectedSpeed = getArmorSpeedForSize(inventory.offHandShield.category, size);
+      const expectedSpeed = getArmorSpeedForSize(inventory.offHandShield.category, size, race);
       if (inventory.offHandShield.speed !== expectedSpeed) {
         nextPartial.offHandShield = { ...inventory.offHandShield, speed: expectedSpeed };
         changed = true;
@@ -738,7 +743,7 @@ export function InventorySection({
     if (changed) {
       updateInventory(nextPartial);
     }
-  }, [size]);
+  }, [size, race]);
 
   function updateOffHandShieldField(field: keyof ArmorLoadout, value: string | number | null) {
     const base = inventory.offHandShield ?? defaultShield();

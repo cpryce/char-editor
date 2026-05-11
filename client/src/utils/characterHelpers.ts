@@ -27,6 +27,15 @@ export const RACIAL_SIZES: Readonly<Record<Race, Size>> = {
   'Half-Orc': 'Medium',
 };
 
+/**
+ * Race-specific base land speed overrides (ft). Races listed here have a base
+ * speed that differs from the default for their size (e.g. Dwarves are Medium
+ * but move at 20 ft. instead of 30 ft.).
+ */
+export const BASE_SPEED_BY_RACE: Readonly<Partial<Record<Race, number>>> = {
+  Dwarf: 20,
+};
+
 /** Default base land speed (ft) by size. Biped humanoid defaults per SRD. */
 export const BASE_SPEED_BY_SIZE: Readonly<Partial<Record<Size, number>>> = {
   Fine: 5,

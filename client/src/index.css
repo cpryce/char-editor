@@ -211,6 +211,37 @@ body {
   cursor: not-allowed;
 }
 
+/* ── Split button group ─────────────────────────────────────── */
+/*
+ * Wrap two .btn siblings in .btn-group (+ .btn-group-primary or
+ * .btn-group-default) to render them as one unified control.
+ * Each child keeps its own border; first/last-child get the rounded
+ * corners. Adjacent borders collapse via border-right:0 on first child.
+ * No overflow:hidden — keeps absolutely-positioned dropdowns visible.
+ */
+.btn-group {
+  display: inline-flex;
+  vertical-align: middle;
+}
+.btn-group .btn {
+  border-radius: 0;
+}
+.btn-group .btn:first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  border-right: 0;
+}
+.btn-group .btn:last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+/* primary divider: semi-transparent white on green */
+.btn-group-primary .btn:last-child {
+  border-left-color: rgba(255,255,255,0.25);
+}
+/* default divider: standard border colour */
+.btn-group-default .btn:last-child {
+  border-left-color: var(--color-btn-border, var(--color-border-default));
+}
+
 /* ── Settings flyout ────────────────────────────────────────── */
 .settings-flyout {
   position: fixed;

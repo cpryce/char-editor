@@ -4,7 +4,7 @@ import { mockAuth, gotoApp } from './fixtures';
 /** Navigates to the app and opens the New Character editor. */
 async function openEditor(page: Page) {
   await gotoApp(page, []);
-  await page.getByRole('button', { name: '+ Character' }).click();
+  await page.getByRole('button', { name: '+ New' }).click();
   await expect(page.getByRole('heading', { name: 'New Character', level: 2 })).toBeVisible();
 }
 
@@ -113,7 +113,7 @@ test.describe('Character Editor', () => {
         await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
       });
       await page.goto('/');
-      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByRole('button', { name: '+ New' }).click();
       await expect(page.getByRole('heading', { name: 'New Character', level: 2 })).toBeVisible();
       await page.waitForTimeout(800);
       expect(postCount).toBe(0);
@@ -127,7 +127,7 @@ test.describe('Character Editor', () => {
         await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
       });
       await page.goto('/');
-      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByRole('button', { name: '+ New' }).click();
       await page.getByPlaceholder('Character name').fill('Thorin');
       await page.waitForTimeout(800);
       expect(postCount).toBe(0);
@@ -141,7 +141,7 @@ test.describe('Character Editor', () => {
         await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
       });
       await page.goto('/');
-      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByRole('button', { name: '+ New' }).click();
       await selectClass(page, 'Rogue');
       await page.waitForTimeout(800);
       expect(postCount).toBe(0);
@@ -161,7 +161,7 @@ test.describe('Character Editor', () => {
         }
       });
       await page.goto('/');
-      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByRole('button', { name: '+ New' }).click();
       await page.getByPlaceholder('Character name').fill('Thorin');
       await selectClass(page, 'Fighter');
       // Export PDF button appears once the first autosave completes
@@ -188,7 +188,7 @@ test.describe('Character Editor', () => {
       });
 
       await page.goto('/');
-      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByRole('button', { name: '+ New' }).click();
       await page.getByPlaceholder('Character name').fill('Thorin');
       await selectClass(page, 'Fighter');
 
@@ -218,7 +218,7 @@ test.describe('Character Editor', () => {
       });
 
       await page.goto('/');
-      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByRole('button', { name: '+ New' }).click();
       await page.getByPlaceholder('Character name').fill('Lyra');
       await selectClass(page, 'Wizard');
 
@@ -246,7 +246,7 @@ test.describe('Character Editor', () => {
       });
 
       await page.goto('/');
-      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByRole('button', { name: '+ New' }).click();
       await page.getByPlaceholder('Character name').fill('Borin');
       await selectClass(page, 'Fighter');
       await abilityRow(page, 'CON').locator('input[type="number"]').first().fill('14');
@@ -275,7 +275,7 @@ test.describe('Character Editor', () => {
       });
 
       await page.goto('/');
-      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByRole('button', { name: '+ New' }).click();
       await page.getByPlaceholder('Character name').fill('Zara');
       await selectClass(page, 'Rogue');
 
@@ -300,7 +300,7 @@ test.describe('Character Editor', () => {
       });
 
       await page.goto('/');
-      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByRole('button', { name: '+ New' }).click();
       await page.getByPlaceholder('Character name').fill('Oops');
       await selectClass(page, 'Cleric');
 
@@ -418,7 +418,7 @@ test.describe('Character Editor', () => {
       });
 
       await page.goto('/');
-      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByRole('button', { name: '+ New' }).click();
       await page.getByPlaceholder('Character name').fill('Backup Tester');
       await selectClass(page, 'Fighter');
       await openInventory(page);
@@ -490,7 +490,7 @@ test.describe('Character Editor', () => {
       });
 
       await page.goto('/');
-      await page.getByRole('button', { name: '+ Character' }).click();
+      await page.getByRole('button', { name: '+ New' }).click();
       await page.getByPlaceholder('Character name').fill('Backup Hero');
       await selectClass(page, 'Fighter');
 

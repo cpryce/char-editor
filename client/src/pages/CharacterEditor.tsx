@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import type { CharacterDraft, AbilityScore, FeatSlot, WornSlot, WornSlotKey } from '../types/character';
+import type { CharacterDraft, AbilityScore, FeatSlot, WornSlot, WornSlotKey, ClassName } from '../types/character';
 import { HIT_DIE_BY_CLASS } from '../types/character';
 import {
   newCharacterDraft,
@@ -25,6 +25,7 @@ import {
   applyMaxDexCap,
   computeAcTotals,
   BASE_SPEED_BY_SIZE,
+  BASE_SPEED_BY_RACE,
 } from '../utils/characterHelpers';
 import { FEAT_BY_NAME } from '../data/feats';
 import { MATERIALS, applyMaxDexDelta } from '../data/materials';
@@ -397,18 +398,28 @@ function stampComputedAttacksForSave(
 
 interface CharacterEditorProps {
   characterId?: string;
+  initialClass?: ClassName;
   onCancel: () => void;
 }
 
-export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps) {
-  const [draft, setDraft] = useState<CharacterDraft>(newCharacterDraft);
+export function CharacterEditor({ characterId, initialClass, onCancel }: CharacterEditorProps) {
+  const [draft, setDraft] = useState<CharacterDraft>(() => {
+    const d = newCharacterDraft();
+    if (!characterId && initialClass) {
+      d.classes = [{ name: initialClass, level: 1, hitDieType: HIT_DIE_BY_CLASS[initialClass] ?? 8, hpRolled: [] }];
+    }
+    return d;
+  });
   const [autoSaveCharacterId, setAutoSaveCharacterId] = useState<string | null>(characterId ?? null);
   const [loadingCharacter, setLoadingCharacter] = useState(Boolean(characterId));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [initialDraftFingerprint, setInitialDraftFingerprint] = useState<string | null>(
-    characterId ? null : JSON.stringify(newCharacterDraft()),
-  );
+  const [initialDraftFingerprint, setInitialDraftFingerprint] = useState<string | null>(() => {
+    if (characterId) return null;
+    const d = newCharacterDraft();
+    if (initialClass) d.classes = [{ name: initialClass, level: 1, hitDieType: HIT_DIE_BY_CLASS[initialClass] ?? 8, hpRolled: [] }];
+    return JSON.stringify(d);
+  });
   const [customFeats, setCustomFeats] = useState<CustomFeat[]>([]);
   const [nameTouched, setNameTouched] = useState(false);
   const [showStatBlock, setShowStatBlock] = useState(false);
@@ -792,7 +803,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
       }));
       const derivedFeats = deriveSelectableFeats(d.classes, race);
       const feats = mergeSelectableFeats(d.feats, derivedFeats);
-      return { ...d, race, size: RACIAL_SIZES[race], baseSpeed: String(BASE_SPEED_BY_SIZE[RACIAL_SIZES[race]] ?? 30), abilityScores: newScores, skills, feats };
+      return { ...d, race, size: RACIAL_SIZES[race], baseSpeed: String(BASE_SPEED_BY_RACE[race] ?? BASE_SPEED_BY_SIZE[RACIAL_SIZES[race]] ?? 30), abilityScores: newScores, skills, feats };
     });
   }, []);
 
@@ -1146,6 +1157,7 @@ export function CharacterEditor({ characterId, onCancel }: CharacterEditorProps)
             derivedMeleeAttackBonus={combatStats.meleeAttack}
             derivedRangedAttackBonus={combatStats.rangedAttack}
             size={draft.size}
+            race={draft.race}
             feats={draft.feats}
             classes={draft.classes}
             dexterity={draft.abilityScores.dexterity.temp ?? abilityTotals.dexterity}
