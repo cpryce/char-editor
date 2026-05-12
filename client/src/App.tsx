@@ -4,7 +4,7 @@ import { CharacterEditor } from './pages/CharacterEditor';
 import { CustomFeatsPage } from './pages/CustomFeatsPage';
 import { InitiativeTrackerPage } from './pages/InitiativeTrackerPage';
 import { NameGeneratorPage } from './pages/NameGeneratorPage';
-import type { ClassName } from './types/character';
+import type { ClassName, Race } from './types/character';
 import './App.css';
 
 interface User {
@@ -307,6 +307,8 @@ function App() {
   const [view, setView] = useState<View>('list');
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [newCharacterClass, setNewCharacterClass] = useState<ClassName | undefined>(undefined);
+  const [newCharacterName, setNewCharacterName] = useState<string | undefined>(undefined);
+  const [newCharacterRace, setNewCharacterRace] = useState<Race | undefined>(undefined);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
@@ -405,7 +407,7 @@ function App() {
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto" style={{ scrollbarGutter: 'stable' }}>
-        <div className="container-xl">
+        <div className={section === 'name-generator' || section === 'initiative-tracker' ? 'container-lg' : 'container-xl'}>
           {section === 'custom-feats' && (
             <CustomFeatsPage />
           )}
@@ -413,7 +415,16 @@ function App() {
             <InitiativeTrackerPage />
           )}
           {section === 'name-generator' && (
-            <NameGeneratorPage />
+            <NameGeneratorPage
+              onCreateCharacter={(name, initialClass, initialRace) => {
+                setNewCharacterName(name);
+                setNewCharacterClass(initialClass);
+                setNewCharacterRace(initialRace);
+                setSelectedCharacterId(null);
+                setView('new');
+                setSection('characters');
+              }}
+            />
           )}
           {section === 'characters' && view === 'list' && (
             <CharactersPage
@@ -432,7 +443,14 @@ function App() {
           {section === 'characters' && view === 'new' && (
             <CharacterEditor
               initialClass={newCharacterClass}
-              onCancel={() => setView('list')}
+              initialName={newCharacterName}
+              initialRace={newCharacterRace}
+              onCancel={() => {
+                setNewCharacterClass(undefined);
+                setNewCharacterName(undefined);
+                setNewCharacterRace(undefined);
+                setView('list');
+              }}
             />
           )}
           {section === 'characters' && view === 'edit' && selectedCharacterId && (

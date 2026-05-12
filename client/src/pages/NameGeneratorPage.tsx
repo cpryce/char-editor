@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { RACES, GENDERS } from '../types/character';
-import type { Race, Gender } from '../types/character';
-import { getCorpus } from '../data/nameCorpora';
+import { RACES, GENDERS, CLASSES } from '../types/character';
+import type { Race, Gender, ClassName } from '../types/character';
+import { getCorpus, getSurnameCorpus } from '../data/nameCorpora';
 import { generateNames } from '../utils/nameGenerator';
 
 const GENERATE_COUNT = 12;
@@ -23,19 +23,36 @@ function RefreshIcon() {
   );
 }
 
-export function NameGeneratorPage() {
+function PlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <path d="M7.75 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 7.75 2Z" />
+    </svg>
+  );
+}
+
+export function NameGeneratorPage({ onCreateCharacter }: { onCreateCharacter?: (name: string, initialClass?: ClassName, initialRace?: Race) => void } = {}) {
   const [race, setRace] = useState<Race>('Human');
   const [gender, setGender] = useState<Gender>('Male');
+  const [includeSurnames, setIncludeSurnames] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<ClassName | undefined>(undefined);
   const [names, setNames] = useState<string[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
 
   const generate = useCallback(() => {
-    const corpus = getCorpus(race, gender);
-    setNames(generateNames(corpus, GENERATE_COUNT));
+    const givenCorpus = getCorpus(race, gender);
+    if (includeSurnames) {
+      const surnameCorpus = getSurnameCorpus(race);
+      const givenNames = generateNames(givenCorpus, GENERATE_COUNT);
+      const surnames = generateNames(surnameCorpus, GENERATE_COUNT);
+      setNames(givenNames.map((given, i) => `${given} ${surnames[i % surnames.length]}`));
+    } else {
+      setNames(generateNames(givenCorpus, GENERATE_COUNT));
+    }
     setHasGenerated(true);
     setCopiedIndex(null);
-  }, [race, gender]);
+  }, [race, gender, includeSurnames]);
 
   async function copyName(name: string, index: number) {
     try {
@@ -48,7 +65,7 @@ export function NameGeneratorPage() {
   }
 
   return (
-    <div className="px-4 py-6 max-w-2xl mx-auto">
+    <div className="px-4 py-6">
       {/* Page header */}
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-[color:var(--color-fg-default)]">
@@ -74,7 +91,7 @@ export function NameGeneratorPage() {
               id="ng-race"
               value={race}
               onChange={(e) => setRace(e.target.value as Race)}
-              className="btn btn-default h-8 appearance-none px-3 text-sm min-w-[140px]"
+              className="h-8 px-3 text-sm min-w-[140px] rounded-md border border-[var(--color-border-default)] bg-white text-slate-900"
             >
               {RACES.map((r) => (
                 <option key={r} value={r}>{r}</option>
@@ -83,44 +100,87 @@ export function NameGeneratorPage() {
           </div>
 
           {/* Gender */}
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]">
+          <div className="flex flex-col gap-1 min-w-[140px]">
+            <label
+              htmlFor="ng-gender"
+              className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]"
+            >
               Gender
-            </span>
-            <div className="flex gap-2">
+            </label>
+            <select
+              id="ng-gender"
+              value={gender}
+              onChange={(e) => setGender(e.target.value as Gender)}
+              className="h-8 px-3 text-sm min-w-[140px] rounded-md border border-[var(--color-border-default)] bg-white text-slate-900"
+            >
               {GENDERS.map((g) => (
-                <label
-                  key={g}
-                  className={[
-                    'inline-flex items-center gap-1.5 px-3 h-8 rounded border text-sm cursor-pointer select-none',
-                    gender === g
-                      ? 'font-medium bg-[var(--color-accent-emphasis)] border-[var(--color-accent-emphasis)] text-[color:var(--color-fg-on-emphasis)]'
-                      : 'bg-[var(--color-canvas-default)] border-[var(--color-border-default)] text-[color:var(--color-fg-default)]',
-                  ].join(' ')}
-                >
-                  <input
-                    type="radio"
-                    name="ng-gender"
-                    value={g}
-                    checked={gender === g}
-                    onChange={() => setGender(g)}
-                    className="sr-only"
-                  />
-                  {g}
-                </label>
+                <option key={g} value={g}>{g}</option>
               ))}
-            </div>
+            </select>
           </div>
 
-          {/* Generate button */}
-          <button
-            type="button"
-            onClick={generate}
-            className="btn btn-primary h-8 px-4 font-semibold flex items-center gap-2 ml-auto"
-          >
-            <RefreshIcon />
-            Generate
-          </button>
+          {/* Surnames toggle */}
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]">
+              Surnames
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={includeSurnames}
+              aria-label="Toggle surnames"
+              onClick={() => setIncludeSurnames((prev) => !prev)}
+              className={[
+                'relative inline-flex h-8 w-14 items-center rounded-full border px-1 transition-colors duration-200 ease-out',
+                includeSurnames
+                  ? 'border-[var(--color-btn-primary-bg)] bg-[var(--color-btn-primary-bg)]'
+                  : 'border-black bg-[var(--color-fg-subtle)]',
+              ].join(' ')}
+            >
+              <span
+                aria-hidden="true"
+                className={[
+                  'absolute top-1 h-6 w-6 rounded-full transition-transform duration-200 ease-out',
+                  includeSurnames
+                    ? 'bg-[var(--color-fg-on-emphasis)]'
+                    : 'bg-white',
+                  includeSurnames ? 'translate-x-6' : 'translate-x-0',
+                ].join(' ')}
+              />
+            </button>
+          </div>
+
+          {/* Class (optional) */}
+          <div className="flex flex-col gap-1 min-w-[140px]">
+            <label
+              htmlFor="ng-class"
+              className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]"
+            >
+              Class (Optional)
+            </label>
+            <select
+              id="ng-class"
+              value={selectedClass ?? ''}
+              onChange={(e) => setSelectedClass((e.target.value as ClassName) || undefined)}
+              className="h-8 px-3 text-sm min-w-[140px] rounded-md border border-[var(--color-border-default)] bg-white text-slate-900"
+            >
+              <option value="">None</option>
+              {CLASSES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-end pt-5">
+            <button
+              type="button"
+              onClick={generate}
+              className="btn btn-primary h-8 px-4 font-semibold flex items-center gap-2"
+            >
+              <RefreshIcon />
+              Generate
+            </button>
+          </div>
         </div>
       </div>
 
@@ -134,12 +194,12 @@ export function NameGeneratorPage() {
       {hasGenerated && names.length > 0 && (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide mb-3 text-[color:var(--color-fg-muted)]">
-            {gender} {race} names
+            {gender} {race} {includeSurnames ? 'full names' : 'names'}
           </p>
           <ul className="rounded-md border overflow-hidden border-[var(--color-border-default)]">
             {names.map((name, i) => (
               <li
-                key={name}
+                key={`${name}-${i}`}
                 className={[
                   'flex items-center justify-between px-4 py-2.5 border-b text-sm border-[var(--color-border-muted)]',
                   i % 2 === 0 ? 'bg-[var(--color-canvas-default)]' : 'bg-[var(--color-canvas-subtle)]',
@@ -148,20 +208,38 @@ export function NameGeneratorPage() {
                 <span className="font-medium text-[color:var(--color-fg-default)]">
                   {name}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => copyName(name, i)}
-                  title="Copy to clipboard"
-                  className={[
-                    'flex items-center gap-1.5 text-xs px-2 py-1 rounded',
-                    copiedIndex === i
-                      ? 'text-[color:var(--color-success-fg)]'
-                      : 'text-[color:var(--color-fg-muted)]',
-                  ].join(' ')}
-                >
-                  <CopyIcon />
-                  {copiedIndex === i ? 'Copied!' : 'Copy'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => copyName(name, i)}
+                    title="Copy to clipboard"
+                    className={[
+                      'flex items-center gap-1.5 text-xs px-2 py-1 rounded',
+                      copiedIndex === i
+                        ? 'text-[color:var(--color-success-fg)]'
+                        : 'text-[color:var(--color-fg-muted)]',
+                    ].join(' ')}
+                  >
+                    <CopyIcon />
+                    {copiedIndex === i ? 'Copied!' : 'Copy'}
+                  </button>
+                  {onCreateCharacter && (
+                    <button
+                      type="button"
+                      disabled={!selectedClass}
+                      onClick={() => onCreateCharacter(name, selectedClass || undefined, race)}
+                      className={[
+                        'flex items-center gap-1.5 text-xs px-2 py-1 rounded',
+                        selectedClass
+                          ? 'text-[color:var(--color-fg-muted)] cursor-pointer'
+                          : 'text-[color:var(--color-fg-subtle)] cursor-not-allowed opacity-50',
+                      ].join(' ')}
+                    >
+                      <PlusIcon />
+                      Create
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

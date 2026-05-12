@@ -122,6 +122,34 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
 };
 
+function applyRaceToDraft(draft: CharacterDraft, race: CharacterDraft['race']) {
+  const prevAdj = RACIAL_ABILITY_ADJUSTMENTS[draft.race] ?? {};
+  const nextAdj = RACIAL_ABILITY_ADJUSTMENTS[race] ?? {};
+  const abilityScores = { ...draft.abilityScores };
+  (Object.keys(abilityScores) as AbilityKey[]).forEach((key) => {
+    abilityScores[key] = {
+      ...abilityScores[key],
+      racial: (abilityScores[key].racial - (prevAdj[key] ?? 0)) + (nextAdj[key] ?? 0),
+    };
+  });
+
+  const skills = applyClassAndRacialSkillRules(draft.skills, draft.classes, race).map((skill) => ({
+    ...skill,
+    bonus: computeSkillBonus(skill, abilityScores),
+  }));
+  const feats = mergeSelectableFeats(draft.feats, deriveSelectableFeats(draft.classes, race));
+
+  return {
+    ...draft,
+    race,
+    size: RACIAL_SIZES[race],
+    baseSpeed: String(BASE_SPEED_BY_RACE[race] ?? BASE_SPEED_BY_SIZE[RACIAL_SIZES[race]] ?? 30),
+    abilityScores,
+    skills,
+    feats,
+  };
+}
+
 function Accordion({
   title, summary, defaultOpen = false, children,
 }: {
@@ -131,7 +159,10 @@ function Accordion({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const buttonClasses = 'w-full flex items-center gap-2 pb-1 mb-3 character-editor-accordion-trigger';
+  const buttonClasses = [
+    'w-full flex items-center gap-2 pb-1 mb-3 character-editor-accordion-trigger',
+    open ? 'character-editor-accordion-trigger--open' : '',
+  ].join(' ');
   const chevronClasses = [
     'character-editor-accordion-chevron',
     open ? 'character-editor-accordion-chevron--open' : '',
@@ -150,7 +181,7 @@ function Accordion({
       >
         <path d="M3 1.5l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <span className="text-sm font-semibold uppercase tracking-wider character-editor-accordion-title">
+      <span className="text-m font-semibold uppercase tracking-wider character-editor-accordion-title">
         {title}
       </span>
       {!open && summary && (
@@ -399,14 +430,24 @@ function stampComputedAttacksForSave(
 interface CharacterEditorProps {
   characterId?: string;
   initialClass?: ClassName;
+  initialName?: string;
+  initialRace?: CharacterDraft['race'];
   onCancel: () => void;
 }
 
-export function CharacterEditor({ characterId, initialClass, onCancel }: CharacterEditorProps) {
+export function CharacterEditor({ characterId, initialClass, initialName, initialRace, onCancel }: CharacterEditorProps) {
   const [draft, setDraft] = useState<CharacterDraft>(() => {
     const d = newCharacterDraft();
     if (!characterId && initialClass) {
       d.classes = [{ name: initialClass, level: 1, hitDieType: HIT_DIE_BY_CLASS[initialClass] ?? 8, hpRolled: [] }];
+    }
+    if (!characterId && initialRace) {
+      const racedDraft = applyRaceToDraft(d, initialRace);
+      if (initialName) racedDraft.name = initialName;
+      return racedDraft;
+    }
+    if (!characterId && initialName) {
+      d.name = initialName;
     }
     return d;
   });
@@ -418,6 +459,12 @@ export function CharacterEditor({ characterId, initialClass, onCancel }: Charact
     if (characterId) return null;
     const d = newCharacterDraft();
     if (initialClass) d.classes = [{ name: initialClass, level: 1, hitDieType: HIT_DIE_BY_CLASS[initialClass] ?? 8, hpRolled: [] }];
+    if (initialRace) {
+      const racedDraft = applyRaceToDraft(d, initialRace);
+      if (initialName) racedDraft.name = initialName;
+      return JSON.stringify(racedDraft);
+    }
+    if (initialName) d.name = initialName;
     return JSON.stringify(d);
   });
   const [customFeats, setCustomFeats] = useState<CustomFeat[]>([]);
@@ -425,6 +472,7 @@ export function CharacterEditor({ characterId, initialClass, onCancel }: Charact
   const [showStatBlock, setShowStatBlock] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const saveSequenceRef = useRef(0);
+  const initialSaveRef = useRef(false);
   const nameError = nameTouched && !draft.name.trim() ? 'Name is required.' : undefined;
   const isEdit = Boolean(characterId);
   const spentAbilityPoints = abilityPointBuyTotal(draft.abilityScores);
@@ -501,6 +549,78 @@ export function CharacterEditor({ characterId, initialClass, onCancel }: Charact
       })),
     [customFeats, characterClassNames],
   );
+
+  // Force-save immediately when creating a new character from name generator (has initialName)
+  useEffect(() => {
+    if (characterId || !initialName || autoSaveCharacterId || initialSaveRef.current) return;
+    
+    initialSaveRef.current = true;
+    
+    const saveNewCharacter = async () => {
+      setSaving(true);
+      setError(null);
+      try {
+        const body = {
+          ...draft,
+          speed: draft.combat.speed.base,
+          inventory: [],
+          age: draft.age ? Number(draft.age) : undefined,
+          languages: draft.languages ? draft.languages.split(',').map((s) => s.trim()).filter(Boolean) : [],
+          hitPoints: {
+            max: calculatedCreateHitPoints,
+            current: calculatedCreateHitPoints,
+            nonlethal: 0,
+          },
+          combat: {
+            ...draft.combat,
+            baseAttackBonus: baseAttackBonusFromClasses(draft.classes),
+            speed: {
+              ...draft.combat.speed,
+              base: BASE_SPEED_BY_RACE[draft.race],
+            },
+            saves: {
+              ...draft.combat.saves,
+              fortitude: { ...draft.combat.saves.fortitude, base: baseSaveBonusFromClasses(draft.classes, 'fortitude') },
+            },
+          },
+          feats: deriveAutoFeats(draft.classes).map((feat) => ({
+            name: feat.name,
+            type: feat.type,
+            source: feat.source,
+            shortDescription: feat.shortDescription,
+            notes: feat.shortDescription,
+          })),
+          equipment: [],
+          currency: { pp: 0, gp: 0, sp: 0, cp: 0 },
+          experience: { current: 0, nextLevel: 1000 },
+        };
+        
+        const res = await fetch('/api/characters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        });
+        
+        if (!res.ok) {
+          const data = await res.json() as { error?: string };
+          throw new Error(data.error ?? 'Failed to save');
+        }
+        
+        const created = await res.json() as { _id?: string };
+        if (created._id) {
+          setAutoSaveCharacterId(created._id);
+          setInitialDraftFingerprint(JSON.stringify(draft));
+        }
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setSaving(false);
+      }
+    };
+    
+    void saveNewCharacter();
+  }, [initialName, autoSaveCharacterId, characterId, draft, calculatedCreateHitPoints]);
 
   useEffect(() => {
     if (!characterId) return;

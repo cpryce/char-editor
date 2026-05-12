@@ -158,7 +158,7 @@ app.get('/api/characters', async (req, res) => {
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const characters = await Character.find(
     { owner: u._id },
-    { name: 1, classes: 1, updatedAt: 1, 'abilityScores.dexterity': 1, 'combat.initiative.miscBonus': 1 },
+    { name: 1, race: 1, classes: 1, updatedAt: 1, 'abilityScores.dexterity': 1, 'combat.initiative.miscBonus': 1 },
   ).sort({ updatedAt: -1 });
   res.json(characters);
 });

@@ -7,6 +7,10 @@
   text-align: left;
 }
 
+.character-editor-accordion-trigger--open {
+  border-bottom: 2px solid var(--fgColor-accent);
+}
+
 .character-editor-accordion-chevron {
   transition: transform 0.15s;
   flex-shrink: 0;

@@ -5,6 +5,7 @@ import type { ClassName } from '../types/character';
 interface CharacterSummary {
   _id: string;
   name: string;
+  race: string;
   classes: ClassEntry[];
   updatedAt: string;
 }
@@ -57,7 +58,7 @@ function savePageSize(userId: string, size: PageSize) {
   } catch { /* ignore */ }
 }
 
-type SortKey = 'name' | 'class' | 'level' | 'updatedAt';
+type SortKey = 'name' | 'race' | 'class' | 'level' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
 
 function loadSort(userId: string): { key: SortKey; dir: SortDir } {
@@ -65,7 +66,7 @@ function loadSort(userId: string): { key: SortKey; dir: SortDir } {
     const prefs = JSON.parse(localStorage.getItem(`char-editor-prefs:${userId}`) ?? '{}');
     const key = prefs?.sortKey;
     const dir = prefs?.sortDir;
-    if ((['name', 'class', 'level', 'updatedAt'] as const).includes(key) &&
+    if ((['name', 'race', 'class', 'level', 'updatedAt'] as const).includes(key) &&
         (dir === 'asc' || dir === 'desc')) {
       return { key, dir };
     }
@@ -90,6 +91,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
   const [pageSize, setPageSize] = useState<PageSize>(() => loadPageSize(userId));
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [raceFilter, setRaceFilter] = useState<string | null>(null);
   const [classFilter, setClassFilter] = useState<string | null>(null);
   const [newDropdownOpen, setNewDropdownOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -118,16 +120,19 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
   }
 
   const allClasses = [...new Set(characters.flatMap((c) => c.classes.map((cl) => cl.name)))].sort();
+  const allRaces = [...new Set(characters.map((c) => c.race))].sort();
 
   const filtered = characters.filter((char) => {
     const matchesSearch = !searchQuery || char.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesRace = !raceFilter || char.race === raceFilter;
     const matchesClass = !classFilter || char.classes.some((c) => c.name === classFilter);
-    return matchesSearch && matchesClass;
+    return matchesSearch && matchesRace && matchesClass;
   });
 
   const sorted = [...filtered].sort((a, b) => {
     let cmp = 0;
     if (sortKey === 'name')      cmp = a.name.localeCompare(b.name);
+    if (sortKey === 'race')      cmp = a.race.localeCompare(b.race);
     if (sortKey === 'class')     cmp = classLabel(a.classes).localeCompare(classLabel(b.classes));
     if (sortKey === 'level')     cmp = totalLevel(a.classes) - totalLevel(b.classes);
     if (sortKey === 'updatedAt') cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
@@ -204,6 +209,28 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
             </svg>
           </div>
 
+          {/* Race filter select */}
+          <div className="relative flex items-center">
+            <svg className="absolute left-2 pointer-events-none text-[color:var(--color-fg-muted)]" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 12.5c2.2 0 4-1.8 4-4s-1.8-4-4-4-4 1.8-4 4 1.8 4 4 4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+              <path d="M5 19c1.7-3 4.1-4.5 7-4.5s5.3 1.5 7 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <select
+              aria-label="Filter by race"
+              value={raceFilter ?? ''}
+              onChange={(e) => { setRaceFilter(e.target.value || null); setPage(1); }}
+              className={`appearance-none h-8 pl-7 pr-6 text-sm leading-none rounded border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] cursor-pointer ${raceFilter ? 'text-[color:var(--color-accent-fg)]' : 'text-[color:var(--color-fg-default)]'}`}
+            >
+              <option value="">All races</option>
+              {allRaces.map((race) => (
+                <option key={race} value={race}>{race}</option>
+              ))}
+            </select>
+            <svg className="absolute right-1.5 pointer-events-none text-[color:var(--color-fg-muted)]" width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+
           {/* Class filter select */}
           <div className="relative flex items-center">
             <svg className="absolute left-2 pointer-events-none text-[color:var(--color-fg-muted)]" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -226,7 +253,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
           </div>
 
           {/* Clear filters button */}
-          {(searchQuery || classFilter) && (
+          {(searchQuery || raceFilter || classFilter) && (
             <button
               type="button"
               title="Clear all filters"
@@ -234,6 +261,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
               onClick={() => {
                 setSearchInput('');
                 setSearchQuery('');
+                setRaceFilter(null);
                 setClassFilter(null);
                 setPage(1);
               }}
@@ -308,6 +336,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
                 {(
                   [
                     { label: 'Name',          key: 'name'      },
+                    { label: 'Race',          key: 'race'      },
                     { label: 'Class',         key: 'class'     },
                     { label: 'Level',         key: 'level'     },
                     { label: 'Last Modified', key: 'updatedAt' },
@@ -346,7 +375,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-4 py-6 text-center text-sm text-[color:var(--color-fg-muted)]"
                   >
                     {characters.length === 0 ? (
@@ -378,6 +407,9 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
                     {char.name}
                   </td>
                   <td className="px-4 py-2 text-[color:var(--color-fg-default)]">
+                    {char.race}
+                  </td>
+                  <td className="px-4 py-2 text-[color:var(--color-fg-default)]">
                     {classLabel(char.classes)}
                   </td>
                   <td className="px-4 py-2 text-[color:var(--color-fg-default)]">
@@ -387,48 +419,22 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
                     {formatDate(char.updatedAt)}
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <button
-                      type="button"
+                    <a
+                      href="#"
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         deleteCharacter(char._id);
                       }}
                       title="Delete character"
                       aria-label={`Delete ${char.name}`}
-                      className="inline-flex items-center justify-center w-6 h-6 border border-[var(--color-border-default)] rounded text-[color:var(--color-danger-fg)] bg-[var(--color-canvas-default)] cursor-pointer"
+                      className="inline-flex items-center justify-center w-6 h-6 text-black"
                     >
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                        aria-hidden="true"
-                      >
-                        <path
-                          d="M3 6h18"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                        />
-                        <path
-                          d="M8 6V4h8v2"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M19 6l-1 14H6L5 6"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                        <path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M4 2H1V4H15V2H12V0H4V2Z"/>
+                        <path fillRule="evenodd" clipRule="evenodd" d="M3 6H13V16H3V6ZM7 9H9V13H7V9Z"/>
                       </svg>
-                    </button>
+                    </a>
                   </td>
                 </tr>
               ))}

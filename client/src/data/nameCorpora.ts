@@ -1,7 +1,5 @@
 import type { Race, Gender } from '../types/character';
 
-type GenderKey = 'Male' | 'Female' | 'Gender Neutral';
-
 const CORPORA: Record<Race, Record<'Male' | 'Female', string[]>> = {
   Human: {
     Male: [
@@ -161,6 +159,46 @@ const CORPORA: Record<Race, Record<'Male' | 'Female', string[]>> = {
   },
 };
 
+const SURNAME_CORPORA: Record<Race, string[]> = {
+  Human: [
+    'Ashford', 'Briar', 'Caldwell', 'Dunwell', 'Eldridge', 'Fairborn',
+    'Garrick', 'Hawthorne', 'Ironwood', 'Kestrel', 'Langley', 'Merrick',
+    'Northcott', 'Pryce', 'Ravenshade', 'Stone', 'Thorne', 'Westfall',
+  ],
+  Elf: [
+    'Amakiir', 'Amastacia', 'Celebren', 'Dalanthan', 'Erenaeth', 'Galanodel',
+    'Holimion', 'Ilphelkiir', 'Liadon', 'Meliamne', 'Nailo', 'Siannodel',
+    'Xiloscient', 'Yllaphon', 'Elyndor', 'Lethalas',
+  ],
+  Dwarf: [
+    'Battlehammer', 'Bronzebeard', 'Deepdelver', 'Fireforge', 'Frostbeard',
+    'Goldfinder', 'Granitehand', 'Ironfist', 'Kegshield', 'Orebreaker',
+    'Rockseeker', 'Stoneshield', 'Strongale', 'Thunderdelve', 'Torchbeard',
+    'Underbrow',
+  ],
+  Gnome: [
+    'Beren', 'Cobblehob', 'Daergel', 'Folkor', 'Garrick', 'Murnig',
+    'Nackle', 'Ningel', 'Raulnor', 'Scheppen', 'Timbers', 'Turen',
+    'Umbodoben', 'Waggletop', 'Wobbledink', 'Zaffrab',
+  ],
+  Halfling: [
+    'Brushgather', 'Goodbarrel', 'Greenbottle', 'Highhill', 'Hilltopple',
+    'Leagallow', 'Longbottom', 'Mooncask', 'Proudfoot', 'Quickstep',
+    'Rumblebelly', 'Tealeaf', 'Thorngage', 'Tosscobble', 'Underbough',
+    'Warmwater',
+  ],
+  'Half-Elf': [
+    'Brightwood', 'Dawnmere', 'Evenwood', 'Farsong', 'Greyvale', 'Moonbrook',
+    'Nightbloom', 'Riversong', 'Silverbough', 'Starleaf', 'Sunmere',
+    'Thornwillow', 'Umberwind', 'Valewhisper', 'Westgrove', 'Willowmere',
+  ],
+  'Half-Orc': [
+    'Bonecrag', 'Doomtusk', 'Embermaw', 'Grimscar', 'Ironjaw', 'Maneater',
+    'Rageborn', 'Rendhide', 'Skullcleaver', 'Skullsplitter', 'Stonefang',
+    'Thundermaw', 'Urgash', 'Warskull', 'Wolftooth', 'Zargrul',
+  ],
+};
+
 /** Returns the name corpus for the given race and gender.
  *  'Gender Neutral' blends the Male and Female corpora. */
 export function getCorpus(race: Race, gender: Gender): string[] {
@@ -169,4 +207,9 @@ export function getCorpus(race: Race, gender: Gender): string[] {
     return [...entry.Male, ...entry.Female];
   }
   return entry[gender];
+}
+
+/** Returns surname corpus for the given race. */
+export function getSurnameCorpus(race: Race): string[] {
+  return SURNAME_CORPORA[race];
 }
