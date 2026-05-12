@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { CharactersPage } from './pages/CharactersPage';
-import { CharacterEditor } from './pages/CharacterEditor';
-import { CustomFeatsPage } from './pages/CustomFeatsPage';
-import { InitiativeTrackerPage } from './pages/InitiativeTrackerPage';
-import { NameGeneratorPage } from './pages/NameGeneratorPage';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import type { ClassName, Race } from './types/character';
 import './App.css';
+
+const CharactersPage = lazy(() => import('./pages/CharactersPage').then((module) => ({ default: module.CharactersPage })));
+const CharacterEditor = lazy(() => import('./pages/CharacterEditor').then((module) => ({ default: module.CharacterEditor })));
+const CustomFeatsPage = lazy(() => import('./pages/CustomFeatsPage').then((module) => ({ default: module.CustomFeatsPage })));
+const InitiativeTrackerPage = lazy(() => import('./pages/InitiativeTrackerPage').then((module) => ({ default: module.InitiativeTrackerPage })));
+const NameGeneratorPage = lazy(() => import('./pages/NameGeneratorPage').then((module) => ({ default: module.NameGeneratorPage })));
 
 interface User {
   id: string;
@@ -407,62 +408,72 @@ function App() {
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto" style={{ scrollbarGutter: 'stable' }}>
-        <div className={section === 'name-generator' || section === 'initiative-tracker' ? 'container-lg' : 'container-xl'}>
-          {section === 'custom-feats' && (
-            <CustomFeatsPage />
+        <Suspense
+          fallback={(
+            <div className={section === 'name-generator' || section === 'initiative-tracker' ? 'container-lg' : 'container-xl'}>
+              <p className="text-sm text-[color:var(--color-fg-muted)]">
+                Loading…
+              </p>
+            </div>
           )}
-          {section === 'initiative-tracker' && (
-            <InitiativeTrackerPage />
-          )}
-          {section === 'name-generator' && (
-            <NameGeneratorPage
-              onCreateCharacter={(name, initialClass, initialRace) => {
-                setNewCharacterName(name);
-                setNewCharacterClass(initialClass);
-                setNewCharacterRace(initialRace);
-                setSelectedCharacterId(null);
-                setView('new');
-                setSection('characters');
-              }}
-            />
-          )}
-          {section === 'characters' && view === 'list' && (
-            <CharactersPage
-              userId={user.id}
-              onNewCharacter={(initialClass) => {
-                setNewCharacterClass(initialClass);
-                setSelectedCharacterId(null);
-                setView('new');
-              }}
-              onEditCharacter={(id) => {
-                setSelectedCharacterId(id);
-                setView('edit');
-              }}
-            />
-          )}
-          {section === 'characters' && view === 'new' && (
-            <CharacterEditor
-              initialClass={newCharacterClass}
-              initialName={newCharacterName}
-              initialRace={newCharacterRace}
-              onCancel={() => {
-                setNewCharacterClass(undefined);
-                setNewCharacterName(undefined);
-                setNewCharacterRace(undefined);
-                setView('list');
-              }}
-            />
-          )}
-          {section === 'characters' && view === 'edit' && selectedCharacterId && (
-            <CharacterEditor
-              characterId={selectedCharacterId}
-              onCancel={() => {
-                setSelectedCharacterId(null);
-                setView('list');
-              }}
-            />
-          )}
-        </div>
+        >
+          <div className={section === 'name-generator' || section === 'initiative-tracker' ? 'container-lg' : 'container-xl'}>
+            {section === 'custom-feats' && (
+              <CustomFeatsPage />
+            )}
+            {section === 'initiative-tracker' && (
+              <InitiativeTrackerPage />
+            )}
+            {section === 'name-generator' && (
+              <NameGeneratorPage
+                onCreateCharacter={(name, initialClass, initialRace) => {
+                  setNewCharacterName(name);
+                  setNewCharacterClass(initialClass);
+                  setNewCharacterRace(initialRace);
+                  setSelectedCharacterId(null);
+                  setView('new');
+                  setSection('characters');
+                }}
+              />
+            )}
+            {section === 'characters' && view === 'list' && (
+              <CharactersPage
+                userId={user.id}
+                onNewCharacter={(initialClass) => {
+                  setNewCharacterClass(initialClass);
+                  setSelectedCharacterId(null);
+                  setView('new');
+                }}
+                onEditCharacter={(id) => {
+                  setSelectedCharacterId(id);
+                  setView('edit');
+                }}
+              />
+            )}
+            {section === 'characters' && view === 'new' && (
+              <CharacterEditor
+                initialClass={newCharacterClass}
+                initialName={newCharacterName}
+                initialRace={newCharacterRace}
+                onCancel={() => {
+                  setNewCharacterClass(undefined);
+                  setNewCharacterName(undefined);
+                  setNewCharacterRace(undefined);
+                  setView('list');
+                }}
+              />
+            )}
+            {section === 'characters' && view === 'edit' && selectedCharacterId && (
+              <CharacterEditor
+                characterId={selectedCharacterId}
+                onCancel={() => {
+                  setSelectedCharacterId(null);
+                  setView('list');
+                }}
+              />
+            )}
+          </div>
+        </Suspense>
       </main>
 
       <SettingsFlyout
