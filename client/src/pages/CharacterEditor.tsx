@@ -527,7 +527,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
     && !hasUnselectedClass;
   const headerTitle = isEdit
     ? (draft.name.trim() || 'Edit Character')
-    : 'New Character';
+    : (draft.name.trim() || 'New Character');
 
   // Custom feats filtered to those available for this character's classes
   const characterClassNames = useMemo(

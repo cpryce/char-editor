@@ -4,7 +4,7 @@ import type { Race, Gender, ClassName } from '../types/character';
 import { getCorpus, getSurnameCorpus } from '../data/nameCorpora';
 import { generateNames } from '../utils/nameGenerator';
 
-const GENERATE_COUNT = 12;
+const GENERATE_COUNT = 6;
 
 function CopyIcon() {
   return (
@@ -193,9 +193,11 @@ export function NameGeneratorPage({ onCreateCharacter }: { onCreateCharacter?: (
 
       {hasGenerated && names.length > 0 && (
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide mb-3 text-[color:var(--color-fg-muted)]">
-            {gender} {race} {includeSurnames ? 'full names' : 'names'}
-          </p>
+          <div className="mb-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]">
+              {gender} {race} {includeSurnames ? 'full names' : 'names'}
+            </p>
+          </div>
           <ul className="rounded-md border overflow-hidden border-[var(--color-border-default)]">
             {names.map((name, i) => (
               <li
@@ -243,6 +245,17 @@ export function NameGeneratorPage({ onCreateCharacter }: { onCreateCharacter?: (
               </li>
             ))}
           </ul>
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={generate}
+              aria-label="Re-generate names"
+              title="Re-generate names"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-border-default)] text-[color:var(--color-fg-muted)] hover:bg-[var(--color-canvas-subtle)]"
+            >
+              <RefreshIcon />
+            </button>
+          </div>
           <p className="text-xs mt-3 text-[color:var(--color-fg-muted)]">
             Click Generate again for a fresh batch.
           </p>

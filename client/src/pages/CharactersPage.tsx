@@ -22,11 +22,19 @@ interface CharactersPageProps {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return 'unknown';
+
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'always' });
+
+  if (elapsedSeconds < 60) return '1 minute ago';
+  if (elapsedSeconds < 60 * 60) return rtf.format(-Math.floor(elapsedSeconds / 60), 'minute');
+  if (elapsedSeconds < 60 * 60 * 24) return rtf.format(-Math.floor(elapsedSeconds / (60 * 60)), 'hour');
+  if (elapsedSeconds < 60 * 60 * 24 * 7) return rtf.format(-Math.floor(elapsedSeconds / (60 * 60 * 24)), 'day');
+  if (elapsedSeconds < 60 * 60 * 24 * 30) return rtf.format(-Math.floor(elapsedSeconds / (60 * 60 * 24 * 7)), 'week');
+  if (elapsedSeconds < 60 * 60 * 24 * 365) return rtf.format(-Math.floor(elapsedSeconds / (60 * 60 * 24 * 30)), 'month');
+  return rtf.format(-Math.floor(elapsedSeconds / (60 * 60 * 24 * 365)), 'year');
 }
 
 function totalLevel(classes: ClassEntry[]) {
