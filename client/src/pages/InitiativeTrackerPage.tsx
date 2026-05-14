@@ -1,7 +1,7 @@
 import { useState } from 'react';
-// @ts-ignore — JSX files without TS types
+// @ts-expect-error — JSX files without TS types
 import { EncountersPage } from './initiative-tracker/EncountersPage';
-// @ts-ignore — JSX files without TS types
+// @ts-expect-error — JSX files without TS types
 import { EncounterPage } from './initiative-tracker/EncounterPage';
 
 type View = 'encounters' | 'encounter';

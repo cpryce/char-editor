@@ -305,7 +305,7 @@ function rtfEscape(text: string): string {
     .replace(/\u2013/g, '\\endash ')
     .replace(/\u2014/g, '\\emdash ')
     // any remaining non-ASCII: encode as \'XX
-    .replace(/[^\x00-\x7F]/g, (ch) => `\\'${ch.charCodeAt(0).toString(16).padStart(2, '0')}`);
+    .replace(/[\u0080-\uFFFF]/g, (ch) => `\\'${ch.charCodeAt(0).toString(16).padStart(2, '0')}`);  // non-ASCII
 }
 
 /**

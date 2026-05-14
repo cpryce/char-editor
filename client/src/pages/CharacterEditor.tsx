@@ -36,7 +36,8 @@ import type { CustomFeat } from '../types/customFeat';
 import { IdentitySection } from './character-editor/IdentitySection';
 import { BackgroundSection } from './character-editor/BackgroundSection';
 import { ClassLevelSection } from './character-editor/ClassLevelSection';
-import { AbilityScoresSection, ABILITY_KEYS } from './character-editor/AbilityScoresSection';
+import { AbilityScoresSection } from './character-editor/AbilityScoresSection';
+import { ABILITY_KEYS } from './character-editor/abilityKeys';
 import { FeatsSection } from './character-editor/FeatsSection';
 import { CombatSection } from './character-editor/CombatSection';
 import type { CombatDerivedStats } from './character-editor/CombatSection';
@@ -1060,6 +1061,9 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
     }, 400);
 
     return () => clearTimeout(timer);
+    // combatStats fields are derived from draft which is already listed;
+    // adding them would be redundant and confusing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     draft,
     loadingCharacter,

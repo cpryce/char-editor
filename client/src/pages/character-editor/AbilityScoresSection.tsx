@@ -5,9 +5,9 @@ import {
   totalScore,
 } from '../../utils/characterHelpers';
 import './AbilityScoresSection.css';
-
-export const ABILITY_KEYS = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'] as const;
-export type AbilityKey = (typeof ABILITY_KEYS)[number];
+import { ABILITY_KEYS } from './abilityKeys';
+import type { AbilityKey } from './abilityKeys';
+export type { AbilityKey };
 
 const ABILITY_LABELS: Record<AbilityKey, string> = {
   strength: 'STR',

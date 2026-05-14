@@ -713,6 +713,9 @@ export function InventorySection({
     previousDerivedRef.current = next;
 
     updateInventory({}, { forceRecompute: true });
+    // updateInventory is stable but not wrapped in useCallback at the call site;
+    // the intent is to only rerun when derived attack bonuses change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [derivedBaseAttackBonus, derivedMeleeAttackBonus, derivedRangedAttackBonus]);
 
   function handleOffHandShieldSelect(name: string, entry?: ArmorCatalogEntry) {
@@ -743,6 +746,10 @@ export function InventorySection({
     if (changed) {
       updateInventory(nextPartial);
     }
+    // inventory.body / offHandShield / updateInventory intentionally omitted —
+    // this effect only recalculates speed when size or race changes, not on
+    // every inventory write (which would cause an infinite loop).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size, race]);
 
   function updateOffHandShieldField(field: keyof ArmorLoadout, value: string | number | null) {
@@ -1303,9 +1310,15 @@ function FeatPopupButton({
   onToggle: (name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLSpanElement>(null);
   const activeNames = options.filter((o) => applied.includes(o.name)).map((o) => o.name);
   const summary = activeNames.length > 0 ? activeNames.join(', ') : 'none';
+
+  function handleToggle() {
+    if (!open) setAnchorEl(triggerRef.current);
+    setOpen((v) => !v);
+  }
 
   return (
     <>
@@ -1314,8 +1327,8 @@ function FeatPopupButton({
         role="button"
         tabIndex={0}
         className="inventory-feat-trigger"
-        onClick={() => setOpen((v) => !v)}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setOpen((v) => !v)}
+        onClick={handleToggle}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleToggle()}
         aria-expanded={open ? 'true' : 'false'}
       >
         <span className={`inventory-hands-detail-value inventory-feat-summary${activeNames.length > 0 ? ' inventory-feat-summary--active' : ''}`}>
@@ -1328,7 +1341,7 @@ function FeatPopupButton({
           applied={applied}
           onToggle={onToggle}
           onClose={() => setOpen(false)}
-          anchorEl={triggerRef.current}
+          anchorEl={anchorEl}
         />
       )}
     </>
