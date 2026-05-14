@@ -158,9 +158,9 @@ export function CombatSection({
           withBorder ? '' : 'combat-subsection--no-border',
         ].join(' ')}
       >
-        <h4 className="text-[11px] font-semibold uppercase tracking-wider combat-subsection-title">
+        <p className="subsection-header">
           {title}
-        </h4>
+        </p>
         {content}
       </section>
     );

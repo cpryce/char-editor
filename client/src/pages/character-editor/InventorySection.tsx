@@ -851,7 +851,7 @@ export function InventorySection({
 
       {/* ── 1. Weapons ── */}
       <div>
-        <p className="inventory-section-title">Weapons</p>
+        <p className="subsection-header">Weapons</p>
         <WeaponSelector
           title="Main Hand"
           weapon={mainHand}
@@ -1002,7 +1002,7 @@ export function InventorySection({
 
       {/* ── 2. Armor ── */}
       <div>
-        <p className="inventory-section-title">Armor</p>
+        <p className="subsection-header">Armor</p>
         <div className="inventory-hands-wrap">
           <table className="inventory-hands-table" aria-label="Armor slots">
             <thead className="inventory-hands-thead">
@@ -1031,7 +1031,7 @@ export function InventorySection({
 
       {/* ── 3. Worn Slots ── */}
       <div>
-        <p className="inventory-section-title">Worn Slots</p>
+        <p className="subsection-header">Worn Slots</p>
         <p className="inventory-help">
           Items can grant bonuses to AC — select a type and value for each slot.
           {' '}* Dodge bonuses stack with each other; all other types apply only the highest.

@@ -107,16 +107,6 @@
   font-weight: 500;
 }
 
-/* ── Section heading ─────────────────────────────────────────────────────── */
-.inventory-section-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-fg-muted);
-  margin-bottom: 4px;
-}
-
 /* ── Hands table ─────────────────────────────────────────────────────────── */
 .inventory-weapon-selector {
   margin-bottom: 12px;

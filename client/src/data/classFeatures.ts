@@ -863,7 +863,112 @@ const CATALOG: Partial<Record<ClassName, ReadonlyArray<ClassFeatureInfo>>> = {
   ],
 
   // ── Paladin ────────────────────────────────────────────────────────────────
-  // (Not included in user-provided SRD pages — add later if needed)
+  Paladin: [
+    {
+      id: 'weapon-armor-proficiency',
+      name: 'Weapon & Armor Proficiency',
+      minLevel: 1,
+      shortDescription: 'All simple and martial weapons; all armor; shields (except tower shields).',
+      fullDescription:
+        'Paladins are proficient with all simple and martial weapons, with all types of armor (heavy, medium, and light), and with shields (except tower shields).',
+    },
+    {
+      id: 'aura-of-good',
+      name: 'Aura of Good (Ex)',
+      minLevel: 1,
+      shortDescription: 'A paladin has a powerful aura of good (as a cleric of equal level).',
+      fullDescription:
+        'The power of a paladin\'s aura of good is equal to her paladin level, just as the aura of a cleric of a good deity.',
+    },
+    {
+      id: 'detect-evil',
+      name: 'Detect Evil (Sp)',
+      minLevel: 1,
+      shortDescription: 'Can use detect evil at will, as the spell.',
+      fullDescription:
+        'At will, a paladin can use detect evil, as the spell.',
+    },
+    {
+      id: 'smite-evil',
+      name: 'Smite Evil (Su)',
+      minLevel: 1,
+      shortDescription: '1/day at 1st level; +1/day every 5 levels. Add Cha bonus to attack and paladin level to damage against evil target.',
+      fullDescription:
+        'Once per day, a paladin may attempt to smite evil with one normal melee attack. She adds her Charisma bonus (if any) to her attack roll and deals 1 extra point of damage per paladin level. If she accidentally smites a creature that is not evil, the smite has no effect but the use is still expended. At 5th level and every five levels thereafter, she may smite evil one additional time per day (to 5/day at 20th level).',
+    },
+    {
+      id: 'divine-grace',
+      name: 'Divine Grace (Su)',
+      minLevel: 2,
+      shortDescription: 'Adds Charisma bonus (if any) to all saving throws.',
+      fullDescription:
+        'At 2nd level, a paladin gains a bonus equal to her Charisma bonus (if any) on all saving throws.',
+    },
+    {
+      id: 'lay-on-hands',
+      name: 'Lay on Hands (Su)',
+      minLevel: 2,
+      shortDescription: 'Can heal total hit points per day equal to paladin level × Charisma bonus (minimum 0).',
+      fullDescription:
+        'Beginning at 2nd level, a paladin can heal wounds by touch. Each day she can heal a total number of hit points of damage equal to her paladin level multiplied by her Charisma bonus (if any). She may divide this healing among multiple recipients, and using lay on hands is a standard action.',
+    },
+    {
+      id: 'aura-of-courage',
+      name: 'Aura of Courage (Su)',
+      minLevel: 3,
+      shortDescription: 'Immune to fear; allies within 10 ft gain +4 morale bonus on saves vs fear.',
+      fullDescription:
+        'Starting at 3rd level, a paladin is immune to fear (magical or otherwise). Allies within 10 feet of her gain a +4 morale bonus on saving throws against fear effects. This ability functions only while the paladin is conscious.',
+    },
+    {
+      id: 'divine-health',
+      name: 'Divine Health (Ex)',
+      minLevel: 3,
+      shortDescription: 'Immune to all diseases, including supernatural and magical diseases.',
+      fullDescription:
+        'At 3rd level, a paladin gains immunity to all diseases, including supernatural and magical diseases.',
+    },
+    {
+      id: 'turn-undead',
+      name: 'Turn Undead (Su)',
+      minLevel: 4,
+      shortDescription: 'Can turn undead as a cleric three levels lower than paladin level.',
+      fullDescription:
+        'When a paladin reaches 4th level, she gains the supernatural ability to turn undead. She may use this ability a number of times per day equal to 3 + her Charisma modifier. She turns undead as a cleric of three levels lower than her paladin level.',
+    },
+    {
+      id: 'spells',
+      name: 'Spells',
+      minLevel: 4,
+      shortDescription: 'Prepares a small number of divine spells from the paladin list. Wisdom-based; caster level = 1/2 paladin level.',
+      fullDescription:
+        'Beginning at 4th level, a paladin gains the ability to cast a small number of divine spells drawn from the paladin spell list. She must have a Wisdom score of at least 10 + spell level, and saving throw DCs are 10 + spell level + Wisdom modifier. A paladin\'s caster level is one-half her paladin level.',
+    },
+    {
+      id: 'special-mount',
+      name: 'Special Mount (Sp)',
+      minLevel: 5,
+      shortDescription: 'Can call a celestial warhorse (or similar mount) that grows stronger with level.',
+      fullDescription:
+        'Upon reaching 5th level, a paladin gains the service of an unusually intelligent, strong, and loyal steed to serve her in her crusade against evil. The mount is typically a heavy warhorse for a Medium paladin or a warpony for a Small paladin, and it gains special abilities based on the paladin\'s level.',
+    },
+    {
+      id: 'remove-disease',
+      name: 'Remove Disease (Sp)',
+      minLevel: 6,
+      shortDescription: '1/week at 6th level; +1/week every 3 levels thereafter.',
+      fullDescription:
+        'At 6th level, a paladin can produce a remove disease effect, as the spell, once per week. She can use this ability one additional time per week for every three levels after 6th (2/week at 9th, 3/week at 12th, 4/week at 15th, and 5/week at 18th).',
+    },
+    {
+      id: 'code-of-conduct',
+      name: 'Code of Conduct',
+      minLevel: 1,
+      shortDescription: 'Must be lawful good, act honorably, and respect legitimate authority; violating code can cause loss of class abilities.',
+      fullDescription:
+        'A paladin must be of lawful good alignment and loses all class abilities if she ever willingly commits an evil act. In addition, her code requires that she respect legitimate authority, act with honor, help those in need (provided they do not use the help for evil or chaotic ends), and punish those who harm or threaten innocents.',
+    },
+  ],
 };
 
 // ── Public API ────────────────────────────────────────────────────────────────

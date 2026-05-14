@@ -248,7 +248,7 @@ export function EncounterPage({ sessionId, onBack }) {
       let next = [...prev];
       characters.filter((ch) => pickerSelection.has(ch._id)).forEach((char) => {
         const modifier = initiativeModifierFromCharacter(char);
-        const c = { id: newId(), name: char.name, type: 'player', initiative: 0, modifier, flatFooted: false, statuses: [] };
+        const c = { id: newId(), name: char.name, type: 'player', initiative: 0, modifier, flatFooted: false, statuses: [], characterId: char._id };
         next = [...next, c];
         lastId = c.id;
       });
@@ -517,7 +517,10 @@ export function EncounterPage({ sessionId, onBack }) {
       </div>
 
       {/* Character picker modal */}
-      {showCharPicker && (
+      {showCharPicker && (() => {
+        const importedIds = new Set(combatants.map((c) => c.characterId).filter(Boolean));
+        const availableChars = characters ? characters.filter((c) => !importedIds.has(c._id)) : characters;
+        return (
         <div
           style={{
             position: 'fixed', inset: 0, zIndex: 300,
@@ -555,10 +558,12 @@ export function EncounterPage({ sessionId, onBack }) {
 
             {/* Character list */}
             <div style={{ overflowY: 'auto', flex: 1 }}>
-              {characters === null ? (
+              {availableChars === null ? (
                 <p style={{ fontSize: '13px', color: 'var(--color-fg-muted)', textAlign: 'center', padding: '24px 0' }}>Loading…</p>
-              ) : characters.length === 0 ? (
-                <p style={{ fontSize: '13px', color: 'var(--color-fg-muted)', textAlign: 'center', padding: '24px 0' }}>No characters found.</p>
+              ) : availableChars.length === 0 ? (
+                <p style={{ fontSize: '13px', color: 'var(--color-fg-muted)', textAlign: 'center', padding: '24px 0' }}>
+                  {characters && characters.length > 0 ? 'All characters are already in the encounter.' : 'No characters found.'}
+                </p>
               ) : (
                 <>
                   {/* Select all row */}
@@ -573,13 +578,13 @@ export function EncounterPage({ sessionId, onBack }) {
                   >
                     <input
                       type="checkbox"
-                      checked={pickerSelection.size === characters.length}
-                      ref={(el) => { if (el) el.indeterminate = pickerSelection.size > 0 && pickerSelection.size < characters.length; }}
+                      checked={pickerSelection.size === availableChars.length}
+                      ref={(el) => { if (el) el.indeterminate = pickerSelection.size > 0 && pickerSelection.size < availableChars.length; }}
                       onChange={() => {
-                        if (pickerSelection.size === characters.length) {
+                        if (pickerSelection.size === availableChars.length) {
                           setPickerSelection(new Set());
                         } else {
-                          setPickerSelection(new Set(characters.map((c) => c._id)));
+                          setPickerSelection(new Set(availableChars.map((c) => c._id)));
                         }
                       }}
                       style={{ width: '15px', height: '15px', cursor: 'pointer', flexShrink: 0 }}
@@ -587,7 +592,7 @@ export function EncounterPage({ sessionId, onBack }) {
                     <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-fg-default)' }}>Select all</span>
                   </label>
 
-                  {characters.map((char) => {
+                  {availableChars.map((char) => {
                     const mod = initiativeModifierFromCharacter(char);
                     const modStr = mod >= 0 ? `+${mod}` : `${mod}`;
                     const checked = pickerSelection.has(char._id);
@@ -634,7 +639,7 @@ export function EncounterPage({ sessionId, onBack }) {
             </div>
 
             {/* Footer */}
-            {characters && characters.length > 0 && (
+            {availableChars && availableChars.length > 0 && (
               <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   onClick={importSelected}
@@ -654,7 +659,8 @@ export function EncounterPage({ sessionId, onBack }) {
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

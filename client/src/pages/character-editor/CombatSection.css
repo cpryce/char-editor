@@ -46,10 +46,6 @@
   border-bottom: none;
 }
 
-.combat-subsection-title {
-  color: var(--color-fg-muted);
-}
-
 .combat-muted-text {
   color: var(--color-fg-muted);
 }

@@ -102,6 +102,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
   const [raceFilter, setRaceFilter] = useState<string | null>(null);
   const [classFilter, setClassFilter] = useState<string | null>(null);
   const [newDropdownOpen, setNewDropdownOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CharacterSummary | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const newRef = useRef<HTMLDivElement>(null);
 
@@ -432,7 +433,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        deleteCharacter(char._id);
+                        setDeleteTarget(char);
                       }}
                       title="Delete character"
                       aria-label={`Delete ${char.name}`}
@@ -519,6 +520,57 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
                 >»</button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {deleteTarget && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 300,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: 'var(--color-canvas-default)',
+              border: '1px solid var(--color-border-default)',
+              borderRadius: '12px',
+              padding: '24px',
+              width: '360px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+            }}
+          >
+            <h3 style={{ margin: '0 0 8px', fontSize: '15px', fontWeight: 600, color: 'var(--color-fg-default)' }}>
+              Delete character?
+            </h3>
+            <p style={{ margin: '0 0 20px', fontSize: '13px', color: 'var(--color-fg-muted)' }}>
+              <strong style={{ color: 'var(--color-fg-default)' }}>{deleteTarget.name}</strong> will be permanently deleted. This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                style={{
+                  padding: '6px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600,
+                  border: '1px solid var(--color-border-default)', cursor: 'pointer',
+                  backgroundColor: 'var(--color-canvas-default)', color: 'var(--color-fg-default)',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { deleteCharacter(deleteTarget._id); setDeleteTarget(null); }}
+                style={{
+                  padding: '6px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600,
+                  border: 'none', cursor: 'pointer',
+                  backgroundColor: 'var(--color-danger-emphasis)', color: '#ffffff',
+                }}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -195,7 +195,7 @@ export function FeatsSection({
 }) {
   return (
     <>
-      <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-fg-muted)' }}>
+      <p className="subsection-header">
         Class Features
       </p>
       <p className="text-sm mb-2" style={{ color: 'var(--color-fg-subtle)' }}>
@@ -203,7 +203,7 @@ export function FeatsSection({
       </p>
       <ClassFeaturesSection features={classFeatures} />
 
-      <p className="text-xs font-semibold uppercase tracking-wider mt-4 mb-1" style={{ color: 'var(--color-fg-muted)' }}>
+      <p className="subsection-header">
         Feat Slots
       </p>
       <p className="text-sm mb-2" style={{ color: 'var(--color-fg-subtle)' }}>
