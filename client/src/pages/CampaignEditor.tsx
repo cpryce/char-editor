@@ -44,8 +44,11 @@ export function CampaignEditor({
   const [charPickerSelection, setCharPickerSelection] = useState<Set<string>>(new Set());
   const [charNewName, setCharNewName] = useState('');
   const [charNewClass, setCharNewClass] = useState<ClassName | null>(null);
+  const [showEncounterDropdown, setShowEncounterDropdown] = useState(false);
+  const [encounterNewName, setEncounterNewName] = useState('');
   const selectAllRef = useRef<HTMLInputElement>(null);
   const charDropdownRef = useRef<HTMLDivElement>(null);
+  const encounterDropdownRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {    fetch(`/api/campaigns/${campaignId}`, { credentials: 'include' })
       .then((r) => r.json())
@@ -91,6 +94,17 @@ export function CampaignEditor({
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [showCharDropdown]);
 
+  useEffect(() => {
+    if (!showEncounterDropdown) return;
+    function handleMouseDown(e: MouseEvent) {
+      if (encounterDropdownRef.current && !encounterDropdownRef.current.contains(e.target as Node)) {
+        setShowEncounterDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [showEncounterDropdown]);
+
   async function openCharDropdown() {
     if (showCharDropdown) { setShowCharDropdown(false); return; }
     const res = await fetch('/api/characters', { credentials: 'include' });
@@ -102,19 +116,23 @@ export function CampaignEditor({
     setShowCharDropdown(true);
   }
 
-  async function startEncounter() {
-    if (!campaign) return;
-    // Create a new encounter session
+  function openEncounterDropdown() {
+    if (showEncounterDropdown) { setShowEncounterDropdown(false); return; }
+    setEncounterNewName('');
+    setShowEncounterDropdown(true);
+  }
+
+  async function createEncounter() {
+    if (!campaign || !encounterNewName.trim()) return;
     const createRes = await fetch('/api/encounters', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: campaign.name }),
+      body: JSON.stringify({ name: encounterNewName.trim() }),
     });
     const session = await createRes.json();
     if (!createRes.ok) return;
 
-    // Add campaign characters as players
     const players = campaign.characters.map((char, i) => ({
       id: `c-${Date.now()}-${i}`,
       name: char.name,
@@ -128,6 +146,8 @@ export function CampaignEditor({
       body: JSON.stringify({ players }),
     });
 
+    setShowEncounterDropdown(false);
+    setEncounterNewName('');
     onStartEncounter(session.id);
   }
 
@@ -403,15 +423,47 @@ export function CampaignEditor({
                 </div>
               )}
             </div>
-            <button
-              type="button"
-              className="btn btn-default"
-              onClick={startEncounter}
-              disabled={campaign.characters.length === 0}
-              title={campaign.characters.length === 0 ? 'Add characters first' : 'Start an encounter with these characters'}
-            >
-              + Encounter
-            </button>
+            <div style={{ position: 'relative' }} ref={encounterDropdownRef}>
+              <button
+                type="button"
+                className="btn btn-default"
+                onClick={openEncounterDropdown}
+                aria-haspopup="true"
+                aria-expanded={showEncounterDropdown}
+                disabled={campaign.characters.length === 0}
+                title={campaign.characters.length === 0 ? 'Add characters first' : undefined}
+              >
+                + Encounter
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ marginLeft: '4px' }}>
+                  <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {showEncounterDropdown && (
+                <div className="char-dropdown">
+                  <div style={{ padding: '10px 12px 6px' }}>
+                    <input
+                      type="text"
+                      value={encounterNewName}
+                      onChange={(e) => setEncounterNewName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') createEncounter(); }}
+                      placeholder="Encounter name"
+                      className="char-new-name-input"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="campaign-picker-footer">
+                    <button
+                      type="button"
+                      className="campaign-picker-add-btn"
+                      disabled={!encounterNewName.trim()}
+                      onClick={createEncounter}
+                    >
+                      Create encounter
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         {campaign.characters.length === 0 ? (
