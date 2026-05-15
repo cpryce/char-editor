@@ -26,6 +26,7 @@ type WeaponSelectorProps = {
   maxAttacks?: number;
   twoWeaponPenalty?: number;
   featControl?: ReactNode;
+  extraControl?: ReactNode;
 };
 
 export function WeaponSelector({
@@ -47,6 +48,7 @@ export function WeaponSelector({
   maxAttacks,
   twoWeaponPenalty = 0,
   featControl,
+  extraControl,
 }: WeaponSelectorProps) {
   const damageValue = weapon?.damage ?? '';
   const mat = weapon?.material ? MATERIALS[weapon.material as MaterialKey] : undefined;
@@ -243,6 +245,12 @@ export function WeaponSelector({
                     <span className="inventory-hands-detail-field">
                       <span className="inventory-hands-detail-label">Feats</span>
                       {featControl}
+                    </span>
+                  )}
+                  {extraControl && (
+                    <span className="inventory-hands-detail-field">
+                      <span className="inventory-hands-detail-label">TWF Feats</span>
+                      {extraControl}
                     </span>
                   )}
                 </div>

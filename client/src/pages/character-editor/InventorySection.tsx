@@ -855,9 +855,8 @@ export function InventorySection({
 
   return (
     <div className="inventory-section">
-
       {/* ── 1. Weapons ── */}
-      <div>
+      <section className="flex flex-col gap-2 pb-4 border-b border-[var(--color-fg-subtle)]">
         <p className="subsection-header">Weapons</p>
         <WeaponSelector
           title="Main Hand"
@@ -884,7 +883,7 @@ export function InventorySection({
           <div className="inventory-weapon-selector-header">
             {!isTwoHanded && (
               <div className="inventory-offhand-mode">
-                {(['none', 'weapon', 'shield'] as const).map((mode) => (
+                {(['shield', 'weapon', 'none'] as const).map((mode) => (
                   <label key={mode}>
                     <input
                       type="radio"
@@ -896,27 +895,16 @@ export function InventorySection({
                     {mode === 'none' ? 'Empty' : mode.charAt(0).toUpperCase() + mode.slice(1)}
                   </label>
                 ))}
-                {offHandMode === 'weapon' && (
+                {offHandMode === 'weapon' && isTwoWeaponFighting && (
                   <>
                     <span className="inventory-offhand-mode-sep" aria-hidden>|</span>
-                    <span className="inventory-offhand-mode-feat-label">Two-weapon feats</span>
-                    <FeatPopupButton
-                      options={twfFeatOptions}
-                      applied={twfAppliedFeats}
-                      onToggle={toggleTwfFeat}
-                    />
-                    {isTwoWeaponFighting && (
-                      <>
-                        <span className="inventory-offhand-mode-sep" aria-hidden>|</span>
-                        <span className="inventory-offhand-mode-twf-summary">
-                          Primary{' '}
-                          <strong>{twfMainPenalty >= 0 ? `+${twfMainPenalty}` : twfMainPenalty}</strong>
-                          {' / '}off-hand{' '}
-                          <strong>{twfOffPenalty >= 0 ? `+${twfOffPenalty}` : twfOffPenalty}</strong>
-                          {offHandIsLight ? '\u00a0(light)' : '\u00a0(one-handed)'}
-                        </span>
-                      </>
-                    )}
+                    <span className="inventory-offhand-mode-twf-summary">
+                      Primary{' '}
+                      <strong>{twfMainPenalty >= 0 ? `+${twfMainPenalty}` : twfMainPenalty}</strong>
+                      {' / '}off-hand{' '}
+                      <strong>{twfOffPenalty >= 0 ? `+${twfOffPenalty}` : twfOffPenalty}</strong>
+                      {offHandIsLight ? '\u00a0(light)' : '\u00a0(one-handed)'}
+                    </span>
                   </>
                 )}
               </div>
@@ -933,7 +921,7 @@ export function InventorySection({
               baseAttackBonus={derivedBaseAttackBonus}
               meleeAttackBonus={derivedMeleeAttackBonus}
               rangedAttackBonus={derivedRangedAttackBonus}
-              rowClass="inventory-hands-row-odd"
+              rowClass="inventory-hands-row-even"
               inputStyle={inputStyle}
               onSelect={handleOffHandWeaponSelect}
               onFieldChange={updateOffHandWeaponField}
@@ -949,31 +937,54 @@ export function InventorySection({
                   onToggle={toggleOffHandFeat}
                 />
               )}
+              extraControl={(
+                <FeatPopupButton
+                  options={twfFeatOptions}
+                  applied={twfAppliedFeats}
+                  onToggle={toggleTwfFeat}
+                />
+              )}
             />
           ) : offHandMode === 'shield' ? (
-            <div className="inventory-shield-selector">
-              <ShieldRow
-                shield={offShield}
-                inputStyle={inputStyle}
-                onSelect={handleOffHandShieldSelect}
-                onFieldChange={updateOffHandShieldField}
-                onClear={() => updateInventory({ offHandShield: null })}
-              />
-            </div>
+            <ShieldRow
+              shield={offShield}
+              inputStyle={inputStyle}
+              onSelect={handleOffHandShieldSelect}
+              onFieldChange={updateOffHandShieldField}
+              onClear={() => updateInventory({ offHandShield: null })}
+            />
           ) : (
-            <span className="inventory-help">No off-hand item selected.</span>
+            <div className="inventory-hands-wrap">
+              <table className="inventory-hands-table" aria-label="Off-hand weapon">
+                <thead className='inventory-hands-thead'>
+                  <tr>
+                    <th className='inventory-hands-th'>Off-Hand</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="inventory-hands-row-even">
+                    <td className="inventory-hands-td inventory-help">No off-hand weapon selected.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           )}
-        </div>
-        <div className="inventory-backup-actions">
-          <button
-            type="button"
-            className="inventory-add-weapon-btn"
-            onClick={addBackupWeapon}
-            disabled={backupWeapons.length >= 3}
-          >
-            Add Weapon
-          </button>
-          <span className="inventory-help">{backupWeapons.length}/3 backup weapons</span>
+   
+          <div className="flex items-center gap-2 mt-4">
+            <button
+              type="button"
+              className="inventory-add-weapon-btn"
+              onClick={addBackupWeapon}
+              disabled={backupWeapons.length >= 3}
+            >
+              <span aria-hidden>+</span>
+              <svg fill="currentColor" viewBox="0 0 32 32" width="14" height="14" aria-hidden xmlns="http://www.w3.org/2000/svg">
+                <path d="M0.857 28.712l0.949-0.949 2.525 2.525-0.949 0.949-2.525-2.525zM14.057 20.781c0-1.516-1.23-2.746-2.746-2.746s-2.746 1.23-2.746 2.746c0 1.516 1.229 2.746 2.746 2.746s2.747-1.229 2.746-2.746zM8.577 21.043l-0.025-0.025-5.198 5.198 2.525 2.525 5.198-5.198-0.029-0.029c-1.307-0.125-2.347-1.164-2.471-2.471zM8.564 20.781c0-1.422 1.082-2.592 2.467-2.732-1.46-1.66-2.757-3.465-3.87-5.394l-3.486 3.486 4.902 4.902c-0.008-0.086-0.013-0.174-0.013-0.262zM14.043 21.061c-0.14 1.385-1.31 2.467-2.732 2.466-0.089-0-0.176-0.005-0.263-0.013l4.908 4.908 3.486-3.486c-1.939-1.12-3.745-2.419-5.4-3.875zM25.484 2.332l-13.219 13.219c0.204 0.301 0.335 0.669 0.335 1.057 0 0.601-0.287 1.139-0.73 1.484 1.085 0.225 1.935 1.090 2.139 2.182 0.344-0.457 0.891-0.754 1.502-0.754 0.388 0 0.735 0.11 1.031 0.309l13.219-13.219 0.928-5.205-5.205 0.928zM1.311 27.268l3.517 3.517 1.547-1.547-3.517-3.517-1.547 1.547z" />
+              </svg>
+              Add Weapon
+            </button>
+            <span className="inventory-help">{backupWeapons.length}/3 backup weapons</span>
+          </div>
         </div>
         {backupWeapons.map((slot, idx) => (
           <WeaponSelector
@@ -1000,15 +1011,11 @@ export function InventorySection({
             )}
           />
         ))}
-        <p className="inventory-help inventory-help--mt">
-          Light and one-handed weapons may be used in either hand.
-          Off-hand is unavailable when wielding a two-handed weapon.
-        </p>
 
-      </div>
+      </section>
 
       {/* ── 2. Armor ── */}
-      <div>
+      <section className="flex flex-col gap-2 pb-4 border-b border-[var(--color-fg-subtle)]">
         <p className="subsection-header">Armor</p>
         <div className="inventory-hands-wrap">
           <table className="inventory-hands-table" aria-label="Armor slots">
@@ -1034,10 +1041,10 @@ export function InventorySection({
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
       {/* ── 3. Worn Slots ── */}
-      <div>
+      <div className='flex flex-col gap-2'>
         <p className="subsection-header">Worn Slots</p>
         <p className="inventory-help">
           Items can grant bonuses to AC — select a type and value for each slot.
@@ -1179,61 +1186,82 @@ function ShieldRow({
   const effectiveAsf    = shield != null ? applyAsfDelta(shield.arcaneSpellFailure, mat?.asfDelta ?? 0) : null;
   const effectiveWeight = shield != null ? applyWeightMultiplier(shield.weight, mat?.weightMultiplier ?? 1) : null;
   return (
-    <div className="inventory-shield-row">
-      <ArmorAutocomplete
-        value={shield?.name ?? ''}
-        entries={SHIELD_ENTRIES}
-        onSelect={onSelect}
-        placeholder="Select shield..."
-        ariaLabel="Off-hand shield selection"
-        style={{ ...inputStyle, minWidth: 160 }}
-      />
-      <label className="inventory-shield-material-label">
-        <span className="inventory-hands-stat">Material</span>
-        <select
-          value={shield?.material ?? ''}
-          onChange={(e) => onFieldChange('material', e.target.value)}
-          className="inventory-hands-input inventory-hands-input--material"
-          aria-label="Shield material"
-          disabled={!shield}
-          title={mat?.note}
-        >
-          <option value="">Standard</option>
-          {ARMOR_MATERIAL_KEYS.map((k) => (
-            <option key={k} value={k}>{MATERIALS[k].label}</option>
-          ))}
-        </select>
-      </label>
-      {shield && (
-        <>
-          <span className="inventory-hands-stat">
-            Enh&nbsp;
-            <input
-              type="number"
-              value={shield.enhancementBonus}
-              onChange={(e) => onFieldChange('enhancementBonus', Number(e.target.value))}
-              className="inventory-hands-input inventory-hands-input--number inventory-hands-input--inline"
-              aria-label="Shield enhancement bonus"
-            />
-          </span>
-          <span className="inventory-hands-stat">AC:</span>
-          <span className="inventory-shield-ac-value">
-            +{totalArmorBonus(shield)}
-          </span>
-          {shield.maxDexBonus !== null && <span className="inventory-hands-stat">Max Dex {shield.maxDexBonus}</span>}
-          {effectiveAcp !== null && effectiveAcp !== 0 && <span className="inventory-hands-stat">ACP {effectiveAcp}</span>}
-          <span className="inventory-hands-stat">ASF {effectiveAsf ?? '—'}</span>
-          {effectiveWeight && <span className="inventory-hands-stat">Wt {effectiveWeight}</span>}
-          <button
-            type="button"
-            onClick={onClear}
-            className="inventory-hands-clear"
-            aria-label="Clear shield"
-          >
-            Clear
-          </button>
-        </>
-      )}
+    <div className="inventory-hands-wrap">
+      <table className="inventory-hands-table" aria-label="Shield slot">
+        <thead className="inventory-hands-thead">
+          <tr>
+            {['Shield', 'Material', 'Base\u00a0AC', 'Enh', 'Total', 'Max\u00a0Dex', 'ACP', 'ASF', 'Speed', 'Wt', ''].map((h) => (
+              <th key={h} className="inventory-hands-th">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="inventory-hands-row-even">
+            <td className="inventory-hands-td">
+              <ArmorAutocomplete
+                value={shield?.name ?? ''}
+                entries={SHIELD_ENTRIES}
+                onSelect={onSelect}
+                placeholder="Select shield..."
+                ariaLabel="Off-hand shield selection"
+                style={{ ...inputStyle, minWidth: 160 }}
+              />
+            </td>
+            <td className="inventory-hands-td">
+              <select
+                value={shield?.material ?? ''}
+                onChange={(e) => onFieldChange('material', e.target.value)}
+                className="inventory-hands-input inventory-hands-input--material"
+                aria-label="Shield material"
+                disabled={!shield}
+                title={mat?.note}
+              >
+                <option value="">Standard</option>
+                {ARMOR_MATERIAL_KEYS.map((k) => (
+                  <option key={k} value={k}>{MATERIALS[k].label}</option>
+                ))}
+              </select>
+            </td>
+            <td className="inventory-hands-td inventory-hands-stat">
+              {shield != null ? shield.armorBonus : '—'}
+            </td>
+            <td className="inventory-hands-td">
+              <input
+                type="number"
+                value={shield?.enhancementBonus ?? 0}
+                onChange={(e) => onFieldChange('enhancementBonus', Number(e.target.value))}
+                className="inventory-hands-input inventory-hands-input--number"
+                aria-label="Shield enhancement bonus"
+                disabled={!shield}
+              />
+            </td>
+            <td className="inventory-hands-td inventory-hands-atk">
+              {shield != null ? `+${totalArmorBonus(shield)}` : '—'}
+            </td>
+            <td className="inventory-hands-td inventory-hands-stat">
+              {shield?.maxDexBonus ?? '—'}
+            </td>
+            <td className="inventory-hands-td inventory-hands-stat">
+              {effectiveAcp ?? '—'}
+            </td>
+            <td className="inventory-hands-td inventory-hands-stat">{effectiveAsf ?? '—'}</td>
+            <td className="inventory-hands-td inventory-hands-stat">—</td>
+            <td className="inventory-hands-td inventory-hands-stat">{effectiveWeight ?? '—'}</td>
+            <td className="inventory-hands-td">
+              {shield != null && (
+                <button
+                  type="button"
+                  onClick={onClear}
+                  className="inventory-hands-clear"
+                  aria-label="Clear shield"
+                >
+                  Clear
+                </button>
+              )}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }

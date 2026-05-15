@@ -172,25 +172,29 @@ export function FeatsSection({
 }) {
   return (
     <>
-      <p className="subsection-header">
-        Class Features
-      </p>
-      <p className="text-sm mb-2 text-[color:var(--color-fg-subtle)]">
-        Features granted automatically by class. Hover a feature name to see the full description.
-      </p>
-      <ClassFeaturesSection features={classFeatures} />
-
-      <p className="subsection-header">
-        Feat Slots
-      </p>
-      <p className="text-sm mb-2 text-[color:var(--color-fg-subtle)]">
-        Slots granted by character level, race, and class bonus feats. Enter the chosen feat name.
-      </p>
-      <SelectableFeatsSection
-        feats={feats}
-        onChange={onFeatsChange}
-        extraFeats={extraFeats}
-      />
+      <section className='flex flex-col gap-1'>
+        <p className="subsection-header">
+          Class Features
+        </p>
+        <p className="text-sm mb-2 text-[color:var(--color-fg-subtle)]">
+          Features granted automatically by class. Hover a feature name to see the full description.
+        </p>
+        <ClassFeaturesSection features={classFeatures} />
+      </section>
+      
+      <section className="flex flex-col gap-1">
+        <p className="subsection-header">
+          Feat Slots
+        </p>
+        <p className="text-sm mb-2 text-[color:var(--color-fg-subtle)]">
+          Slots granted by character level, race, and class bonus feats. Enter the chosen feat name.
+        </p>
+        <SelectableFeatsSection
+          feats={feats}
+          onChange={onFeatsChange}
+          extraFeats={extraFeats}
+        />
+      </section>
     </>
   );
 }

@@ -1135,6 +1135,12 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
               onClick={() => setShowStatBlock(true)}
               className="stat-block-open-btn"
             >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 11H3L3 0H5L5 11H8V12L4 16L0 12V11Z" fill="currentColor"/>
+                <path d="M16 10H10V8H16V10Z" fill="currentColor"/>
+                <path d="M10 6H14V4H10V6Z" fill="currentColor"/>
+                <path d="M12 2H10V0H12V2Z" fill="currentColor"/>
+              </svg>
               Stat Block
             </button>
           )}
@@ -1162,7 +1168,15 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
                 }
               }}
             >
-              {exportingPdf ? 'Exporting…' : 'Export PDF'}
+              {exportingPdf ? 'Exporting…' : (
+                <>
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15 16H1L1 9H3L3 14H13V9H15L15 16Z" fill="currentColor"/>
+                    <path d="M12 6L9 6L9 1.74846e-07L7 0V6L4 6L4 7L8 11L12 7L12 6Z" fill="currentColor"/>
+                  </svg>
+                  Export PDF
+                </>
+              )}
             </button>
           )}
         </div>

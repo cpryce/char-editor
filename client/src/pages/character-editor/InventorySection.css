@@ -1,7 +1,7 @@
 .inventory-section {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 1.0rem;
 }
 
 /* ── Worn slots grid ─────────────────────────────────────────────────────── */
@@ -10,13 +10,14 @@
   grid-template-columns: max-content minmax(130px, 1fr) 5rem 10rem 4rem;
   gap: 4px 8px;
   align-items: center;
+  margin-top: 0.5rem;
 }
 
 .inventory-slot-label {
   color: var(--color-fg-muted);
   font-size: 12px;
   white-space: nowrap;
-  text-align: right;
+  text-align: left;
 }
 
 .inventory-slot-input {
@@ -42,7 +43,7 @@
 /* ── Slot AC bonus fields ──────────────────────────────────────────────────── */
 
 .inventory-slots-col-header {
-  font-size: 10px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -109,6 +110,7 @@
 
 /* ── Hands table ─────────────────────────────────────────────────────────── */
 .inventory-weapon-selector {
+  gap: 0.5rem;
   margin-bottom: 12px;
 }
 
@@ -141,11 +143,15 @@
 .inventory-backup-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 0.5rem;
+  margin-top: 12px;
   margin-bottom: 8px;
 }
 
 .inventory-add-weapon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 1px solid var(--color-border-default);
   border-radius: 6px;
   background: var(--color-canvas-default);
