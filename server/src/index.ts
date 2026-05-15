@@ -13,6 +13,7 @@ import { fillCharacterPdf } from './utils/fillCharacterPdf';
 import { Character } from './models/Character';
 import { CustomFeat } from './models/CustomFeat';
 import { EncounterSession } from './models/EncounterSession';
+import { Campaign } from './models/Campaign';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -355,6 +356,133 @@ app.delete('/api/encounters/:id', async (req, res) => {
   const encounter = await EncounterSession.findOneAndDelete({ _id: req.params.id, userId: u._id });
   if (!encounter) { res.status(404).json({ error: 'Not found' }); return; }
   res.status(204).end();
+});
+
+// ── Campaign routes ─────────────────────────────────────────────
+
+/** Returns a campaign with populated character + encounter summaries. */
+async function getCampaignDetail(campaignId: string, ownerId: mongoose.Types.ObjectId) {
+  const campaign = await Campaign.findOne({ _id: campaignId, owner: ownerId }).lean();
+  if (!campaign) return null;
+  const [characters, encounters] = await Promise.all([
+    Character.find(
+      { _id: { $in: campaign.characterIds } },
+      { name: 1, race: 1, classes: 1 },
+    ).lean(),
+    EncounterSession.find(
+      { _id: { $in: campaign.encounterIds } },
+      { name: 1 },
+    ).lean(),
+  ]);
+  return {
+    ...campaign,
+    characters: characters.map((c) => ({ _id: c._id.toString(), name: c.name, race: c.race, classes: c.classes })),
+    encounters: encounters.map((e) => ({ _id: e._id.toString(), id: e._id.toString(), name: e.name })),
+  };
+}
+
+app.get('/api/campaigns', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const campaigns = await Campaign.find({ owner: u._id }, { name: 1, description: 1, characterIds: 1, encounterIds: 1, updatedAt: 1 }).sort({ updatedAt: -1 }).lean();
+  res.json(campaigns);
+});
+
+app.post('/api/campaigns', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const { name } = req.body as { name?: string };
+  if (!name?.trim()) { res.status(400).json({ error: 'Name is required.' }); return; }
+  const campaign = await Campaign.create({ owner: u._id, name: name.trim() });
+  res.status(201).json(campaign);
+});
+
+app.get('/api/campaigns/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const detail = await getCampaignDetail(req.params.id, u._id);
+  if (!detail) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json(detail);
+});
+
+app.put('/api/campaigns/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const { name, description } = req.body as { name?: string; description?: string };
+  const update: Record<string, unknown> = {};
+  if (name !== undefined) update.name = name.trim();
+  if (description !== undefined) update.description = description;
+  const campaign = await Campaign.findOneAndUpdate(
+    { _id: req.params.id, owner: u._id },
+    { $set: update },
+    { returnDocument: 'after', runValidators: true },
+  ).lean();
+  if (!campaign) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json(campaign);
+});
+
+app.delete('/api/campaigns/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const campaign = await Campaign.findOneAndDelete({ _id: req.params.id, owner: u._id });
+  if (!campaign) { res.status(404).json({ error: 'Not found' }); return; }
+  res.status(204).end();
+});
+
+app.post('/api/campaigns/:id/characters', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const { characterId } = req.body as { characterId?: string };
+  if (!characterId) { res.status(400).json({ error: 'characterId is required.' }); return; }
+  const char = await Character.findOne({ _id: characterId, owner: u._id });
+  if (!char) { res.status(404).json({ error: 'Character not found.' }); return; }
+  await Campaign.updateOne(
+    { _id: req.params.id, owner: u._id },
+    { $addToSet: { characterIds: char._id } },
+  );
+  const detail = await getCampaignDetail(req.params.id, u._id);
+  if (!detail) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json(detail);
+});
+
+app.delete('/api/campaigns/:id/characters/:charId', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  await Campaign.updateOne(
+    { _id: req.params.id, owner: u._id },
+    { $pull: { characterIds: new mongoose.Types.ObjectId(req.params.charId) } },
+  );
+  const detail = await getCampaignDetail(req.params.id, u._id);
+  if (!detail) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json(detail);
+});
+
+app.post('/api/campaigns/:id/encounters', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const { encounterId } = req.body as { encounterId?: string };
+  if (!encounterId) { res.status(400).json({ error: 'encounterId is required.' }); return; }
+  const enc = await EncounterSession.findOne({ _id: encounterId, userId: u._id });
+  if (!enc) { res.status(404).json({ error: 'Encounter not found.' }); return; }
+  await Campaign.updateOne(
+    { _id: req.params.id, owner: u._id },
+    { $addToSet: { encounterIds: enc._id } },
+  );
+  const detail = await getCampaignDetail(req.params.id, u._id);
+  if (!detail) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json(detail);
+});
+
+app.delete('/api/campaigns/:id/encounters/:encId', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  await Campaign.updateOne(
+    { _id: req.params.id, owner: u._id },
+    { $pull: { encounterIds: new mongoose.Types.ObjectId(req.params.encId) } },
+  );
+  const detail = await getCampaignDetail(req.params.id, u._id);
+  if (!detail) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json(detail);
 });
 
 if (IS_PRODUCTION) {
