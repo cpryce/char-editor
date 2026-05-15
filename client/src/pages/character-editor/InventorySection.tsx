@@ -1329,7 +1329,7 @@ function FeatPopupButton({
         className="inventory-feat-trigger"
         onClick={handleToggle}
         onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleToggle()}
-        aria-expanded={open ? 'true' : 'false'}
+        aria-expanded={open}
       >
         <span className={`inventory-hands-detail-value inventory-feat-summary${activeNames.length > 0 ? ' inventory-feat-summary--active' : ''}`}>
           {summary}

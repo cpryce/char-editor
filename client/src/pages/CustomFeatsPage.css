@@ -1,0 +1,90 @@
+/* ── Delete confirm modal ─────────────────────────────────────────────────── */
+.cf-delete-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  border: none;
+  z-index: 200;
+  cursor: pointer;
+}
+
+.cf-delete-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 201;
+  background: var(--color-canvas-overlay);
+  border: 1px solid var(--color-border-default);
+  border-radius: 10px;
+  padding: 24px 28px;
+  width: 360px;
+  max-width: 92vw;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+/* ── Field label ─────────────────────────────────────────────────────────── */
+.cf-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Input / textarea ────────────────────────────────────────────────────── */
+.cf-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: var(--color-canvas-default);
+  color: var(--color-fg-default);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+/* ── Editor header back button ───────────────────────────────────────────── */
+.cf-back-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  color: var(--color-fg-muted);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ── Editor header section separator ────────────────────────────────────── */
+.cf-header-sep {
+  width: 10px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Error alert ─────────────────────────────────────────────────────────── */
+.cf-error-alert {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger-fg);
+  border: 1px solid var(--color-danger-muted);
+}
+
+/* ── List table header border ────────────────────────────────────────────── */
+.cf-list-header {
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+/* ── Danger variant for btn ──────────────────────────────────────────────── */
+.btn-danger {
+  color: var(--color-danger-fg);
+  border-color: var(--color-danger-fg);
+}
+
+/* ── Edit button in table row ────────────────────────────────────────────── */
+.cf-row-edit-btn {
+  border: 1px solid var(--color-border-default);
+  background: transparent;
+  color: var(--color-accent-fg);
+  cursor: pointer;
+}

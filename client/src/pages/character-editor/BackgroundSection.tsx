@@ -14,7 +14,7 @@ export function BackgroundSection({
   return (
     <>
       <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Description</span>
+        <span className="text-xs font-medium text-[color:var(--color-fg-muted)]">Description</span>
         <textarea
           value={description}
           rows={3}
@@ -23,7 +23,7 @@ export function BackgroundSection({
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Backstory</span>
+        <span className="text-xs font-medium text-[color:var(--color-fg-muted)]">Backstory</span>
         <textarea
           value={backstory}
           rows={5}

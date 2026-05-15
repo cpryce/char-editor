@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { CustomFeat } from '../types/customFeat';
 import type { FeatCategory } from '../components/FeatAutocomplete';
 import { CLASSES } from '../types/character';
+import './CustomFeatsPage.css';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -64,38 +65,18 @@ function DeleteConfirmModal({
         type="button"
         aria-label="Cancel delete"
         onClick={onCancel}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.4)',
-          border: 'none',
-          zIndex: 200,
-          cursor: 'pointer',
-        }}
+        className="cf-delete-overlay"
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Confirm delete"
-        style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%,-50%)',
-          zIndex: 201,
-          background: 'var(--color-canvas-overlay)',
-          border: '1px solid var(--color-border-default)',
-          borderRadius: 10,
-          padding: '24px 28px',
-          width: 360,
-          maxWidth: '92vw',
-          boxShadow: '0 12px 32px rgba(0,0,0,0.28)',
-        }}
+        className="cf-delete-dialog"
       >
-        <p className="text-sm font-semibold mb-2" style={{ color: 'var(--color-fg-default)' }}>
+        <p className="text-sm font-semibold mb-2 text-[color:var(--color-fg-default)]">
           Delete "{featName}"?
         </p>
-        <p className="text-sm mb-5" style={{ color: 'var(--color-fg-muted)' }}>
+        <p className="text-sm mb-5 text-[color:var(--color-fg-muted)]">
           This cannot be undone. Characters using this feat by name will retain the name but lose the
           description.
         </p>
@@ -104,12 +85,7 @@ function DeleteConfirmModal({
           <button
             type="button"
             onClick={onConfirm}
-            className="btn"
-            style={{
-              background: 'var(--color-danger-fg)',
-              color: '#fff',
-              border: '1px solid var(--color-danger-fg)',
-            }}
+            className="btn bg-[var(--color-danger-fg)] text-white border-[var(--color-danger-fg)]"
           >
             Delete
           </button>
@@ -220,30 +196,8 @@ function FeatEditorForm({
       setError('Network error — please try again.');
     } finally {
       setSaving(false);
-      setConfirmDelete(false);
     }
   }
-
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: 12,
-    fontWeight: 600,
-    color: 'var(--color-fg-muted)',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-  };
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '6px 10px',
-    border: '1px solid var(--color-border-default)',
-    borderRadius: 6,
-    background: 'var(--color-canvas-default)',
-    color: 'var(--color-fg-default)',
-    fontSize: 13,
-    boxSizing: 'border-box',
-  };
 
   return (
     <>
@@ -257,8 +211,7 @@ function FeatEditorForm({
 
       {/* Header */}
       <div
-        className="flex items-center justify-between px-6 py-3 shrink-0"
-        style={{ borderBottom: '1px solid var(--color-border-muted)' }}
+        className="flex items-center justify-between px-6 py-3 shrink-0 border-b border-[var(--color-border-muted)]"
       >
         <div className="flex items-center gap-1.5">
           <button
@@ -266,16 +219,7 @@ function FeatEditorForm({
             onClick={onBack}
             title="Back to custom feats"
             aria-label="Back to custom feats"
-            className="inline-flex items-center justify-center"
-            style={{
-              width: 30,
-              height: 30,
-              border: 'none',
-              color: 'var(--color-fg-muted)',
-              background: 'transparent',
-              cursor: 'pointer',
-              padding: 0,
-            }}
+            className="inline-flex items-center justify-center cf-back-btn"
           >
             <svg
               width="22"
@@ -303,8 +247,7 @@ function FeatEditorForm({
           </button>
           <span
             aria-hidden="true"
-            className="inline-flex items-center justify-center"
-            style={{ width: 10, color: 'var(--color-fg-muted)' }}
+            className="inline-flex items-center justify-center cf-header-sep"
           >
             <svg
               width="8"
@@ -318,7 +261,7 @@ function FeatEditorForm({
               <circle cx="4" cy="16" r="1.5" fill="currentColor" />
             </svg>
           </span>
-          <h2 className="text-xl font-semibold" style={{ color: 'var(--color-fg-default)' }}>
+          <h2 className="text-xl font-semibold text-[color:var(--color-fg-default)]">
             {featId ? draft.name || 'Edit Custom Feat' : 'New Custom Feat'}
           </h2>
         </div>
@@ -328,8 +271,7 @@ function FeatEditorForm({
               type="button"
               onClick={() => setConfirmDelete(true)}
               disabled={saving}
-              className="btn"
-              style={{ color: 'var(--color-danger-fg)', borderColor: 'var(--color-danger-fg)' }}
+              className="btn btn-danger"
             >
               Delete
             </button>
@@ -348,8 +290,7 @@ function FeatEditorForm({
       <div className="flex-1 overflow-y-auto px-6 py-5">
         {error && (
           <div
-            className="mb-4 px-3 py-2 rounded text-sm"
-            style={{ background: 'var(--color-danger-subtle)', color: 'var(--color-danger-fg)', border: '1px solid var(--color-danger-muted)' }}
+            className="mb-4 px-3 py-2 rounded text-sm cf-error-alert"
           >
             {error}
           </div>
@@ -360,11 +301,11 @@ function FeatEditorForm({
 
             {/* Name */}
             <div>
-              <label style={labelStyle} htmlFor="cf-name">Name</label>
+              <label className="cf-field-label" htmlFor="cf-name">Name</label>
               <input
                 id="cf-name"
                 type="text"
-                style={inputStyle}
+                className="cf-input"
                 value={draft.name}
                 onChange={(e) => set('name', e.target.value)}
                 maxLength={120}
@@ -374,11 +315,11 @@ function FeatEditorForm({
 
             {/* Short Description */}
             <div>
-              <label style={labelStyle} htmlFor="cf-short">Short Description</label>
+              <label className="cf-field-label" htmlFor="cf-short">Short Description</label>
               <input
                 id="cf-short"
                 type="text"
-                style={inputStyle}
+                className="cf-input"
                 value={draft.shortDescription}
                 onChange={(e) => set('shortDescription', e.target.value)}
                 maxLength={300}
@@ -388,11 +329,11 @@ function FeatEditorForm({
 
             {/* Prerequisites */}
             <div>
-              <label style={labelStyle} htmlFor="cf-prereq">Prerequisites</label>
+              <label className="cf-field-label" htmlFor="cf-prereq">Prerequisites</label>
               <input
                 id="cf-prereq"
                 type="text"
-                style={inputStyle}
+                className="cf-input"
                 value={draft.prerequisites}
                 onChange={(e) => set('prerequisites', e.target.value)}
                 maxLength={300}
@@ -402,10 +343,10 @@ function FeatEditorForm({
 
             {/* Full Description */}
             <div>
-              <label style={labelStyle} htmlFor="cf-full">Full Description</label>
+              <label className="cf-field-label" htmlFor="cf-full">Full Description</label>
               <textarea
                 id="cf-full"
-                style={{ ...inputStyle, minHeight: 100, resize: 'vertical', fontFamily: 'inherit' }}
+                className="cf-input min-h-[100px] resize-y font-[inherit]"
                 value={draft.fullDescription}
                 onChange={(e) => set('fullDescription', e.target.value)}
                 maxLength={4000}
@@ -415,13 +356,12 @@ function FeatEditorForm({
 
             {/* Feat Types */}
             <div>
-              <span style={labelStyle}>Feat Type(s)</span>
+              <span className="cf-field-label">Feat Type(s)</span>
               <div className="flex flex-wrap gap-3">
                 {FEAT_CATEGORIES.map((cat) => (
                   <label
                     key={cat}
-                    className="flex items-center gap-1.5 text-sm cursor-pointer"
-                    style={{ color: 'var(--color-fg-default)' }}
+                    className="flex items-center gap-1.5 text-sm cursor-pointer text-[color:var(--color-fg-default)]"
                   >
                     <input
                       type="checkbox"
@@ -437,8 +377,7 @@ function FeatEditorForm({
             {/* Repeatable */}
             <div>
               <label
-                className="flex items-center gap-2 text-sm cursor-pointer"
-                style={{ color: 'var(--color-fg-default)' }}
+                className="flex items-center gap-2 text-sm cursor-pointer text-[color:var(--color-fg-default)]"
               >
                 <input
                   type="checkbox"
@@ -447,7 +386,7 @@ function FeatEditorForm({
                 />
                 <span>
                   <span className="font-semibold">Repeatable</span>
-                  <span style={{ color: 'var(--color-fg-muted)', marginLeft: 6 }}>
+                  <span className="text-[color:var(--color-fg-muted)] ml-[6px]">
                     — can be selected more than once (for different weapon types, spell schools, etc.)
                   </span>
                 </span>
@@ -456,8 +395,8 @@ function FeatEditorForm({
 
             {/* Class Restrictions */}
             <div>
-              <span style={labelStyle}>Class Restrictions</span>
-              <p className="text-xs mb-2" style={{ color: 'var(--color-fg-muted)' }}>
+              <span className="cf-field-label">Class Restrictions</span>
+              <p className="text-xs mb-2 text-[color:var(--color-fg-muted)]">
                 Leave all unchecked to make this feat available to every character.
                 Check specific classes to restrict it to characters with at least one of those classes.
               </p>
@@ -465,8 +404,7 @@ function FeatEditorForm({
                 {CLASSES.map((cls) => (
                   <label
                     key={cls}
-                    className="flex items-center gap-1.5 text-sm cursor-pointer"
-                    style={{ color: 'var(--color-fg-default)' }}
+                    className="flex items-center gap-1.5 text-sm cursor-pointer text-[color:var(--color-fg-default)]"
                   >
                     <input
                       type="checkbox"
@@ -556,8 +494,7 @@ export function CustomFeatsPage() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-5">
         <h2
-          className="text-xl font-semibold"
-          style={{ color: 'var(--color-fg-default)' }}
+          className="text-xl font-semibold text-[color:var(--color-fg-default)]"
         >
           Custom Feats
         </h2>
@@ -571,29 +508,24 @@ export function CustomFeatsPage() {
       </div>
 
       {loading && (
-        <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>Loading…</p>
+        <p className="text-sm text-[color:var(--color-fg-muted)]">Loading…</p>
       )}
 
       {error && (
-        <p className="text-sm" style={{ color: 'var(--color-danger-fg)' }}>{error}</p>
+        <p className="text-sm text-[color:var(--color-danger-fg)]">{error}</p>
       )}
 
       {!loading && !error && (
         <div
-          className="rounded overflow-hidden border"
-          style={{ borderColor: 'var(--color-border-default)' }}
+          className="rounded overflow-hidden border border-[var(--color-border-default)]"
         >
           <table className="w-full text-sm border-collapse">
             <thead>
-              <tr style={{ background: 'var(--color-canvas-subtle)' }}>
+              <tr className="bg-[var(--color-canvas-subtle)]">
                 {['Name', 'Type(s)', 'Short Description', 'Restrictions', 'Last Modified', ''].map((h) => (
                   <th
                     key={h}
-                    className="text-left px-4 py-2 font-medium"
-                    style={{
-                      color: 'var(--color-fg-muted)',
-                      borderBottom: '1px solid var(--color-border-default)',
-                    }}
+                    className="text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]"
                   >
                     {h}
                   </th>
@@ -605,15 +537,13 @@ export function CustomFeatsPage() {
                 <tr>
                   <td
                     colSpan={6}
-                    className="px-4 py-6 text-center text-sm"
-                    style={{ color: 'var(--color-fg-muted)' }}
+                    className="px-4 py-6 text-center text-sm text-[color:var(--color-fg-muted)]"
                   >
                     No custom feats yet.{' '}
                     <button
                       type="button"
                       onClick={() => setView({ mode: 'new' })}
-                      className="bg-transparent border-0 p-0 cursor-pointer underline [font:inherit]"
-                      style={{ color: 'var(--color-accent-fg)' }}
+                      className="bg-transparent border-0 p-0 cursor-pointer underline [font:inherit] text-[color:var(--color-accent-fg)]"
                     >
                       Create one
                     </button>{' '}
@@ -624,43 +554,31 @@ export function CustomFeatsPage() {
                 feats.map((feat, i) => (
                   <tr
                     key={feat._id}
-                    className="cursor-pointer"
-                    style={{
-                      borderBottom: '1px solid var(--color-border-muted)',
-                      background: i % 2 === 0
-                        ? 'var(--color-canvas-default)'
-                        : 'var(--color-canvas-subtle)',
-                    }}
-                    onClick={() => setView({ mode: 'edit', feat })}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-subtle)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0
-                      ? 'var(--color-canvas-default)'
-                      : 'var(--color-canvas-subtle)')}
-                  >
-                    <td className="px-4 py-2 font-medium" style={{ color: 'var(--color-fg-default)' }}>
+                    className={`cursor-pointer border-b border-[var(--color-border-muted)] hover:bg-[var(--color-accent-subtle)] ${i % 2 === 0 ? 'bg-[var(--color-canvas-default)]' : 'bg-[var(--color-canvas-subtle)]'}`}
+                    onClick={() => setView({ mode: 'edit', feat })}>
+                    <td className="px-4 py-2 font-medium text-[color:var(--color-fg-default)]">
                       {feat.name}
                       {feat.repeatable && (
                         <span
-                          className="ml-2 text-xs"
-                          style={{ color: 'var(--color-fg-muted)' }}
+                          className="ml-2 text-xs text-[color:var(--color-fg-muted)]"
                           title="Repeatable"
                         >
                           ×n
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-2" style={{ color: 'var(--color-fg-muted)', whiteSpace: 'nowrap' }}>
+                    <td className="px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">
                       {feat.featTypes.join(', ')}
                     </td>
-                    <td className="px-4 py-2" style={{ color: 'var(--color-fg-default)', maxWidth: 280 }}>
-                      <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <td className="px-4 py-2 text-[color:var(--color-fg-default)] max-w-[280px]">
+                      <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
                         {feat.shortDescription || '—'}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-xs" style={{ color: 'var(--color-fg-muted)', whiteSpace: 'nowrap' }}>
+                    <td className="px-4 py-2 text-xs text-[color:var(--color-fg-muted)] whitespace-nowrap">
                       {feat.classRestrictions.length === 0 ? 'All classes' : feat.classRestrictions.join(', ')}
                     </td>
-                    <td className="px-4 py-2" style={{ color: 'var(--color-fg-muted)', whiteSpace: 'nowrap' }}>
+                    <td className="px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">
                       {formatDate(feat.updatedAt)}
                     </td>
                     <td className="px-4 py-2 text-right">
@@ -672,13 +590,7 @@ export function CustomFeatsPage() {
                         }}
                         title="Edit feat"
                         aria-label={`Edit ${feat.name}`}
-                        className="text-xs px-2 py-1 rounded"
-                        style={{
-                          border: '1px solid var(--color-border-default)',
-                          background: 'transparent',
-                          color: 'var(--color-accent-fg)',
-                          cursor: 'pointer',
-                        }}
+                        className="text-xs px-2 py-1 rounded cf-row-edit-btn"
                       >
                         Edit
                       </button>
