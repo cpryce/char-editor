@@ -7,6 +7,8 @@ const CharacterEditor = lazy(() => import('./pages/CharacterEditor').then((modul
 const CustomFeatsPage = lazy(() => import('./pages/CustomFeatsPage').then((module) => ({ default: module.CustomFeatsPage })));
 const InitiativeTrackerPage = lazy(() => import('./pages/InitiativeTrackerPage').then((module) => ({ default: module.InitiativeTrackerPage })));
 const NameGeneratorPage = lazy(() => import('./pages/NameGeneratorPage').then((module) => ({ default: module.NameGeneratorPage })));
+const CampaignsPage = lazy(() => import('./pages/CampaignsPage').then((module) => ({ default: module.CampaignsPage })));
+const CampaignEditor = lazy(() => import('./pages/CampaignEditor').then((module) => ({ default: module.CampaignEditor })));
 
 interface User {
   id: string;
@@ -15,7 +17,7 @@ interface User {
   avatar?: string;
 }
 
-type Section = 'characters' | 'custom-feats' | 'initiative-tracker' | 'name-generator';
+type Section = 'characters' | 'custom-feats' | 'initiative-tracker' | 'name-generator' | 'campaigns';
 type View = 'list' | 'new' | 'edit';
 type Theme = 'light' | 'dark';
 
@@ -305,6 +307,9 @@ function App() {
   const [section, setSection] = useState<Section>('characters');
   const [view, setView] = useState<View>('list');
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [initiativeSessionId, setInitiativeSessionId] = useState<string | null>(null);
+  const [characterReturnCampaignId, setCharacterReturnCampaignId] = useState<string | null>(null);
   const [newCharacterClass, setNewCharacterClass] = useState<ClassName | undefined>(undefined);
   const [newCharacterName, setNewCharacterName] = useState<string | undefined>(undefined);
   const [newCharacterRace, setNewCharacterRace] = useState<Race | undefined>(undefined);
@@ -353,6 +358,7 @@ function App() {
       setSelectedCharacterId(null);
       setView('new');
     } else {
+      if (id !== 'initiative-tracker') setInitiativeSessionId(null);
       setSection(id as Section);
       setSelectedCharacterId(null);
       setView('list');
@@ -395,9 +401,14 @@ function App() {
                 { id: 'name-generator',     label: 'Name Generator' },
               ]}
             />
-            <button type="button" disabled className="nav-placeholder-btn">
-              Campaigns
-            </button>
+            <NavDropdown
+              label="Campaigns"
+              active={activeNav}
+              onNavigate={navigate}
+              items={[
+                { id: 'campaigns', label: 'Campaigns' },
+              ]}
+            />
           </nav>
 
           <UserMenu user={user} onLogout={logout} onOpenSettings={() => setSettingsOpen(true)} />
@@ -408,19 +419,19 @@ function App() {
       <main className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
         <Suspense
           fallback={(
-            <div className={section === 'name-generator' || section === 'initiative-tracker' ? 'container-lg' : 'container-xl'}>
+            <div className="container-xl">
               <p className="text-sm text-[color:var(--color-fg-muted)]">
                 Loading…
               </p>
             </div>
           )}
         >
-          <div className={section === 'name-generator' || section === 'initiative-tracker' ? 'container-lg' : 'container-xl'}>
+          <div className="container-xl">
             {section === 'custom-feats' && (
               <CustomFeatsPage />
             )}
             {section === 'initiative-tracker' && (
-              <InitiativeTrackerPage />
+              <InitiativeTrackerPage initialSessionId={initiativeSessionId ?? undefined} />
             )}
             {section === 'name-generator' && (
               <NameGeneratorPage
@@ -431,6 +442,34 @@ function App() {
                   setSelectedCharacterId(null);
                   setView('new');
                   setSection('characters');
+                }}
+              />
+            )}
+            {section === 'campaigns' && view === 'list' && (
+              <CampaignsPage
+                onEditCampaign={(id) => {
+                  setSelectedCampaignId(id);
+                  setView('edit');
+                }}
+              />
+            )}
+            {section === 'campaigns' && view === 'edit' && selectedCampaignId && (
+              <CampaignEditor
+                campaignId={selectedCampaignId}
+                onBack={() => {
+                  setSelectedCampaignId(null);
+                  setView('list');
+                }}
+                onStartEncounter={(sessionId) => {
+                  setInitiativeSessionId(sessionId);
+                  setSection('initiative-tracker');
+                  setView('list');
+                }}
+                onEditCharacter={(id) => {
+                  setSelectedCharacterId(id);
+                  setCharacterReturnCampaignId(selectedCampaignId);
+                  setSection('characters');
+                  setView('edit');
                 }}
               />
             )}
@@ -466,7 +505,14 @@ function App() {
                 characterId={selectedCharacterId}
                 onCancel={() => {
                   setSelectedCharacterId(null);
-                  setView('list');
+                  if (characterReturnCampaignId) {
+                    setSelectedCampaignId(characterReturnCampaignId);
+                    setCharacterReturnCampaignId(null);
+                    setSection('campaigns');
+                    setView('edit');
+                  } else {
+                    setView('list');
+                  }
                 }}
               />
             )}

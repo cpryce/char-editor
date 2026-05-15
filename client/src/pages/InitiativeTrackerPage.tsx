@@ -6,9 +6,9 @@ import { EncounterPage } from './initiative-tracker/EncounterPage';
 
 type View = 'encounters' | 'encounter';
 
-export function InitiativeTrackerPage() {
-  const [view, setView] = useState<View>('encounters');
-  const [sessionId, setSessionId] = useState<string | null>(null);
+export function InitiativeTrackerPage({ initialSessionId }: { initialSessionId?: string } = {}) {
+  const [view, setView] = useState<View>(initialSessionId ? 'encounter' : 'encounters');
+  const [sessionId, setSessionId] = useState<string | null>(initialSessionId ?? null);
 
   const handleOpenEncounter = (id: string) => {
     setSessionId(id);

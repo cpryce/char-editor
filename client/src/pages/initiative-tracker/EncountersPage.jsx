@@ -79,7 +79,7 @@ export function EncountersPage({ onOpenEncounter }) {
   const atLimit = encounters.length >= MAX_ENCOUNTERS;
 
   return (
-    <div className="px-4 py-6">
+    <div className="p-6 max-w-3xl">
       <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--color-fg-default)' }}>
         Encounters
       </h2>

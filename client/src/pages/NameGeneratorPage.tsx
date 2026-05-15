@@ -65,7 +65,7 @@ export function NameGeneratorPage({ onCreateCharacter }: { onCreateCharacter?: (
   }
 
   return (
-    <div className="px-4 py-6">
+    <div className="p-6 max-w-3xl">
       {/* Page header */}
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-[color:var(--color-fg-default)]">
