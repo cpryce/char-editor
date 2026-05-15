@@ -308,7 +308,7 @@ app.get('/api/encounters', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const encounters = await EncounterSession.find({ userId: u._id }).sort({ lastAccessed: -1 }).lean();
-  const campaignIds = [...new Set(encounters.map((e) => e.campaignId?.toString()).filter(Boolean))];
+  const campaignIds = [...new Set(encounters.map((e) => e.campaignId?.toString()).filter((id): id is string => Boolean(id)))];
   const campaigns = campaignIds.length > 0
     ? await Campaign.find({ _id: { $in: campaignIds } }, { name: 1 }).lean()
     : [];
