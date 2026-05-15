@@ -10,6 +10,7 @@ export interface IPlayer {
 export interface IEncounterSession extends Document {
   userId: mongoose.Types.ObjectId;
   name: string;
+  description: string;
   players: IPlayer[];
   lastAccessed: Date;
 }
@@ -28,6 +29,7 @@ const EncounterSessionSchema = new Schema<IEncounterSession>(
   {
     userId:       { type: Schema.Types.ObjectId, ref: 'User', required: true },
     name:         { type: String, required: true, trim: true },
+    description:  { type: String, default: '' },
     players:      { type: [PlayerSchema], default: [] },
     lastAccessed: { type: Date, default: Date.now },
   },

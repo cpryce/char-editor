@@ -386,3 +386,136 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
 }
+
+/* ── Two-column layout ──────────────────────────────────────── */
+
+.campaign-editor-body {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.campaign-editor-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.campaign-editor-main .campaign-editor-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.campaign-editor-rail {
+  width: 260px;
+  flex-shrink: 0;
+}
+
+/* ── Right rail sections ────────────────────────────────────── */
+
+.campaign-rail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.campaign-rail-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.campaign-rail-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.campaign-rail-field-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-fg-muted);
+}
+
+.campaign-rail-edit-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-fg-muted);
+  padding: 2px 4px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+}
+
+.campaign-rail-edit-btn:hover {
+  color: var(--color-fg-default);
+  background: var(--color-canvas-subtle);
+}
+
+.campaign-rail-description {
+  font-size: 0.9375rem;
+  color: var(--color-fg-default);
+  line-height: 1.5;
+  cursor: pointer;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+}
+
+.campaign-rail-description:hover {
+  background: var(--color-canvas-subtle);
+}
+
+.campaign-rail-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--color-fg-muted);
+}
+
+/* ── Players ────────────────────────────────────────────────── */
+
+.campaign-rail-players {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.campaign-rail-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.campaign-rail-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.campaign-rail-avatar--initials {
+  background: var(--color-accent-subtle);
+  color: var(--fgColor-accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.campaign-rail-player-name {
+  font-size: 0.8125rem;
+  color: var(--color-fg-default);
+  font-weight: 500;
+}

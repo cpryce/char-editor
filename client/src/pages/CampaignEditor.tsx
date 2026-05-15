@@ -17,11 +17,25 @@ interface CharSummary {
   classes?: Array<{ name: string; level: number }>;
 }
 
+interface UserSummary {
+  _id: string;
+  name?: string;
+  email: string;
+  avatar?: string;
+}
+
 interface CampaignDetail {
   _id: string;
   name: string;
   description: string;
+  createdAt: string;
+  owner: UserSummary | null;
   characters: CharSummary[];
+  players: UserSummary[];
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 export function CampaignEditor({
@@ -46,6 +60,7 @@ export function CampaignEditor({
   const [charNewClass, setCharNewClass] = useState<ClassName | null>(null);
   const [showEncounterDropdown, setShowEncounterDropdown] = useState(false);
   const [encounterNewName, setEncounterNewName] = useState('');
+  const [editingDescription, setEditingDescription] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const charDropdownRef = useRef<HTMLDivElement>(null);
   const encounterDropdownRef = useRef<HTMLDivElement>(null);
@@ -74,12 +89,15 @@ export function CampaignEditor({
   }
 
   function saveDescription() {
+    setEditingDescription(false);
     if (description === (campaign?.description ?? '')) return;
     fetch(`/api/campaigns/${campaignId}`, {
       method: 'PUT',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ description }),
+    }).then((r) => r.json()).then((updated) => {
+      setCampaign((prev) => prev ? { ...prev, description: updated.description ?? '' } : prev);
     });
   }
 
@@ -250,7 +268,7 @@ export function CampaignEditor({
   }
 
   return (
-    <div className="campaign-editor p-6 max-w-3xl">
+    <div className="campaign-editor p-6">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button type="button" onClick={onBack} className="campaign-editor-back-btn" aria-label="Back to campaigns">
@@ -269,24 +287,14 @@ export function CampaignEditor({
         />
       </div>
 
-      {/* Description */}
-      <section className="campaign-editor-section">
-        <label className="campaign-editor-section-label" htmlFor="campaign-desc">
-          Description
-        </label>
-        <textarea
-          id="campaign-desc"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          onBlur={saveDescription}
-          placeholder="Campaign notes, story overview…"
-          className="campaign-editor-description"
-          rows={4}
-        />
-      </section>
+      {/* Two-column body */}
+      <div className="campaign-editor-body">
 
-      {/* Characters */}
-      <section className="campaign-editor-section">
+        {/* ── Main column ── */}
+        <main className="campaign-editor-main">
+
+          {/* Characters */}
+          <section className="campaign-editor-section">
         <div className="campaign-editor-section-header">
           <h3 className="campaign-editor-section-title">Characters</h3>
           <div className="flex items-center gap-2">
@@ -512,6 +520,85 @@ export function CampaignEditor({
           </div>
         )}
       </section>
+
+        </main>{/* ── Right rail ── */}
+        <aside className="campaign-editor-rail">
+
+          {/* About */}
+          <section className="campaign-rail-section">
+            <div className="campaign-rail-section-header">
+              <h3 className="subsection-header">About</h3>
+              {campaign.description && !editingDescription && (
+                <button
+                  type="button"
+                  className="campaign-rail-edit-btn"
+                  onClick={() => setEditingDescription(true)}
+                  aria-label="Edit description"
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm1.414 1.06a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354l-1.086-1.086ZM11.189 6.25 9.75 4.81l-6.286 6.287a.25.25 0 0 0-.064.108l-.558 1.953 1.953-.558a.25.25 0 0 0 .108-.064L11.19 6.25Z"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+            {!campaign.description || editingDescription ? (
+              <>
+                <p className="campaign-rail-field-label">Description</p>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  onBlur={saveDescription}
+                  placeholder="Add a description…"
+                  className="campaign-editor-description"
+                  rows={4}
+                  autoFocus={editingDescription}
+                />
+              </>
+            ) : (
+              <>
+                <p className="campaign-rail-field-label">Description</p>
+                <p className="campaign-rail-description" onClick={() => setEditingDescription(true)}>
+                  {campaign.description}
+                </p>
+              </>
+            )}
+            <div className="campaign-rail-meta">
+              <div>Created {formatDate(campaign.createdAt)}</div>
+              {campaign.owner && (
+                <div>by {campaign.owner.name || campaign.owner.email}</div>
+              )}
+            </div>
+          </section>
+
+          {/* Players */}
+          <section className="campaign-rail-section">
+            <h3 className="subsection-header">Players</h3>
+            {campaign.players.length === 0 ? (
+              <p className="campaign-editor-empty">No players yet.</p>
+            ) : (
+              <div className="campaign-rail-players">
+                {campaign.players.map((player) => (
+                  <div key={player._id} className="campaign-rail-player">
+                    {player.avatar ? (
+                      <img
+                        src={player.avatar}
+                        alt={player.name || player.email}
+                        className="campaign-rail-avatar"
+                      />
+                    ) : (
+                      <div className="campaign-rail-avatar campaign-rail-avatar--initials">
+                        {(player.name || player.email).charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="campaign-rail-player-name">{player.name || player.email}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+        </aside>
+      </div>
     </div>
   );
 }

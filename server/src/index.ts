@@ -337,10 +337,11 @@ app.get('/api/encounters/:id', async (req, res) => {
 app.put('/api/encounters/:id', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  const { name, players } = req.body as { name?: string; players?: unknown };
+  const { name, players, description } = req.body as { name?: string; players?: unknown; description?: string };
   const update: Record<string, unknown> = { lastAccessed: new Date() };
   if (name !== undefined) update.name = name.trim();
   if (players !== undefined) update.players = players;
+  if (description !== undefined) update.description = description;
   const encounter = await EncounterSession.findOneAndUpdate(
     { _id: req.params.id, userId: u._id },
     update,
@@ -364,20 +365,31 @@ app.delete('/api/encounters/:id', async (req, res) => {
 async function getCampaignDetail(campaignId: string, ownerId: mongoose.Types.ObjectId) {
   const campaign = await Campaign.findOne({ _id: campaignId, owner: ownerId }).lean();
   if (!campaign) return null;
-  const [characters, encounters] = await Promise.all([
+  const [characters, encounters, ownerUser] = await Promise.all([
     Character.find(
       { _id: { $in: campaign.characterIds } },
-      { name: 1, race: 1, classes: 1 },
+      { name: 1, race: 1, classes: 1, owner: 1 },
     ).lean(),
     EncounterSession.find(
       { _id: { $in: campaign.encounterIds } },
       { name: 1 },
     ).lean(),
+    User.findById(ownerId, { name: 1, email: 1, avatar: 1 }).lean(),
   ]);
+  const playerIds = [...new Set(
+    characters.map((c) => c.owner?.toString()).filter((id): id is string => Boolean(id)),
+  )];
+  const playerUsers = playerIds.length > 0
+    ? await User.find({ _id: { $in: playerIds } }, { name: 1, email: 1, avatar: 1 }).lean()
+    : [];
   return {
     ...campaign,
+    owner: ownerUser
+      ? { _id: ownerUser._id.toString(), name: ownerUser.name, email: ownerUser.email, avatar: ownerUser.avatar }
+      : null,
     characters: characters.map((c) => ({ _id: c._id.toString(), name: c.name, race: c.race, classes: c.classes })),
     encounters: encounters.map((e) => ({ _id: e._id.toString(), id: e._id.toString(), name: e.name })),
+    players: playerUsers.map((u) => ({ _id: u._id.toString(), name: u.name, email: u.email, avatar: u.avatar })),
   };
 }
 
@@ -385,7 +397,17 @@ app.get('/api/campaigns', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const campaigns = await Campaign.find({ owner: u._id }, { name: 1, description: 1, characterIds: 1, encounterIds: 1, updatedAt: 1 }).sort({ updatedAt: -1 }).lean();
-  res.json(campaigns);
+  const allCharIds = campaigns.flatMap((c) => c.characterIds);
+  const charOwners = allCharIds.length > 0
+    ? await Character.find({ _id: { $in: allCharIds } }, { owner: 1 }).lean()
+    : [];
+  const charOwnerMap = new Map(charOwners.map((c) => [c._id.toString(), c.owner?.toString() ?? null]));
+  res.json(campaigns.map((c) => ({
+    ...c,
+    playerCount: new Set(
+      c.characterIds.map((id) => charOwnerMap.get(id.toString())).filter(Boolean),
+    ).size,
+  })));
 });
 
 app.post('/api/campaigns', async (req, res) => {

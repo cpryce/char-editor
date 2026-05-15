@@ -6,6 +6,7 @@ interface CampaignSummary {
   description: string;
   characterIds: string[];
   encounterIds: string[];
+  playerCount: number;
   updatedAt: string;
 }
 
@@ -114,7 +115,23 @@ export function CampaignsPage({ onEditCampaign }: { onEditCampaign: (id: string)
                 <span className="font-medium text-sm block" style={{ color: 'var(--color-fg-default)' }}>
                   {c.name}
                 </span>
-                <span className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
+                {c.description && (
+                  <span
+                    className="text-xs block mt-0.5"
+                    style={{
+                      color: 'var(--color-fg-default)',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {c.description}
+                  </span>
+                )}
+                <span className="text-xs block mt-1" style={{ color: 'var(--color-fg-muted)' }}>
+                  {c.playerCount} player{c.playerCount !== 1 ? 's' : ''}
+                  {' · '}
                   {c.characterIds.length} character{c.characterIds.length !== 1 ? 's' : ''}
                   {' · '}
                   {c.encounterIds.length} encounter{c.encounterIds.length !== 1 ? 's' : ''}
