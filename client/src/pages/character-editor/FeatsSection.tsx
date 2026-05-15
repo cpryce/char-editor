@@ -6,20 +6,19 @@ import type { FeatCategory, FeatCatalogEntry } from '../../components/FeatAutoco
 function ClassFeaturesSection({ features }: { features: DerivedClassFeature[] }) {
   if (features.length === 0) {
     return (
-      <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+      <p className="text-sm text-[color:var(--color-fg-muted)]">
         Select a class to see class features.
       </p>
     );
   }
 
   return (
-    <div className="rounded overflow-hidden" style={{ border: '1px solid var(--color-border-default)' }}>
+    <div className="rounded overflow-hidden border border-[var(--color-border-default)]">
       <table aria-label="Class features" className="w-full text-xs border-collapse">
         <thead>
-          <tr style={{ background: 'var(--color-canvas-subtle)' }}>
+          <tr className="bg-[var(--color-canvas-subtle)]">
             {['Feature', 'Class (Level)', 'Description'].map((header) => (
-              <th key={header} className="px-3 py-2 text-left font-medium"
-                style={{ color: 'var(--color-fg-muted)', borderBottom: '1px solid var(--color-border-default)' }}>
+              <th key={header} className="px-3 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">
                 {header}
               </th>
             ))}
@@ -29,18 +28,15 @@ function ClassFeaturesSection({ features }: { features: DerivedClassFeature[] })
           {features.map((feature, index) => (
             <tr
               key={`${feature.className}-${feature.id}`}
-              style={{
-                background: index % 2 === 0 ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)',
-                borderBottom: '1px solid var(--color-border-muted)',
-              }}
+              className={`border-b border-[var(--color-border-muted)] ${index % 2 === 0 ? 'bg-[var(--color-canvas-default)]' : 'bg-[var(--color-canvas-subtle)]'}`}
             >
-              <td className="px-3 py-2 font-medium" style={{ color: 'var(--color-fg-default)', whiteSpace: 'nowrap' }}>
+              <td className="px-3 py-2 font-medium text-[color:var(--color-fg-default)] whitespace-nowrap">
                 {feature.name}
               </td>
-              <td className="px-3 py-2" style={{ color: 'var(--color-fg-muted)', whiteSpace: 'nowrap' }}>
+              <td className="px-3 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">
                 {feature.className} {feature.minLevel}
               </td>
-              <td className="px-3 py-2" style={{ color: 'var(--color-fg-muted)' }}>
+              <td className="px-3 py-2 text-[color:var(--color-fg-muted)]">
                 {feature.shortDescription}
               </td>
             </tr>
@@ -86,13 +82,12 @@ function SelectableFeatsSection({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="rounded overflow-hidden" style={{ border: '1px solid var(--color-border-default)' }}>
+      <div className="rounded overflow-hidden border border-[var(--color-border-default)]">
         <table aria-label="Selectable feats" className="w-full text-xs border-collapse">
           <thead>
-            <tr style={{ background: 'var(--color-canvas-subtle)' }}>
+            <tr className="bg-[var(--color-canvas-subtle)]">
               {TABLE_HEADERS.map((header) => (
-                <th key={header} className="px-3 py-2 text-left font-medium"
-                  style={{ color: 'var(--color-fg-muted)', borderBottom: '1px solid var(--color-border-default)' }}>
+                <th key={header} className="px-3 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">
                   {header}
                 </th>
               ))}
@@ -101,18 +96,14 @@ function SelectableFeatsSection({
           <tbody>
             {feats.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-3 text-center"
-                  style={{ color: 'var(--color-fg-subtle)' }}>
+                <td colSpan={5} className="px-3 py-3 text-center text-[color:var(--color-fg-subtle)]">
                   No feat slots yet — select a class to populate.
                 </td>
               </tr>
             )}
             {feats.map((feat, i) => (
               <tr key={i}
-                style={{
-                  background: i % 2 === 0 ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)',
-                  borderBottom: '1px solid var(--color-border-muted)',
-                }}
+                className={`border-b border-[var(--color-border-muted)] ${i % 2 === 0 ? 'bg-[var(--color-canvas-default)]' : 'bg-[var(--color-canvas-subtle)]'}`}
               >
                 <td className="px-3 py-1">
                   <FeatAutocomplete
@@ -131,13 +122,13 @@ function SelectableFeatsSection({
                     }
                   />
                 </td>
-                <td className="px-3 py-1" style={{ color: 'var(--color-fg-muted)', fontSize: 11 }}>
+                <td className="px-3 py-1 text-[color:var(--color-fg-muted)] text-[11px]">
                   {feat.shortDescription ?? ''}
                 </td>
-                <td className="px-3 py-1" style={{ color: 'var(--color-fg-default)', whiteSpace: 'nowrap' }}>
+                <td className="px-3 py-1 text-[color:var(--color-fg-default)] whitespace-nowrap">
                   {feat.type}
                 </td>
-                <td className="px-3 py-1" style={{ color: 'var(--color-fg-muted)', whiteSpace: 'nowrap' }}>
+                <td className="px-3 py-1 text-[color:var(--color-fg-muted)] whitespace-nowrap">
                   {feat.sourceLabel}
                 </td>
                 <td className="px-3 py-1 text-center">
@@ -146,15 +137,7 @@ function SelectableFeatsSection({
                       type="button"
                       aria-label={`Remove additional feat ${i + 1}`}
                       onClick={() => removeFeat(i)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--color-fg-muted)',
-                        cursor: 'pointer',
-                        fontSize: 14,
-                        lineHeight: 1,
-                        padding: '0 4px',
-                      }}
+                      className="bg-transparent border-0 text-[color:var(--color-fg-muted)] cursor-pointer text-sm leading-none py-0 px-1"
                     >
                       ×
                     </button>
@@ -168,13 +151,7 @@ function SelectableFeatsSection({
       <button
         type="button"
         onClick={addFeat}
-        className="text-xs px-3 py-1 rounded self-start"
-        style={{
-          border: '1px solid var(--color-border-default)',
-          color: 'var(--color-fg-default)',
-          cursor: 'pointer',
-          background: 'transparent',
-        }}
+        className="text-xs px-3 py-1 rounded self-start border border-[var(--color-border-default)] text-[color:var(--color-fg-default)] cursor-pointer bg-transparent"
       >
         + Add Feat
       </button>
@@ -198,7 +175,7 @@ export function FeatsSection({
       <p className="subsection-header">
         Class Features
       </p>
-      <p className="text-sm mb-2" style={{ color: 'var(--color-fg-subtle)' }}>
+      <p className="text-sm mb-2 text-[color:var(--color-fg-subtle)]">
         Features granted automatically by class. Hover a feature name to see the full description.
       </p>
       <ClassFeaturesSection features={classFeatures} />
@@ -206,7 +183,7 @@ export function FeatsSection({
       <p className="subsection-header">
         Feat Slots
       </p>
-      <p className="text-sm mb-2" style={{ color: 'var(--color-fg-subtle)' }}>
+      <p className="text-sm mb-2 text-[color:var(--color-fg-subtle)]">
         Slots granted by character level, race, and class bonus feats. Enter the chosen feat name.
       </p>
       <SelectableFeatsSection

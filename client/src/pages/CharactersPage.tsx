@@ -365,7 +365,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
                           viewBox="0 0 10 10"
                           fill="none"
                           xmlns="http://www.w3.org/2000/svg"
-                          style={{ color: 'var(--color-fg-muted)', opacity: 0.6 }}
+                          className="text-[color:var(--color-fg-muted)] opacity-60"
                         >
                           {sortDir === 'asc' ? (
                             <path d="M2 6l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -466,7 +466,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
                 savePageSize(userId, next);
                 setPage(1);
               }}
-              style={{ background: 'var(--color-canvas-default)', border: '1px solid var(--color-border-default)', borderRadius: 4, color: 'var(--color-fg-default)', padding: '2px 6px' }}
+              className="bg-[var(--color-canvas-default)] border border-[var(--color-border-default)] rounded text-[color:var(--color-fg-default)] py-[2px] px-[6px]"
             >
               {PAGE_SIZE_OPTIONS.map((s) => (
                 <option key={s ?? 'all'} value={s ?? 'all'}>
@@ -525,48 +525,36 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
       )}
       {deleteTarget && (
         <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 300,
-            backgroundColor: 'rgba(0,0,0,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
+          role="presentation"
+          className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center"
           onClick={() => setDeleteTarget(null)}
+          onKeyDown={(e) => e.key === 'Escape' && setDeleteTarget(null)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-char-title"
             onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: 'var(--color-canvas-default)',
-              border: '1px solid var(--color-border-default)',
-              borderRadius: '12px',
-              padding: '24px',
-              width: '360px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-            }}
+            className="bg-[var(--color-canvas-default)] border border-[var(--color-border-default)] rounded-xl p-6 w-[360px] shadow-[0_8px_24px_rgba(0,0,0,0.2)]"
           >
-            <h3 style={{ margin: '0 0 8px', fontSize: '15px', fontWeight: 600, color: 'var(--color-fg-default)' }}>
+            <h3 id="delete-char-title" className="mb-2 text-[15px] font-semibold text-[color:var(--color-fg-default)]">
               Delete character?
             </h3>
-            <p style={{ margin: '0 0 20px', fontSize: '13px', color: 'var(--color-fg-muted)' }}>
-              <strong style={{ color: 'var(--color-fg-default)' }}>{deleteTarget.name}</strong> will be permanently deleted. This cannot be undone.
+            <p className="mb-5 text-[13px] text-[color:var(--color-fg-muted)]">
+              <strong className="text-[color:var(--color-fg-default)]">{deleteTarget.name}</strong> will be permanently deleted. This cannot be undone.
             </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <div className="flex justify-end gap-2">
               <button
+                type="button"
                 onClick={() => setDeleteTarget(null)}
-                style={{
-                  padding: '6px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600,
-                  border: '1px solid var(--color-border-default)', cursor: 'pointer',
-                  backgroundColor: 'var(--color-canvas-default)', color: 'var(--color-fg-default)',
-                }}
+                className="py-[6px] px-4 rounded-[6px] text-[13px] font-semibold border border-[var(--color-border-default)] cursor-pointer bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={() => { deleteCharacter(deleteTarget._id); setDeleteTarget(null); }}
-                style={{
-                  padding: '6px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600,
-                  border: 'none', cursor: 'pointer',
-                  backgroundColor: 'var(--color-danger-emphasis)', color: '#ffffff',
-                }}
+                className="py-[6px] px-4 rounded-[6px] text-[13px] font-semibold border-0 cursor-pointer bg-[var(--color-danger-emphasis)] text-white"
               >
                 Delete
               </button>

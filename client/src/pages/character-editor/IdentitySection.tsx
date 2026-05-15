@@ -92,7 +92,7 @@ export function IdentitySection({
                 className="identity-input identity-input--readonly w-full"
               />
             </label>
-            <label className="flex flex-col gap-1" style={{ width: '72px', flexShrink: 0 }}>
+            <label className="flex flex-col gap-1 w-[72px] shrink-0">
               <span className="text-xs font-medium identity-label-text">Speed (ft)</span>
               <input
                 type="text"

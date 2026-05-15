@@ -4,26 +4,26 @@ import { CSS } from '@dnd-kit/utilities';
 
 /* ── Status condition icons (monochrome SVG, scale with font-size via 1em) ── */
 const ShakenIcon = () => (
-  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" style={{ verticalAlign: 'middle' }}>
+  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="align-middle">
     <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.712c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
   </svg>
 );
 
 const DazedIcon = () => (
-  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" style={{ verticalAlign: 'middle' }}>
+  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="align-middle">
     <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
     <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
   </svg>
 );
 
 const StunnedIcon = () => (
-  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" style={{ verticalAlign: 'middle' }}>
+  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="align-middle">
     <path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/>
   </svg>
 );
 
 const UnconsciousIcon = () => (
-  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ verticalAlign: 'middle' }}>
+  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="align-middle">
     <path d="M2 10.5h5L2 14.5h5"/>
     <path d="M8.5 6.5h4L8.5 11h4"/>
     <path d="M13.5 3h2L13.5 6h2"/>
@@ -31,7 +31,7 @@ const UnconsciousIcon = () => (
 );
 
 const InvisibleIcon = () => (
-  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ verticalAlign: 'middle' }}>
+  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="align-middle">
     <path d="M2 8s2.5-5 6-5 6 5 6 5-2.5 5-6 5-6-5-6-5z"/>
     <circle cx="8" cy="8" r="2"/>
     <path d="M3 3l10 10"/>
@@ -39,7 +39,7 @@ const InvisibleIcon = () => (
 );
 
 const DeadIcon = () => (
-  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" style={{ verticalAlign: 'middle' }}>
+  <svg width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="align-middle">
     <path fillRule="evenodd" d="M8 2C5.2 2 3 4.2 3 7c0 2 1.1 3.7 2.8 4.6V14h4.4v-2.4C12 10.7 13 8.9 13 7c0-2.8-2.2-5-5-5z M5.5 6.5 a1 1 0 1 0 2 0 a1 1 0 1 0-2 0 M9.5 6.5 a1 1 0 1 0 2 0 a1 1 0 1 0-2 0"/>
   </svg>
 );
