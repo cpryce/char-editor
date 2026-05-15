@@ -309,6 +309,7 @@ function App() {
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [initiativeSessionId, setInitiativeSessionId] = useState<string | null>(null);
+  const [characterReturnCampaignId, setCharacterReturnCampaignId] = useState<string | null>(null);
   const [newCharacterClass, setNewCharacterClass] = useState<ClassName | undefined>(undefined);
   const [newCharacterName, setNewCharacterName] = useState<string | undefined>(undefined);
   const [newCharacterRace, setNewCharacterRace] = useState<Race | undefined>(undefined);
@@ -418,14 +419,14 @@ function App() {
       <main className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
         <Suspense
           fallback={(
-            <div className={section === 'name-generator' || section === 'initiative-tracker' ? 'container-lg' : 'container-xl'}>
+            <div className="container-xl">
               <p className="text-sm text-[color:var(--color-fg-muted)]">
                 Loading…
               </p>
             </div>
           )}
         >
-          <div className={section === 'name-generator' || section === 'initiative-tracker' ? 'container-lg' : 'container-xl'}>
+          <div className="container-xl">
             {section === 'custom-feats' && (
               <CustomFeatsPage />
             )}
@@ -464,6 +465,12 @@ function App() {
                   setSection('initiative-tracker');
                   setView('list');
                 }}
+                onEditCharacter={(id) => {
+                  setSelectedCharacterId(id);
+                  setCharacterReturnCampaignId(selectedCampaignId);
+                  setSection('characters');
+                  setView('edit');
+                }}
               />
             )}
             {section === 'characters' && view === 'list' && (
@@ -498,7 +505,14 @@ function App() {
                 characterId={selectedCharacterId}
                 onCancel={() => {
                   setSelectedCharacterId(null);
-                  setView('list');
+                  if (characterReturnCampaignId) {
+                    setSelectedCampaignId(characterReturnCampaignId);
+                    setCharacterReturnCampaignId(null);
+                    setSection('campaigns');
+                    setView('edit');
+                  } else {
+                    setView('list');
+                  }
                 }}
               />
             )}

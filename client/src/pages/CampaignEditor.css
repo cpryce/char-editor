@@ -115,6 +115,16 @@
   font-weight: 500;
   color: var(--color-fg-default);
   flex: 1;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.campaign-editor-list-name:hover {
+  color: var(--fgColor-accent);
+  text-decoration: underline;
 }
 
 .campaign-editor-list-meta {
@@ -285,4 +295,94 @@
   background: var(--color-canvas-subtle);
   color: var(--color-fg-subtle);
   cursor: not-allowed;
+}
+
+/* ── Characters dropdown ────────────────────────────────────── */
+
+.char-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  width: 300px;
+  background: var(--color-canvas-overlay);
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.char-dropdown-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border-default);
+  flex-shrink: 0;
+}
+
+.char-dropdown-tab {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--color-canvas-subtle);
+  border: none;
+  cursor: pointer;
+  color: var(--color-fg-muted);
+  transition: background 80ms ease, color 80ms ease;
+}
+
+.char-dropdown-tab:not(.char-dropdown-tab--active):hover {
+  background: color-mix(in srgb, var(--color-canvas-subtle) 85%, var(--color-fg-muted) 15%);
+  color: var(--color-fg-default);
+}
+
+.char-dropdown-tab--active {
+  background: var(--color-canvas-default);
+  color: var(--color-fg-default);
+  box-shadow: inset 0 -2px 0 var(--fgColor-accent);
+}
+
+.char-dropdown-body {
+  overflow-y: auto;
+  max-height: 320px;
+  padding: 4px;
+}
+
+/* ── New character form ─────────────────────────────────────── */
+
+.char-new-name-input {
+  width: 100%;
+  font-size: 13px;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: var(--color-canvas-default);
+  color: var(--color-fg-default);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.char-new-name-input:focus {
+  border-color: var(--color-accent-emphasis);
+}
+
+.char-new-class-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--color-fg-default);
+}
+
+.char-new-class-row:hover {
+  background: var(--color-canvas-subtle);
+}
+
+.char-dropdown-body--classes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }

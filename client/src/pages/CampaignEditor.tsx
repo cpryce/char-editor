@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { CLASSES, type ClassName } from '../types/character';
 import './CampaignEditor.css';
+
+const HIT_DIE_BY_CLASS: Record<string, number> = {
+  Barbarian: 12, Fighter: 10, Paladin: 10, Ranger: 8,
+  Bard: 6, Cleric: 8, Druid: 8, Monk: 8,
+  Rogue: 6, Sorcerer: 4, Wizard: 4,
+};
+
+const DEFAULT_ABILITY_SCORE = { base: 10, racial: 0, enhancement: 0, misc: 0, temp: null, tempMod: null, levelUp: 0 };
 
 interface CharSummary {
   _id: string;
@@ -19,18 +28,24 @@ export function CampaignEditor({
   campaignId,
   onBack,
   onStartEncounter,
+  onEditCharacter,
 }: {
   campaignId: string;
   onBack: () => void;
   onStartEncounter: (sessionId: string) => void;
+  onEditCharacter: (id: string) => void;
 }) {
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [allChars, setAllChars] = useState<CharSummary[]>([]);
-  const [showCharPicker, setShowCharPicker] = useState(false);
+  const [showCharDropdown, setShowCharDropdown] = useState(false);
+  const [charDropdownTab, setCharDropdownTab] = useState<'import' | 'new'>('import');
   const [charPickerSelection, setCharPickerSelection] = useState<Set<string>>(new Set());
+  const [charNewName, setCharNewName] = useState('');
+  const [charNewClass, setCharNewClass] = useState<ClassName | null>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
+  const charDropdownRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {    fetch(`/api/campaigns/${campaignId}`, { credentials: 'include' })
       .then((r) => r.json())
@@ -65,11 +80,26 @@ export function CampaignEditor({
     });
   }
 
-  async function openCharPicker() {
+  useEffect(() => {
+    if (!showCharDropdown) return;
+    function handleMouseDown(e: MouseEvent) {
+      if (charDropdownRef.current && !charDropdownRef.current.contains(e.target as Node)) {
+        setShowCharDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [showCharDropdown]);
+
+  async function openCharDropdown() {
+    if (showCharDropdown) { setShowCharDropdown(false); return; }
     const res = await fetch('/api/characters', { credentials: 'include' });
     setAllChars(await res.json());
     setCharPickerSelection(new Set());
-    setShowCharPicker(true);
+    setCharDropdownTab('import');
+    setCharNewName('');
+    setCharNewClass(null);
+    setShowCharDropdown(true);
   }
 
   async function startEncounter() {
@@ -122,7 +152,7 @@ export function CampaignEditor({
       latest = await res.json();
     }
     setCampaign(latest);
-    setShowCharPicker(false);
+    setShowCharDropdown(false);
     setCharPickerSelection(new Set());
   }
 
@@ -132,6 +162,43 @@ export function CampaignEditor({
       credentials: 'include',
     });
     setCampaign(await res.json());
+  }
+
+  async function createNewCharacter() {
+    if (!charNewClass || !charNewName.trim()) return;
+    const hitDieType = HIT_DIE_BY_CLASS[charNewClass] ?? 8;
+    const charRes = await fetch('/api/characters', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: charNewName.trim(),
+        gender: 'Male',
+        race: 'Human',
+        alignment: 'True Neutral',
+        classes: [{ name: charNewClass, level: 1, hitDieType, hpRolled: [hitDieType] }],
+        abilityScores: {
+          strength:     { ...DEFAULT_ABILITY_SCORE },
+          dexterity:    { ...DEFAULT_ABILITY_SCORE },
+          constitution: { ...DEFAULT_ABILITY_SCORE },
+          intelligence: { ...DEFAULT_ABILITY_SCORE },
+          wisdom:       { ...DEFAULT_ABILITY_SCORE },
+          charisma:     { ...DEFAULT_ABILITY_SCORE },
+        },
+        hitPoints: { max: hitDieType, current: hitDieType, nonlethal: 0 },
+      }),
+    });
+    if (!charRes.ok) return;
+    const newChar = await charRes.json();
+    const addRes = await fetch(`/api/campaigns/${campaignId}/characters`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ characterId: newChar._id }),
+    });
+    if (!addRes.ok) return;
+    setCampaign(await addRes.json());
+    setShowCharDropdown(false);
   }
 
   if (!campaign) {
@@ -152,6 +219,14 @@ export function CampaignEditor({
     if (c.race) parts.push(c.race);
     if (c.classes?.length) parts.push(c.classes.map((cl) => `${cl.name} ${cl.level}`).join(', '));
     return parts.join(' · ');
+  }
+
+  function classLabel(classes?: CharSummary['classes']) {
+    return classes?.map((cl) => cl.name).join(', ') ?? '—';
+  }
+
+  function totalLevel(classes?: CharSummary['classes']) {
+    return classes?.reduce((sum, cl) => sum + cl.level, 0) ?? 0;
   }
 
   return (
@@ -195,12 +270,142 @@ export function CampaignEditor({
         <div className="campaign-editor-section-header">
           <h3 className="campaign-editor-section-title">Characters</h3>
           <div className="flex items-center gap-2">
-            <button type="button" className="stat-block-open-btn" onClick={openCharPicker}>
-              + Add Character
-            </button>
+            {/* Select-style dropdown with tabbed picker */}
+            <div style={{ position: 'relative' }} ref={charDropdownRef}>
+              <button
+                type="button"
+                className="btn btn-default"
+                onClick={openCharDropdown}
+                aria-haspopup="true"
+                aria-expanded={showCharDropdown}
+              >
+                Characters
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ marginLeft: '4px' }}>
+                  <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {showCharDropdown && (
+                <div className="char-dropdown">
+                  <div className="char-dropdown-tabs">
+                    <button
+                      type="button"
+                      className={`char-dropdown-tab${charDropdownTab === 'import' ? ' char-dropdown-tab--active' : ''}`}
+                      onClick={() => setCharDropdownTab('import')}
+                    >
+                      Import
+                    </button>
+                    <button
+                      type="button"
+                      className={`char-dropdown-tab${charDropdownTab === 'new' ? ' char-dropdown-tab--active' : ''}`}
+                      onClick={() => setCharDropdownTab('new')}
+                    >
+                      New
+                    </button>
+                  </div>
+                  {charDropdownTab === 'import' && (
+                    <div className="char-dropdown-body">
+                      {availableChars.length === 0 ? (
+                        <p style={{ fontSize: '13px', color: 'var(--color-fg-muted)', textAlign: 'center', padding: '24px 0' }}>
+                          All characters are already in this campaign.
+                        </p>
+                      ) : (
+                        <>
+                          <label className="campaign-picker-row campaign-picker-row--select-all">
+                            <input
+                              type="checkbox"
+                              ref={selectAllRef}
+                              checked={charPickerSelection.size === availableChars.length && availableChars.length > 0}
+                              onChange={() => {
+                                if (charPickerSelection.size === availableChars.length) {
+                                  setCharPickerSelection(new Set());
+                                } else {
+                                  setCharPickerSelection(new Set(availableChars.map((c) => c._id)));
+                                }
+                              }}
+                              className="campaign-picker-checkbox"
+                            />
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-fg-default)' }}>Select all</span>
+                          </label>
+                          {availableChars.map((c) => {
+                            const checked = charPickerSelection.has(c._id);
+                            return (
+                              <label
+                                key={c._id}
+                                className={['campaign-picker-row', checked ? 'campaign-picker-row--checked' : ''].join(' ')}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => togglePickerChar(c._id)}
+                                  className="campaign-picker-checkbox"
+                                />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-fg-default)' }}>{c.name}</div>
+                                  {charMeta(c) && (
+                                    <div style={{ fontSize: '11px', color: 'var(--color-fg-muted)' }}>{charMeta(c)}</div>
+                                  )}
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {charDropdownTab === 'import' && availableChars.length > 0 && (
+                    <div className="campaign-picker-footer">
+                      <button
+                        type="button"
+                        onClick={addSelectedCharacters}
+                        disabled={charPickerSelection.size === 0}
+                        className="campaign-picker-add-btn"
+                      >
+                        {charPickerSelection.size === 0 ? 'Add selected' : `Add ${charPickerSelection.size} selected`}
+                      </button>
+                    </div>
+                  )}
+                  {charDropdownTab === 'new' && (
+                    <>
+                      <div style={{ padding: '10px 12px 4px' }}>
+                        <input
+                          type="text"
+                          value={charNewName}
+                          onChange={(e) => setCharNewName(e.target.value)}
+                          placeholder="Character Name"
+                          className="char-new-name-input"
+                        />
+                      </div>
+                      <div className="char-dropdown-body char-dropdown-body--classes" style={{ paddingTop: 2 }}>
+                        {CLASSES.map((cls) => (
+                          <label key={cls} className="char-new-class-row">
+                            <input
+                              type="checkbox"
+                              checked={charNewClass === cls}
+                              onChange={() => setCharNewClass(charNewClass === cls ? null : cls)}
+                              className="campaign-picker-checkbox"
+                            />
+                            <span>{cls}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="campaign-picker-footer">
+                        <button
+                          type="button"
+                          className="campaign-picker-add-btn"
+                          disabled={!charNewClass || !charNewName.trim()}
+                          onClick={createNewCharacter}
+                        >
+                          Create character
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
             <button
               type="button"
-              className="stat-block-open-btn"
+              className="btn btn-default"
               onClick={startEncounter}
               disabled={campaign.characters.length === 0}
               title={campaign.characters.length === 0 ? 'Add characters first' : 'Start an encounter with these characters'}
@@ -212,97 +417,49 @@ export function CampaignEditor({
         {campaign.characters.length === 0 ? (
           <p className="campaign-editor-empty">No characters assigned yet.</p>
         ) : (
-          <ul className="campaign-editor-list">
-            {campaign.characters.map((c) => (
-              <li key={c._id} className="campaign-editor-list-item">
-                <span className="campaign-editor-list-name">{c.name}</span>
-                <span className="campaign-editor-list-meta">{charMeta(c)}</span>
-                <button
-                  type="button"
-                  className="campaign-editor-remove-btn"
-                  onClick={() => removeCharacter(c._id)}
-                  aria-label={`Remove ${c.name}`}
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="rounded overflow-hidden border border-[var(--color-border-default)]">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-[var(--color-canvas-subtle)]">
+                  {['Name', 'Race', 'Class', 'Level'].map((h) => (
+                    <th key={h} className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">
+                      {h}
+                    </th>
+                  ))}
+                  <th className="border-b border-[var(--color-border-default)]" />
+                </tr>
+              </thead>
+              <tbody>
+                {campaign.characters.map((c) => (
+                  <tr
+                    key={c._id}
+                    className="border-b border-[var(--color-border-muted)] last:border-b-0 cursor-pointer hover:bg-[var(--color-canvas-subtle)] bg-[var(--color-canvas-default)]"
+                    onClick={() => onEditCharacter(c._id)}
+                  >
+                    <td className="px-4 py-2 font-medium text-[color:var(--color-fg-default)]">{c.name}</td>
+                    <td className="px-4 py-2 text-[color:var(--color-fg-default)]">{c.race ?? '—'}</td>
+                    <td className="px-4 py-2 text-[color:var(--color-fg-default)]">{classLabel(c.classes)}</td>
+                    <td className="px-4 py-2 text-[color:var(--color-fg-default)]">{totalLevel(c.classes)}</td>
+                    <td className="px-4 py-2 text-right">
+                      <button
+                        type="button"
+                        className="campaign-editor-remove-btn inline-flex items-center justify-center w-6 h-6"
+                        onClick={(e) => { e.stopPropagation(); removeCharacter(c._id); }}
+                        aria-label={`Remove ${c.name}`}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                          <path d="M4 2H1V4H15V2H12V0H4V2Z"/>
+                          <path fillRule="evenodd" clipRule="evenodd" d="M3 6H13V16H3V6ZM7 9H9V13H7V9Z"/>
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
-
-      {/* Character picker */}
-      {showCharPicker && (
-        <div className="campaign-picker-overlay" onClick={() => setShowCharPicker(false)}>
-          <div className="campaign-picker-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="campaign-picker-header">
-              <span>Add Characters</span>
-              <button type="button" className="campaign-picker-close" aria-label="Close" onClick={() => setShowCharPicker(false)}>✕</button>
-            </div>
-            <div className="campaign-picker-body">
-              {availableChars.length === 0 ? (
-                <p style={{ fontSize: '13px', color: 'var(--color-fg-muted)', textAlign: 'center', padding: '24px 0' }}>
-                  All your characters are already in this campaign.
-                </p>
-              ) : (
-                <>
-                  {/* Select all */}
-                  <label className="campaign-picker-row campaign-picker-row--select-all">
-                    <input
-                      type="checkbox"
-                      ref={selectAllRef}
-                      checked={charPickerSelection.size === availableChars.length}
-                      onChange={() => {
-                        if (charPickerSelection.size === availableChars.length) {
-                          setCharPickerSelection(new Set());
-                        } else {
-                          setCharPickerSelection(new Set(availableChars.map((c) => c._id)));
-                        }
-                      }}
-                      className="campaign-picker-checkbox"
-                    />
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-fg-default)' }}>Select all</span>
-                  </label>
-                  {availableChars.map((c) => {
-                    const checked = charPickerSelection.has(c._id);
-                    return (
-                      <label
-                        key={c._id}
-                        className={['campaign-picker-row', checked ? 'campaign-picker-row--checked' : ''].join(' ')}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => togglePickerChar(c._id)}
-                          className="campaign-picker-checkbox"
-                        />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-fg-default)' }}>{c.name}</div>
-                          {charMeta(c) && (
-                            <div style={{ fontSize: '11px', color: 'var(--color-fg-muted)' }}>{charMeta(c)}</div>
-                          )}
-                        </div>
-                      </label>
-                    );
-                  })}
-                </>
-              )}
-            </div>
-            {availableChars.length > 0 && (
-              <div className="campaign-picker-footer">
-                <button
-                  type="button"
-                  onClick={addSelectedCharacters}
-                  disabled={charPickerSelection.size === 0}
-                  className="campaign-picker-add-btn"
-                >
-                  {charPickerSelection.size === 0 ? 'Add selected' : `Add ${charPickerSelection.size} selected`}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
