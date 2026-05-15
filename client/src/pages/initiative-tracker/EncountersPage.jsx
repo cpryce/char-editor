@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const MAX_ENCOUNTERS = 5;
 
@@ -25,6 +25,21 @@ export function EncountersPage({ onOpenEncounter }) {
   const [error, setError] = useState('');
   const [editingDesc, setEditingDesc] = useState(null);
   const [descDraft, setDescDraft] = useState('');
+  const [showCreatePanel, setShowCreatePanel] = useState(false);
+  const [panelCampaigns, setPanelCampaigns] = useState(null);
+  const [selectedCampaignId, setSelectedCampaignId] = useState(null);
+  const createPanelRef = useRef(null);
+
+  useEffect(() => {
+    if (!showCreatePanel) return;
+    function handleOutsideClick(e) {
+      if (createPanelRef.current && !createPanelRef.current.contains(e.target)) {
+        setShowCreatePanel(false);
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [showCreatePanel]);
 
   useEffect(() => {
     fetch('/api/encounters', { credentials: 'include' })
@@ -34,15 +49,17 @@ export function EncountersPage({ onOpenEncounter }) {
   }, []);
 
   const createEncounter = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     if (!newName.trim()) return;
     setCreating(true);
     setError('');
+    const body = { name: newName.trim() };
+    if (selectedCampaignId) body.campaignId = selectedCampaignId;
     const res = await fetch('/api/encounters', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ name: newName.trim() }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -52,8 +69,22 @@ export function EncountersPage({ onOpenEncounter }) {
     }
     setEncounters((prev) => [data, ...prev]);
     setNewName('');
+    setSelectedCampaignId(null);
+    setShowCreatePanel(false);
     setCreating(false);
     onOpenEncounter(data.id);
+  };
+
+  const openCreatePanel = () => {
+    setNewName('');
+    setSelectedCampaignId(null);
+    setShowCreatePanel(true);
+    if (panelCampaigns === null) {
+      fetch('/api/campaigns', { credentials: 'include' })
+        .then((r) => r.json())
+        .then((data) => setPanelCampaigns(data))
+        .catch(() => setPanelCampaigns([]));
+    }
   };
 
   const deleteEncounter = async (id) => {
@@ -80,39 +111,82 @@ export function EncountersPage({ onOpenEncounter }) {
 
   return (
     <div className="p-6 max-w-3xl">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold" style={{ color: 'var(--color-fg-default)' }}>
-          Encounters
-        </h2>
-        <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-          {encounters.length} / {MAX_ENCOUNTERS} encounters used.
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h2 className="text-xl font-semibold" style={{ color: 'var(--color-fg-default)' }}>
+            Encounters
+          </h2>
+          <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+            {encounters.length} / {MAX_ENCOUNTERS} encounters used.
+          </p>
+        </div>
+        <div style={{ position: 'relative' }} ref={createPanelRef}>
+          <button
+            type="button"
+            className="btn btn-default"
+            onClick={openCreatePanel}
+            disabled={atLimit}
+            aria-haspopup="true"
+            aria-expanded={showCreatePanel}
+            title={atLimit ? `Maximum of ${MAX_ENCOUNTERS} encounters reached` : undefined}
+          >
+            + Encounter
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ marginLeft: '4px' }}>
+              <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          {showCreatePanel && (
+            <div className="char-dropdown">
+              <div style={{ padding: '10px 12px 6px' }}>
+                <input
+                  type="text"
+                  autoFocus
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') createEncounter(); if (e.key === 'Escape') setShowCreatePanel(false); }}
+                  placeholder="Encounter name…"
+                  className="char-new-name-input"
+                />
+              </div>
+              {panelCampaigns === null && (
+                <div style={{ padding: '6px 12px', borderTop: '1px solid var(--color-border-muted)' }}>
+                  <p style={{ fontSize: '13px', color: 'var(--color-fg-muted)' }}>Loading campaigns…</p>
+                </div>
+              )}
+              {panelCampaigns !== null && panelCampaigns.length > 0 && (
+                <div style={{ padding: '6px 12px 8px', borderTop: '1px solid var(--color-border-muted)' }}>
+                  <p style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-fg-muted)', marginBottom: '6px' }}>Campaign</p>
+                  {panelCampaigns.map((c) => {
+                    const cid = c._id.toString();
+                    return (
+                      <label key={cid} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '3px 0' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedCampaignId === cid}
+                          onChange={() => setSelectedCampaignId((prev) => prev === cid ? null : cid)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                        <span style={{ fontSize: '13px', color: 'var(--color-fg-default)' }}>{c.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="campaign-picker-footer">
+                <button
+                  type="button"
+                  className="campaign-picker-add-btn"
+                  disabled={creating || !newName.trim()}
+                  onClick={createEncounter}
+                >
+                  Create encounter
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      <form onSubmit={createEncounter} className="flex gap-2 mb-4">
-        <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="New encounter name…"
-              disabled={atLimit}
-              className="flex-1 px-3 py-1.5 rounded text-sm"
-              style={{
-                backgroundColor: 'var(--color-canvas-default)',
-                border: '1px solid var(--color-border-default)',
-                color: 'var(--color-fg-default)',
-                outline: 'none',
-                opacity: atLimit ? 0.5 : 1,
-              }}
-            />
-            <button
-              type="submit"
-              disabled={creating || !newName.trim() || atLimit}
-              className="btn btn-primary"
-            >
-              Create Encounter
-            </button>
-          </form>
 
           {atLimit && (
             <p className="text-xs mb-3" style={{ color: 'var(--color-danger-fg)' }}>
@@ -157,23 +231,12 @@ export function EncountersPage({ onOpenEncounter }) {
                       key={s.id}
                       className="border-b border-[var(--color-border-muted)] last:border-b-0 bg-[var(--color-canvas-default)] hover:bg-[var(--color-canvas-subtle)]"
                     >
-                      <td className="px-4 py-2 font-medium whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => onOpenEncounter(s.id)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: 0,
-                            color: 'var(--fgColor-accent)',
-                            fontWeight: 500,
-                            fontSize: 'inherit',
-                          }}
-                          className="hover:underline"
-                        >
-                          {s.name}
-                        </button>
+                      <td
+                        className="px-4 py-2 font-medium whitespace-nowrap"
+                        style={{ color: 'var(--color-fg-default)', cursor: 'pointer' }}
+                        onClick={() => onOpenEncounter(s.id)}
+                      >
+                        {s.name}
                       </td>
                       <td className="px-4 py-2" style={{ color: 'var(--color-fg-muted)', minWidth: 180 }}>
                         {editingDesc === s.id ? (
@@ -219,17 +282,41 @@ export function EncountersPage({ onOpenEncounter }) {
                         {formatDate(s.updatedAt)}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        <button
-                          type="button"
-                          className="campaign-editor-remove-btn inline-flex items-center justify-center w-6 h-6"
-                          onClick={() => deleteEncounter(s.id)}
-                          aria-label={`Delete ${s.name}`}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                            <path d="M4 2H1V4H15V2H12V0H4V2Z"/>
-                            <path fillRule="evenodd" clipRule="evenodd" d="M3 6H13V16H3V6ZM7 9H9V13H7V9Z"/>
-                          </svg>
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => onOpenEncounter(s.id)}
+                            aria-label={`Open ${s.name}`}
+                            title={`Open ${s.name}`}
+                            style={{
+                              background: 'none',
+                              border: '1px solid var(--color-border-default)',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              width: '24px',
+                              height: '24px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--color-fg-muted)',
+                              fontSize: '14px',
+                              padding: 0,
+                            }}
+                          >
+                            →
+                          </button>
+                          <button
+                            type="button"
+                            className="campaign-editor-remove-btn inline-flex items-center justify-center w-6 h-6"
+                            onClick={() => deleteEncounter(s.id)}
+                            aria-label={`Delete ${s.name}`}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                              <path d="M4 2H1V4H15V2H12V0H4V2Z"/>
+                              <path fillRule="evenodd" clipRule="evenodd" d="M3 6H13V16H3V6ZM7 9H9V13H7V9Z"/>
+                            </svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

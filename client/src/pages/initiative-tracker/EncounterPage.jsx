@@ -21,6 +21,14 @@ import '../CharacterEditor.css';
 let _idCounter = 1;
 function newId() { return `c-${Date.now()}-${_idCounter++}`; }
 
+function formatDuration(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return `${seconds}s`;
+  return `${minutes}m ${seconds}s`;
+}
+
 function initiativeModifierFromCharacter(char) {
   const dex = char.abilityScores?.dexterity;
   const dexTotal = dex
@@ -47,6 +55,13 @@ export function EncounterPage({ sessionId, onBack }) {
   const [characters, setCharacters] = useState(null);
   const [notes, setNotes] = useState(() => localStorage.getItem(`encounter-notes-${sessionId}`) ?? '');
   const [editingNotes, setEditingNotes] = useState(false);
+  const [startedAt, setStartedAt] = useState(null);
+  const [lastRun, setLastRun] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`encounter-history-${sessionId}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
   const selectedIdRef = useRef(null);
   selectedIdRef.current = selectedId;
   const activeIndexRef = useRef(activeIndex);
@@ -315,10 +330,23 @@ export function EncounterPage({ sessionId, onBack }) {
 
   const resetRound = () => {
     setStarted(false);
+    setStartedAt(null);
     setActiveIndex(0);
     setRound(1);
     setCombatants((prev) => prev.map((c) => ({ ...c, deferred: false })));
   };
+
+  function stopCombat() {
+    const durationMs = startedAt != null ? Date.now() - startedAt : 0;
+    const run = { rounds: round, durationMs, endedAt: Date.now() };
+    localStorage.setItem(`encounter-history-${sessionId}`, JSON.stringify(run));
+    setLastRun(run);
+    setStartedAt(null);
+    setStarted(false);
+    setActiveIndex(0);
+    setRound(1);
+    setCombatants((prev) => prev.map((c) => ({ ...c, deferred: false })));
+  }
 
   function saveNotes() {
     setEditingNotes(false);
@@ -467,7 +495,7 @@ export function EncounterPage({ sessionId, onBack }) {
           <div className="flex gap-2" style={{ justifyContent: 'flex-end' }}>
             {!started && (
               <button
-                onClick={() => setStarted(true)}
+                onClick={() => { setStarted(true); setStartedAt(Date.now()); }}
                 aria-label="Start combat"
                 style={{
                   ...iconBtnStyle('primary'),
@@ -481,6 +509,24 @@ export function EncounterPage({ sessionId, onBack }) {
                 title="Start combat"
               >
                 ▶
+              </button>
+            )}
+            {started && (
+              <button
+                onClick={stopCombat}
+                aria-label="Stop combat"
+                style={{
+                  ...iconBtnStyle('danger'),
+                  padding: '4px 12px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  gap: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title="Stop combat"
+              >
+                ■
               </button>
             )}
             <button onClick={prevTurn} aria-label="Previous turn" style={{ ...iconBtnStyle('secondary'), opacity: started ? 1 : 0.35, cursor: started ? 'pointer' : 'default' }} title="Previous turn">←</button>
@@ -528,6 +574,35 @@ export function EncounterPage({ sessionId, onBack }) {
           </main>
 
           <aside className="campaign-editor-rail">
+            {session?.campaignName && (
+              <section className="campaign-rail-section">
+                <div className="campaign-rail-section-header">
+                  <h3 className="subsection-header">Campaign</h3>
+                </div>
+                <p className="campaign-rail-description">{session.campaignName}</p>
+              </section>
+            )}
+            {lastRun && (
+              <section className="campaign-rail-section">
+                <div className="campaign-rail-section-header">
+                  <h3 className="subsection-header">Last Run</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div>
+                    <p className="campaign-rail-field-label">Rounds</p>
+                    <p className="campaign-rail-description">{lastRun.rounds}</p>
+                  </div>
+                  <div>
+                    <p className="campaign-rail-field-label">Duration</p>
+                    <p className="campaign-rail-description">{formatDuration(lastRun.durationMs)}</p>
+                  </div>
+                  <div>
+                    <p className="campaign-rail-field-label">Ended</p>
+                    <p className="campaign-rail-description">{new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(lastRun.endedAt))}</p>
+                  </div>
+                </div>
+              </section>
+            )}
             <section className="campaign-rail-section" style={{ borderBottom: 'none' }}>
               <div className="campaign-rail-section-header">
                 <h3 className="subsection-header">Notes</h3>
@@ -546,7 +621,6 @@ export function EncounterPage({ sessionId, onBack }) {
               </div>
               {!notes || editingNotes ? (
                 <>
-                  <p className="campaign-rail-field-label">Encounter Notes</p>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -559,7 +633,6 @@ export function EncounterPage({ sessionId, onBack }) {
                 </>
               ) : (
                 <>
-                  <p className="campaign-rail-field-label">Encounter Notes</p>
                   <p className="campaign-rail-description" onClick={() => setEditingNotes(true)}>
                     {notes}
                   </p>

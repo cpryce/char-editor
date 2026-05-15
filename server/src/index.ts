@@ -308,7 +308,16 @@ app.get('/api/encounters', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const encounters = await EncounterSession.find({ userId: u._id }).sort({ lastAccessed: -1 }).lean();
-  res.json(encounters.map((s) => ({ ...s, id: s._id.toString() })));
+  const campaignIds = [...new Set(encounters.map((e) => e.campaignId?.toString()).filter(Boolean))];
+  const campaigns = campaignIds.length > 0
+    ? await Campaign.find({ _id: { $in: campaignIds } }, { name: 1 }).lean()
+    : [];
+  const campaignMap = new Map(campaigns.map((c) => [c._id.toString(), c.name]));
+  res.json(encounters.map((s) => ({
+    ...s,
+    id: s._id.toString(),
+    campaignName: s.campaignId ? (campaignMap.get(s.campaignId.toString()) ?? null) : null,
+  })));
 });
 
 app.post('/api/encounters', async (req, res) => {
@@ -319,10 +328,22 @@ app.post('/api/encounters', async (req, res) => {
     res.status(400).json({ error: `Maximum of ${MAX_ENCOUNTERS} encounters reached.` });
     return;
   }
-  const { name } = req.body as { name?: string };
+  const { name, campaignId } = req.body as { name?: string; campaignId?: string };
   if (!name?.trim()) { res.status(400).json({ error: 'Name is required.' }); return; }
-  const encounter = await EncounterSession.create({ userId: u._id, name: name.trim() });
-  res.status(201).json({ ...encounter.toObject(), id: encounter._id.toString() });
+  const encounter = await EncounterSession.create({
+    userId: u._id,
+    name: name.trim(),
+    campaignId: campaignId || null,
+  });
+  if (campaignId) {
+    await Campaign.updateOne({ _id: campaignId, owner: u._id }, { $addToSet: { encounterIds: encounter._id } });
+  }
+  let campaignName: string | null = null;
+  if (campaignId) {
+    const campaign = await Campaign.findById(campaignId, { name: 1 }).lean();
+    campaignName = campaign?.name ?? null;
+  }
+  res.status(201).json({ ...encounter.toObject(), id: encounter._id.toString(), campaignName });
 });
 
 app.get('/api/encounters/:id', async (req, res) => {
@@ -331,7 +352,12 @@ app.get('/api/encounters/:id', async (req, res) => {
   const encounter = await EncounterSession.findOne({ _id: req.params.id, userId: u._id }).lean();
   if (!encounter) { res.status(404).json({ error: 'Not found' }); return; }
   await EncounterSession.updateOne({ _id: encounter._id }, { lastAccessed: new Date() });
-  res.json({ ...encounter, id: encounter._id.toString() });
+  let campaignName: string | null = null;
+  if (encounter.campaignId) {
+    const campaign = await Campaign.findById(encounter.campaignId, { name: 1 }).lean();
+    campaignName = campaign?.name ?? null;
+  }
+  res.json({ ...encounter, id: encounter._id.toString(), campaignName });
 });
 
 app.put('/api/encounters/:id', async (req, res) => {
@@ -356,6 +382,9 @@ app.delete('/api/encounters/:id', async (req, res) => {
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const encounter = await EncounterSession.findOneAndDelete({ _id: req.params.id, userId: u._id });
   if (!encounter) { res.status(404).json({ error: 'Not found' }); return; }
+  if (encounter.campaignId) {
+    await Campaign.updateOne({ _id: encounter.campaignId }, { $pull: { encounterIds: encounter._id } });
+  }
   res.status(204).end();
 });
 
