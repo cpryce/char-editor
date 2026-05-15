@@ -215,7 +215,7 @@ function SettingsFlyout({
                 type="button"
                 role="switch"
                 aria-label="Theme toggle"
-                aria-checked="true"
+                aria-checked={true}
                 onClick={() => onThemeChange('light')}
                 className="relative inline-flex items-center theme-toggle-btn"
               >
@@ -253,7 +253,7 @@ function SettingsFlyout({
                 type="button"
                 role="switch"
                 aria-label="Theme toggle"
-                aria-checked="false"
+                aria-checked={false}
                 onClick={() => onThemeChange('dark')}
                 className="relative inline-flex items-center theme-toggle-btn"
               >
