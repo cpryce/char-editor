@@ -1,0 +1,82 @@
+/* Shared with CustomFeatsPage styles — reuses .cf-* classes from CustomFeatsPage.css */
+
+/* ── Features table ──────────────────────────────────────────────────────── */
+.cc-features-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.cc-features-table th {
+  text-align: left;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-fg-muted);
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.cc-features-table td {
+  padding: 4px 8px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.cc-features-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── Feature row input ───────────────────────────────────────────────────── */
+.cc-feature-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 5px;
+  background: var(--color-canvas-default);
+  color: var(--color-fg-default);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.cc-feature-input:focus {
+  outline: none;
+  border-color: var(--color-accent-emphasis);
+  box-shadow: 0 0 0 3px var(--color-accent-muted);
+}
+
+/* ── Remove feature button ───────────────────────────────────────────────── */
+.cc-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-danger-fg);
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  opacity: 0.7;
+  font-size: 16px;
+}
+
+.cc-remove-btn:hover {
+  opacity: 1;
+  background: var(--color-danger-subtle);
+}
+
+/* ── BAB radio group ─────────────────────────────────────────────────────── */
+.cc-bab-group {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cc-bab-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--color-fg-default);
+}

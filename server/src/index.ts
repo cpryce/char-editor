@@ -12,6 +12,7 @@ import { User } from './models/User';
 import { fillCharacterPdf } from './utils/fillCharacterPdf';
 import { Character } from './models/Character';
 import { CustomFeat } from './models/CustomFeat';
+import { CustomClass } from './models/CustomClass';
 import { EncounterSession } from './models/EncounterSession';
 import { Campaign } from './models/Campaign';
 
@@ -297,6 +298,70 @@ app.delete('/api/custom-feats/:id', async (req, res) => {
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const feat = await CustomFeat.findOneAndDelete({ _id: req.params.id, owner: u._id });
   if (!feat) { res.status(404).json({ error: 'Not found' }); return; }
+  res.status(204).end();
+});
+
+// ── Custom Classes ───────────────────────────────────────────────────────────
+
+app.get('/api/custom-classes', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const classes = await CustomClass.find({ owner: u._id }).sort({ name: 1 });
+  res.json(classes);
+});
+
+app.post('/api/custom-classes', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  try {
+    const cls = await CustomClass.create({ ...req.body, owner: u._id });
+    res.status(201).json(cls);
+  } catch (err: unknown) {
+    if (err instanceof mongoose.Error.ValidationError) {
+      res.status(400).json({ error: err.message });
+    } else if ((err as { code?: number }).code === 11000) {
+      res.status(409).json({ error: 'A custom class with this name already exists.' });
+    } else {
+      throw err;
+    }
+  }
+});
+
+app.get('/api/custom-classes/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const cls = await CustomClass.findOne({ _id: req.params.id, owner: u._id });
+  if (!cls) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json(cls);
+});
+
+app.put('/api/custom-classes/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  try {
+    const cls = await CustomClass.findOneAndUpdate(
+      { _id: req.params.id, owner: u._id },
+      { $set: req.body },
+      { returnDocument: 'after', runValidators: true },
+    );
+    if (!cls) { res.status(404).json({ error: 'Not found' }); return; }
+    res.json(cls);
+  } catch (err: unknown) {
+    if (err instanceof mongoose.Error.ValidationError) {
+      res.status(400).json({ error: err.message });
+    } else if ((err as { code?: number }).code === 11000) {
+      res.status(409).json({ error: 'A custom class with this name already exists.' });
+    } else {
+      throw err;
+    }
+  }
+});
+
+app.delete('/api/custom-classes/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const cls = await CustomClass.findOneAndDelete({ _id: req.params.id, owner: u._id });
+  if (!cls) { res.status(404).json({ error: 'Not found' }); return; }
   res.status(204).end();
 });
 

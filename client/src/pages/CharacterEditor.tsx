@@ -33,6 +33,8 @@ import type { MaterialKey } from '../data/materials';
 import { getWeaponAttackClass } from '../data/weapons';
 import type { FeatCatalogEntry } from '../components/FeatAutocomplete';
 import type { CustomFeat } from '../types/customFeat';
+import type { CustomClass } from '../types/customClass';
+import type { CustomClassLookup } from '../utils/characterHelpers';
 import { IdentitySection } from './character-editor/IdentitySection';
 import { BackgroundSection } from './character-editor/BackgroundSection';
 import { ClassLevelSection } from './character-editor/ClassLevelSection';
@@ -263,6 +265,7 @@ function deriveCombatStats({
   size,
   abilityMods,
   baseSpeed,
+  customClassMap = new Map(),
 }: {
   combat: CharacterDraft['combat'];
   inventory: CharacterDraft['inventory'];
@@ -271,6 +274,7 @@ function deriveCombatStats({
   size: CharacterDraft['size'];
   abilityMods: Record<AbilityKey, number>;
   baseSpeed: string;
+  customClassMap?: Map<string, CustomClassLookup>;
 }): CombatDerivedStats {
   const dexMod = abilityMods.dexterity;
   const conMod = abilityMods.constitution;
@@ -287,10 +291,10 @@ function deriveCombatStats({
   const speedArmorAdjust = inventory.body?.speed && !isNaN(armoredSpeedFt) ? armoredSpeedFt - speedBase : 0;
   const speedFly = safeCombatNumber(combat.speed.fly);
   const speedSwim = safeCombatNumber(combat.speed.swim);
-  const bab = baseAttackBonusFromClasses(classes);
-  const fortitudeBase = baseSaveBonusFromClasses(classes, 'fortitude');
-  const reflexBase = baseSaveBonusFromClasses(classes, 'reflex');
-  const willBase = baseSaveBonusFromClasses(classes, 'will');
+  const bab = baseAttackBonusFromClasses(classes, customClassMap);
+  const fortitudeBase = baseSaveBonusFromClasses(classes, 'fortitude', customClassMap);
+  const reflexBase = baseSaveBonusFromClasses(classes, 'reflex', customClassMap);
+  const willBase = baseSaveBonusFromClasses(classes, 'will', customClassMap);
 
   const armorMat = inventory.body?.material ? MATERIALS[inventory.body.material as MaterialKey] : undefined;
   const armorMaxDex = parseMaxDexBonus(applyMaxDexDelta(inventory.body?.maxDexBonus ?? null, armorMat?.maxDexDelta ?? 0));
@@ -469,6 +473,19 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
     return JSON.stringify(d);
   });
   const [customFeats, setCustomFeats] = useState<CustomFeat[]>([]);
+  const [customClasses, setCustomClasses] = useState<CustomClass[]>([]);
+
+  const customClassMap = useMemo<Map<string, CustomClassLookup>>(() => {
+    return new Map(customClasses.map((cc) => [cc.name, {
+      babProgression: cc.babProgression,
+      fortitudeSave: cc.fortitudeSave,
+      reflexSave: cc.reflexSave,
+      willSave: cc.willSave,
+      classSkills: cc.classSkills,
+      features: cc.features,
+    }]));
+  }, [customClasses]);
+
   const [nameTouched, setNameTouched] = useState(false);
   const [showStatBlock, setShowStatBlock] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -477,7 +494,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
   const nameError = nameTouched && !draft.name.trim() ? 'Name is required.' : undefined;
   const isEdit = Boolean(characterId);
   const spentAbilityPoints = abilityPointBuyTotal(draft.abilityScores);
-  const classFeatures = deriveClassFeatures(draft.classes);
+  const classFeatures = deriveClassFeatures(draft.classes, customClassMap);
   const remainingAbilityPoints = ABILITY_POINT_BUY_BUDGET - spentAbilityPoints;
   const totalLevel = totalCharacterLevel(draft.classes);
   const earnedLevelUpPoints = Math.floor(totalLevel / 4);
@@ -513,6 +530,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
     size: draft.size,
     abilityMods,
     baseSpeed: draft.baseSpeed,
+    customClassMap,
   });
   const combatSummary = `AC ${combatStats.totalAC} · Init ${signed(combatStats.initiativeTotal)} · F/R/W ${signed(combatStats.fortitudeTotal)}/${signed(combatStats.reflexTotal)}/${signed(combatStats.willTotal)}`;
   const inventorySummary = [
@@ -574,14 +592,14 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
           },
           combat: {
             ...draft.combat,
-            baseAttackBonus: baseAttackBonusFromClasses(draft.classes),
+            baseAttackBonus: baseAttackBonusFromClasses(draft.classes, customClassMap),
             speed: {
               ...draft.combat.speed,
               base: BASE_SPEED_BY_RACE[draft.race],
             },
             saves: {
               ...draft.combat.saves,
-              fortitude: { ...draft.combat.saves.fortitude, base: baseSaveBonusFromClasses(draft.classes, 'fortitude') },
+              fortitude: { ...draft.combat.saves.fortitude, base: baseSaveBonusFromClasses(draft.classes, 'fortitude', customClassMap) },
             },
           },
           feats: deriveAutoFeats(draft.classes).map((feat) => ({
@@ -793,7 +811,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
           skills: mergedSkills,
         };
 
-        const adjustedSkills = applyClassAndRacialSkillRules(loaded.skills, loaded.classes, loaded.race).map((skill) => ({
+        const adjustedSkills = applyClassAndRacialSkillRules(loaded.skills, loaded.classes, loaded.race, customClassMap).map((skill) => ({
           ...skill,
           bonus: computeSkillBonus(skill, loaded.abilityScores),
         }));
@@ -856,14 +874,14 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
         ...d.abilityScores,
         [key]: { ...d.abilityScores[key], base: nextBase },
       };
-      const recalculatedSkills = applyClassAndRacialSkillRules(d.skills, d.classes, d.race);
+      const recalculatedSkills = applyClassAndRacialSkillRules(d.skills, d.classes, d.race, customClassMap);
       const skills = recalculatedSkills.map((sk) => ({
         ...sk,
         bonus: computeSkillBonus(sk, newScores),
       }));
       return { ...d, abilityScores: newScores, skills };
     });
-  }, []);
+  }, [customClassMap]);
 
   const setLevelUp = useCallback((key: AbilityKey, value: number) => {
     setDraft((d) => {
@@ -871,14 +889,14 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
         ...d.abilityScores,
         [key]: { ...d.abilityScores[key], levelUp: Math.max(0, value) },
       };
-      const recalculatedSkills = applyClassAndRacialSkillRules(d.skills, d.classes, d.race);
+      const recalculatedSkills = applyClassAndRacialSkillRules(d.skills, d.classes, d.race, customClassMap);
       const skills = recalculatedSkills.map((sk) => ({
         ...sk,
         bonus: computeSkillBonus(sk, newScores),
       }));
       return { ...d, abilityScores: newScores, skills };
     });
-  }, [])
+  }, [customClassMap])
 
   const setEnhancement = useCallback((key: AbilityKey, value: number) => {
     setDraft((d) => {
@@ -886,14 +904,14 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
         ...d.abilityScores,
         [key]: { ...d.abilityScores[key], enhancement: value },
       };
-      const recalculatedSkills = applyClassAndRacialSkillRules(d.skills, d.classes, d.race);
+      const recalculatedSkills = applyClassAndRacialSkillRules(d.skills, d.classes, d.race, customClassMap);
       const skills = recalculatedSkills.map((sk) => ({
         ...sk,
         bonus: computeSkillBonus(sk, newScores),
       }));
       return { ...d, abilityScores: newScores, skills };
     });
-  }, [])
+  }, [customClassMap])
 
   const setAbilityTempScore = useCallback((key: AbilityKey, value: number | null) => {
     setDraft((d) => ({
@@ -917,7 +935,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
           racial: (newScores[key].racial - (prevAdj[key] ?? 0)) + (nextAdj[key] ?? 0),
         };
       });
-      const adjustedSkills = applyClassAndRacialSkillRules(d.skills, d.classes, race);
+      const adjustedSkills = applyClassAndRacialSkillRules(d.skills, d.classes, race, customClassMap);
       const skills = adjustedSkills.map((sk) => ({
         ...sk,
         bonus: computeSkillBonus(sk, newScores),
@@ -926,11 +944,11 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
       const feats = mergeSelectableFeats(d.feats, derivedFeats);
       return { ...d, race, size: RACIAL_SIZES[race], baseSpeed: String(BASE_SPEED_BY_RACE[race] ?? BASE_SPEED_BY_SIZE[RACIAL_SIZES[race]] ?? 30), abilityScores: newScores, skills, feats };
     });
-  }, []);
+  }, [customClassMap]);
 
   const setClasses = useCallback((classes: CharacterDraft['classes']) => {
     setDraft((d) => {
-      const adjustedSkills = applyClassAndRacialSkillRules(d.skills, classes, d.race);
+      const adjustedSkills = applyClassAndRacialSkillRules(d.skills, classes, d.race, customClassMap);
       const skills = adjustedSkills.map((sk) => ({
         ...sk,
         bonus: computeSkillBonus(sk, d.abilityScores),
@@ -939,14 +957,31 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
       const feats = mergeSelectableFeats(d.feats, derivedFeats);
       return { ...d, classes, skills, feats };
     });
-  }, []);
+  }, [customClassMap]);
 
-  // Fetch custom feats once on mount (shared across all characters)
+  // Re-apply class skill flags whenever the custom class map is populated/changed
+  useEffect(() => {
+    if (customClassMap.size === 0) return;
+    setDraft((d) => {
+      const recalculated = applyClassAndRacialSkillRules(d.skills, d.classes, d.race, customClassMap);
+      const skills = recalculated.map((sk) => ({
+        ...sk,
+        bonus: computeSkillBonus(sk, d.abilityScores),
+      }));
+      return { ...d, skills };
+    });
+  }, [customClassMap]);
+
+  // Fetch custom feats and custom classes once on mount
   useEffect(() => {
     fetch('/api/custom-feats', { credentials: 'include' })
       .then((r) => r.ok ? r.json() as Promise<CustomFeat[]> : Promise.resolve([]))
       .then(setCustomFeats)
-      .catch(() => { /* non-critical — custom feats simply won't appear in autocomplete */ });
+      .catch(() => { /* non-critical */ });
+    fetch('/api/custom-classes', { credentials: 'include' })
+      .then((r) => r.ok ? r.json() as Promise<CustomClass[]> : Promise.resolve([]))
+      .then(setCustomClasses)
+      .catch(() => { /* non-critical */ });
   }, []);
 
   useEffect(() => {
@@ -1224,6 +1259,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             hitPoints={draft.hitPoints}
             calculatedCreateHitPoints={calculatedCreateHitPoints}
             inputStyle={inputStyle}
+            customClasses={customClasses}
             onClassesChange={setClasses}
             onHitPointsChange={(next) => setField('hitPoints', next)}
           />

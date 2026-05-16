@@ -1,4 +1,5 @@
 import type { CharacterDraft } from '../../types/character';
+import type { CustomClass } from '../../types/customClass';
 import { createPortal } from 'react-dom';
 import { useState } from 'react';
 import { CLASSES, HIT_DIE_BY_CLASS } from '../../types/character';
@@ -99,20 +100,23 @@ function LockedBaseClassDisplay({
 }
 
 function ClassesSection({
-  classes, onChange, isCreate = false, inputStyle,
+  classes, onChange, isCreate = false, inputStyle, customClasses = [],
 }: {
   classes: CharacterDraft['classes'];
   onChange: (c: CharacterDraft['classes']) => void;
   isCreate?: boolean;
   inputStyle: React.CSSProperties;
+  customClasses?: CustomClass[];
 }) {
-  const classSelectWidth = `${Math.max('— Select class —'.length, ...CLASSES.map((className) => className.length)) + 2}ch`;
+  const allClassNames: readonly string[] = [...CLASSES, ...customClasses.map((c) => c.name).filter((n) => !CLASSES.includes(n as typeof CLASSES[number]))].sort();
+  const hitDieFor = (name: string): number => HIT_DIE_BY_CLASS[name] ?? customClasses.find((c) => c.name === name)?.hitDice ?? 8;
+  const classSelectWidth = `${Math.max('— Select class —'.length, ...allClassNames.map((n) => n.length)) + 2}ch`;
 
   if (isCreate) {
     const selectedName = classes[0]?.name ?? '';
     function handleClassChange(name: string) {
       if (!name) { onChange([]); return; }
-      onChange([{ name, level: 1, hitDieType: HIT_DIE_BY_CLASS[name] ?? 8, hpRolled: [] }]);
+      onChange([{ name, level: 1, hitDieType: hitDieFor(name), hpRolled: [] }]);
     }
     return (
       <div className="flex flex-col items-start gap-3">
@@ -124,11 +128,11 @@ function ClassesSection({
             style={{ ...inputStyle, width: classSelectWidth }}
           >
             <option value="">— Select class —</option>
-            {CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
+            {allClassNames.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
           {selectedName && (
             <span className="text-sm" style={{ color: 'var(--color-fg-default)' }}>
-              Level 1 &nbsp;·&nbsp; d{HIT_DIE_BY_CLASS[selectedName]} hit die
+              Level 1 &nbsp;·&nbsp; d{hitDieFor(selectedName)} hit die
             </span>
           )}
         </div>
@@ -149,7 +153,7 @@ function ClassesSection({
       if (idx !== i) return c;
       if (field === 'name') {
         const name = value as string;
-        return { ...c, name, hitDieType: HIT_DIE_BY_CLASS[name] ?? 8 };
+        return { ...c, name, hitDieType: hitDieFor(name) };
       }
       return { ...c, level: value as number };
     });
@@ -157,7 +161,7 @@ function ClassesSection({
   }
 
   const usedClassNames = new Set(classes.map((c) => c.name).filter(Boolean));
-  const canAddAnotherClass = usedClassNames.size < CLASSES.length;
+  const canAddAnotherClass = usedClassNames.size < allClassNames.length;
 
   return (
     <div className="flex flex-col gap-2">
@@ -178,7 +182,7 @@ function ClassesSection({
               required
             >
               <option value="">— Select class —</option>
-              {CLASSES.filter((className) => {
+              {allClassNames.filter((className) => {
                 const usedByAnotherRow = classes.some((existing, idx) => idx !== i && existing.name === className);
                 return !usedByAnotherRow;
               }).map((className) => (
@@ -239,6 +243,7 @@ export function ClassLevelSection({
   inputStyle,
   onClassesChange,
   onHitPointsChange,
+  customClasses = [],
 }: {
   classes: CharacterDraft['classes'];
   isEdit: boolean;
@@ -247,6 +252,7 @@ export function ClassLevelSection({
   inputStyle: React.CSSProperties;
   onClassesChange: (classes: CharacterDraft['classes']) => void;
   onHitPointsChange: (next: CharacterDraft['hitPoints']) => void;
+  customClasses?: CustomClass[];
 }) {
   return (
     <>
@@ -255,6 +261,7 @@ export function ClassLevelSection({
         onChange={onClassesChange}
         isCreate={!isEdit}
         inputStyle={inputStyle}
+        customClasses={customClasses}
       />
       {isEdit ? (
         <div className="grid grid-cols-3 gap-4 max-w-xl">

@@ -404,10 +404,13 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
                     )}
                   </td>
                 </tr>
-              ) : paginated.map((char) => (
+              ) : paginated.map((char, idx) => (
                 <tr
                   key={char._id}
-                  className="border-b border-[var(--color-border-muted)] cursor-pointer hover:bg-[var(--color-canvas-subtle)] bg-[var(--color-canvas-default)]"
+                  className="border-b border-[var(--color-border-muted)] cursor-pointer"
+                  style={{ backgroundColor: idx % 2 === 0 ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-subtle)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = idx % 2 === 0 ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)'; }}
                   onClick={() => onEditCharacter(char._id)}
                 >
                   <td

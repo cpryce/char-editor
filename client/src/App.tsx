@@ -9,6 +9,7 @@ const InitiativeTrackerPage = lazy(() => import('./pages/InitiativeTrackerPage')
 const NameGeneratorPage = lazy(() => import('./pages/NameGeneratorPage').then((module) => ({ default: module.NameGeneratorPage })));
 const CampaignsPage = lazy(() => import('./pages/CampaignsPage').then((module) => ({ default: module.CampaignsPage })));
 const CampaignEditor = lazy(() => import('./pages/CampaignEditor').then((module) => ({ default: module.CampaignEditor })));
+const CustomClassesPage = lazy(() => import('./pages/CustomClassesPage').then((module) => ({ default: module.CustomClassesPage })));
 
 interface User {
   id: string;
@@ -17,7 +18,7 @@ interface User {
   avatar?: string;
 }
 
-type Section = 'characters' | 'custom-feats' | 'initiative-tracker' | 'name-generator' | 'campaigns';
+type Section = 'characters' | 'custom-feats' | 'custom-classes' | 'initiative-tracker' | 'name-generator' | 'campaigns';
 type View = 'list' | 'new' | 'edit';
 type Theme = 'light' | 'dark';
 
@@ -339,7 +340,7 @@ function App() {
       <main className="flex items-center justify-center h-screen app-loading-main">
         <div className="flex flex-col items-center gap-4">
           <h1 className="text-3xl font-semibold app-loading-title">
-            char-editor
+            AD&D (3.5e) Tools
           </h1>
           <a
             href="/auth/google"
@@ -353,19 +354,13 @@ function App() {
   }
 
   function navigate(id: string) {
-    if (id === 'characters-new') {
-      setSection('characters');
-      setSelectedCharacterId(null);
-      setView('new');
-    } else {
-      if (id !== 'initiative-tracker') setInitiativeSessionId(null);
-      setSection(id as Section);
-      setSelectedCharacterId(null);
-      setView('list');
-    }
+    if (id !== 'initiative-tracker') setInitiativeSessionId(null);
+    setSection(id as Section);
+    setSelectedCharacterId(null);
+    setView('list');
   }
 
-  const activeNav = section === 'characters' && view === 'new' ? 'characters-new' : section;
+  const activeNav = section;
 
   return (
     <div className="flex flex-col h-screen app-root">
@@ -387,7 +382,7 @@ function App() {
               onNavigate={navigate}
               items={[
                 { id: 'characters',     label: 'Characters' },
-                { id: 'characters-new', label: '+ New Character' },
+                { id: 'custom-classes', label: 'Custom Classes' },
                 { id: 'custom-feats',   label: 'Custom Feats' },
                 { id: 'custom-skills',  label: 'Custom Skills', placeholder: true },
               ]}
@@ -429,6 +424,9 @@ function App() {
           <div className="container-xl">
             {section === 'custom-feats' && (
               <CustomFeatsPage />
+            )}
+            {section === 'custom-classes' && (
+              <CustomClassesPage />
             )}
             {section === 'initiative-tracker' && (
               <InitiativeTrackerPage initialSessionId={initiativeSessionId ?? undefined} />

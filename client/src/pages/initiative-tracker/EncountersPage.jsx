@@ -214,7 +214,7 @@ export function EncountersPage({ onOpenEncounter }) {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="bg-[var(--color-canvas-subtle)]">
-                    {['Name', 'Description', 'Last Modified'].map((h) => (
+                    {['Name', 'Campaign', 'Last Modified'].map((h) => (
                       <th
                         key={h}
                         className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]"
@@ -230,49 +230,18 @@ export function EncountersPage({ onOpenEncounter }) {
                     <tr
                       key={s.id}
                       className="border-b border-[var(--color-border-muted)] last:border-b-0 bg-[var(--color-canvas-default)] hover:bg-[var(--color-canvas-subtle)]"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => onOpenEncounter(s.id)}
                     >
                       <td
                         className="px-4 py-2 font-medium whitespace-nowrap"
-                        style={{ color: 'var(--color-fg-default)', cursor: 'pointer' }}
-                        onClick={() => onOpenEncounter(s.id)}
+                        style={{ color: 'var(--color-fg-default)' }}
                       >
                         {s.name}
                       </td>
-                      <td className="px-4 py-2" style={{ color: 'var(--color-fg-muted)', minWidth: 180 }}>
-                        {editingDesc === s.id ? (
-                          <input
-                            type="text"
-                            autoFocus
-                            value={descDraft}
-                            onChange={(e) => setDescDraft(e.target.value)}
-                            onBlur={() => saveDescription(s.id, descDraft)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') saveDescription(s.id, descDraft);
-                              if (e.key === 'Escape') setEditingDesc(null);
-                            }}
-                            style={{
-                              width: '100%',
-                              background: 'transparent',
-                              border: '1px solid var(--color-accent-emphasis)',
-                              borderRadius: 4,
-                              padding: '2px 6px',
-                              fontSize: 'inherit',
-                              color: 'var(--color-fg-default)',
-                              outline: 'none',
-                            }}
-                          />
-                        ) : (
-                          <span
-                            style={{ cursor: 'pointer', display: 'block', minHeight: '1.25em' }}
-                            onClick={() => { setEditingDesc(s.id); setDescDraft(s.description ?? ''); }}
-                            title="Click to edit"
-                          >
-                            {s.description || (
-                              <span style={{ color: 'var(--color-fg-subtle)', fontStyle: 'italic' }}>
-                                Add description…
-                              </span>
-                            )}
-                          </span>
+                      <td className="px-4 py-2" style={{ color: 'var(--color-fg-muted)' }}>
+                        {s.campaignName || (
+                          <span style={{ color: 'var(--color-fg-subtle)', fontStyle: 'italic' }}>—</span>
                         )}
                       </td>
                       <td
@@ -285,30 +254,8 @@ export function EncountersPage({ onOpenEncounter }) {
                         <div className="flex items-center justify-end gap-1">
                           <button
                             type="button"
-                            onClick={() => onOpenEncounter(s.id)}
-                            aria-label={`Open ${s.name}`}
-                            title={`Open ${s.name}`}
-                            style={{
-                              background: 'none',
-                              border: '1px solid var(--color-border-default)',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              width: '24px',
-                              height: '24px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'var(--color-fg-muted)',
-                              fontSize: '14px',
-                              padding: 0,
-                            }}
-                          >
-                            →
-                          </button>
-                          <button
-                            type="button"
                             className="campaign-editor-remove-btn inline-flex items-center justify-center w-6 h-6"
-                            onClick={() => deleteEncounter(s.id)}
+                            onClick={(e) => { e.stopPropagation(); deleteEncounter(s.id); }}
                             aria-label={`Delete ${s.name}`}
                           >
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

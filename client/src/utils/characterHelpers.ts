@@ -105,23 +105,50 @@ function saveByProgression(level: number, progression: 'good' | 'poor') {
   return Math.floor(level / 3);
 }
 
-export function baseAttackBonusFromClasses(classes: CharacterDraft['classes']) {
+export interface CustomClassLookup {
+  babProgression: number;      // 1.0 | 0.75 | 0.5
+  fortitudeSave: 'good' | 'poor';
+  reflexSave: 'good' | 'poor';
+  willSave: 'good' | 'poor';
+  classSkills?: string;        // comma/newline-separated skill names
+  features?: Array<{ name: string; level: number; description: string }>;
+}
+
+function babProgressionFromRate(rate: number): ProgressionRate {
+  if (rate >= 1) return 'good';
+  if (rate >= 0.75) return 'average';
+  return 'poor';
+}
+
+export function baseAttackBonusFromClasses(
+  classes: CharacterDraft['classes'],
+  customClassMap: Map<string, CustomClassLookup> = new Map(),
+) {
   return classes.reduce((sum, entry) => {
-    const className = entry.name as ClassName;
-    const progression = CLASS_BAB_PROGRESSION[className];
-    if (!progression) return sum;
     const level = Math.max(0, Math.trunc(entry.level || 0));
-    return sum + babByProgression(level, progression);
+    const builtIn = CLASS_BAB_PROGRESSION[entry.name as ClassName];
+    if (builtIn) return sum + babByProgression(level, builtIn);
+    const custom = customClassMap.get(entry.name);
+    if (custom) return sum + babByProgression(level, babProgressionFromRate(custom.babProgression));
+    return sum;
   }, 0);
 }
 
-export function baseSaveBonusFromClasses(classes: CharacterDraft['classes'], saveType: SaveType) {
+export function baseSaveBonusFromClasses(
+  classes: CharacterDraft['classes'],
+  saveType: SaveType,
+  customClassMap: Map<string, CustomClassLookup> = new Map(),
+) {
   return classes.reduce((sum, entry) => {
-    const className = entry.name as ClassName;
-    const progression = CLASS_SAVE_PROGRESSION[className]?.[saveType];
-    if (!progression) return sum;
     const level = Math.max(0, Math.trunc(entry.level || 0));
-    return sum + saveByProgression(level, progression);
+    const builtIn = CLASS_SAVE_PROGRESSION[entry.name as ClassName]?.[saveType];
+    if (builtIn) return sum + saveByProgression(level, builtIn);
+    const custom = customClassMap.get(entry.name);
+    if (custom) {
+      const saveKey = saveType === 'fortitude' ? 'fortitudeSave' : saveType === 'reflex' ? 'reflexSave' : 'willSave';
+      return sum + saveByProgression(level, custom[saveKey]);
+    }
+    return sum;
   }, 0);
 }
 
@@ -224,12 +251,32 @@ export function deriveAutoFeats(classes: CharacterDraft['classes']): ClassFeatEn
  * Returns all class features for the character's current classes and levels,
  * sorted by class name then minLevel.
  */
-export function deriveClassFeatures(classes: CharacterDraft['classes']) {
+export function deriveClassFeatures(
+  classes: CharacterDraft['classes'],
+  customClassMap: Map<string, CustomClassLookup> = new Map(),
+) {
   return classes
     .flatMap((entry) => {
-      const className = entry.name as ClassName;
       const level = Math.max(0, Math.trunc(entry.level || 0));
-      if (!className || level === 0) return [];
+      if (!entry.name || level === 0) return [];
+
+      // Custom class — synthesize DerivedClassFeature objects from stored features
+      const custom = customClassMap.get(entry.name);
+      if (custom) {
+        return (custom.features ?? [])
+          .filter((f) => f.level <= level && f.name.trim())
+          .map((f) => ({
+            id: f.name.toLowerCase().replace(/\s+/g, '-'),
+            name: f.name,
+            minLevel: f.level,
+            shortDescription: f.description || '',
+            fullDescription: f.description || '',
+            className: entry.name as ClassName,
+          }));
+      }
+
+      // Built-in class
+      const className = entry.name as ClassName;
       return getClassFeatures(className, level);
     })
     .sort((a, b) => {
@@ -521,13 +568,22 @@ export function totalSkillPointsAvailable(
   }, 0);
 }
 
+function parseCustomClassSkills(raw: string): string[] {
+  return raw.split(/[,\n]+/).map((s) => s.trim()).filter(Boolean);
+}
+
 export function applyClassAndRacialSkillRules(
   skills: CharacterDraft['skills'],
   classes: CharacterDraft['classes'],
   race: Race,
+  customClassMap: Map<string, CustomClassLookup> = new Map(),
 ) {
   const classSkillNames = new Set(
-    classes.flatMap((entry) => Array.from(CLASS_SKILLS[entry.name as ClassName] ?? [])),
+    classes.flatMap((entry) => {
+      const builtIn = Array.from(CLASS_SKILLS[entry.name as ClassName] ?? []);
+      const custom = parseCustomClassSkills(customClassMap.get(entry.name)?.classSkills ?? '');
+      return [...builtIn, ...custom];
+    }),
   );
   const racialBonuses = RACIAL_SKILL_BONUSES[race] ?? {};
 
