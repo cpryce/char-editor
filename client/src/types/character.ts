@@ -156,6 +156,8 @@ export interface CharacterDraft {
   name: string;
   gender: Gender;
   race: Race;
+  /** For Pathfinder flexible races (Human, Half-Elf, Half-Orc): the ability key receiving the +2 racial bonus. */
+  racialAbilityChoice?: string | null;
   alignment: Alignment;
   size: Size;
   baseSpeed: string;

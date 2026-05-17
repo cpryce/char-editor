@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import type { CharacterDraft, AbilityScore, FeatSlot, WornSlot, WornSlotKey, ClassName } from '../types/character';
+import type { CharacterDraft, AbilityScore, FeatSlot, WornSlot, WornSlotKey } from '../types/character';
 import { HIT_DIE_BY_CLASS } from '../types/character';
 import {
   newCharacterDraft,
@@ -7,11 +7,11 @@ import {
   totalScore,
   buildIterativeAttackString,
   computeSkillBonus,
-  RACIAL_ABILITY_ADJUSTMENTS,
   RACIAL_SIZES,
-  ABILITY_POINT_BUY_BUDGET,
-  abilityPointBuyTotal,
-  affordableAbilityBaseScore,
+  type PointBuySystem,
+  POINT_BUY_CONFIGS,
+  abilityPointBuyTotalFor,
+  affordableAbilityBaseScoreFor,
   applyClassAndRacialSkillRules,
   totalCharacterLevel,
   spentSkillPoints,
@@ -26,6 +26,9 @@ import {
   computeAcTotals,
   BASE_SPEED_BY_SIZE,
   BASE_SPEED_BY_RACE,
+  PATHFINDER_FLEXIBLE_RACES,
+  isPathfinderSystem,
+  getRacialAdjFor,
 } from '../utils/characterHelpers';
 import { FEAT_BY_NAME } from '../data/feats';
 import { MATERIALS, applyMaxDexDelta } from '../data/materials';
@@ -125,9 +128,14 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
 };
 
-function applyRaceToDraft(draft: CharacterDraft, race: CharacterDraft['race']) {
-  const prevAdj = RACIAL_ABILITY_ADJUSTMENTS[draft.race] ?? {};
-  const nextAdj = RACIAL_ABILITY_ADJUSTMENTS[race] ?? {};
+function applyRaceToDraft(
+  draft: CharacterDraft,
+  race: CharacterDraft['race'],
+  system: PointBuySystem = 'adnd28',
+  choice?: string | null,
+) {
+  const prevAdj = getRacialAdjFor(draft.race, system, draft.racialAbilityChoice);
+  const nextAdj = getRacialAdjFor(race, system, choice);
   const abilityScores = { ...draft.abilityScores };
   (Object.keys(abilityScores) as AbilityKey[]).forEach((key) => {
     abilityScores[key] = {
@@ -145,6 +153,7 @@ function applyRaceToDraft(draft: CharacterDraft, race: CharacterDraft['race']) {
   return {
     ...draft,
     race,
+    racialAbilityChoice: choice ?? null,
     size: RACIAL_SIZES[race],
     baseSpeed: String(BASE_SPEED_BY_RACE[race] ?? BASE_SPEED_BY_SIZE[RACIAL_SIZES[race]] ?? 30),
     abilityScores,
@@ -434,20 +443,27 @@ function stampComputedAttacksForSave(
 
 interface CharacterEditorProps {
   characterId?: string;
-  initialClass?: ClassName;
+  initialClass?: string;
   initialName?: string;
   initialRace?: CharacterDraft['race'];
   onCancel: () => void;
+  pointBuySystem?: PointBuySystem;
 }
 
-export function CharacterEditor({ characterId, initialClass, initialName, initialRace, onCancel }: CharacterEditorProps) {
+export function CharacterEditor({ characterId, initialClass, initialName, initialRace, onCancel, pointBuySystem = 'adnd28' }: CharacterEditorProps) {
   const [draft, setDraft] = useState<CharacterDraft>(() => {
     const d = newCharacterDraft();
+    const defaultBase = POINT_BUY_CONFIGS[pointBuySystem].defaultBase;
+    if (!characterId && defaultBase !== 8) {
+      for (const key of Object.keys(d.abilityScores) as Array<keyof typeof d.abilityScores>) {
+        d.abilityScores[key] = { ...d.abilityScores[key], base: defaultBase };
+      }
+    }
     if (!characterId && initialClass) {
       d.classes = [{ name: initialClass, level: 1, hitDieType: HIT_DIE_BY_CLASS[initialClass] ?? 8, hpRolled: [] }];
     }
     if (!characterId && initialRace) {
-      const racedDraft = applyRaceToDraft(d, initialRace);
+      const racedDraft = applyRaceToDraft(d, initialRace, pointBuySystem, null);
       if (initialName) racedDraft.name = initialName;
       return racedDraft;
     }
@@ -463,6 +479,12 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
   const [initialDraftFingerprint, setInitialDraftFingerprint] = useState<string | null>(() => {
     if (characterId) return null;
     const d = newCharacterDraft();
+    const defaultBase = POINT_BUY_CONFIGS[pointBuySystem].defaultBase;
+    if (defaultBase !== 8) {
+      for (const key of Object.keys(d.abilityScores) as Array<keyof typeof d.abilityScores>) {
+        d.abilityScores[key] = { ...d.abilityScores[key], base: defaultBase };
+      }
+    }
     if (initialClass) d.classes = [{ name: initialClass, level: 1, hitDieType: HIT_DIE_BY_CLASS[initialClass] ?? 8, hpRolled: [] }];
     if (initialRace) {
       const racedDraft = applyRaceToDraft(d, initialRace);
@@ -493,9 +515,9 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
   const initialSaveRef = useRef(false);
   const nameError = nameTouched && !draft.name.trim() ? 'Name is required.' : undefined;
   const isEdit = Boolean(characterId);
-  const spentAbilityPoints = abilityPointBuyTotal(draft.abilityScores);
+  const spentAbilityPoints = abilityPointBuyTotalFor(draft.abilityScores, pointBuySystem);
   const classFeatures = deriveClassFeatures(draft.classes, customClassMap);
-  const remainingAbilityPoints = ABILITY_POINT_BUY_BUDGET - spentAbilityPoints;
+  const remainingAbilityPoints = POINT_BUY_CONFIGS[pointBuySystem].budget - spentAbilityPoints;
   const totalLevel = totalCharacterLevel(draft.classes);
   const earnedLevelUpPoints = Math.floor(totalLevel / 4);
   const spentLevelUpPoints = ABILITY_KEYS.reduce((sum, key) => sum + (draft.abilityScores[key].levelUp ?? 0), 0);
@@ -869,7 +891,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
 
   const setAbilityBase = useCallback((key: AbilityKey, requestedBase: number) => {
     setDraft((d) => {
-      const nextBase = affordableAbilityBaseScore(d.abilityScores, key, requestedBase);
+      const nextBase = affordableAbilityBaseScoreFor(d.abilityScores, key, requestedBase, pointBuySystem);
       const newScores = {
         ...d.abilityScores,
         [key]: { ...d.abilityScores[key], base: nextBase },
@@ -881,7 +903,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
       }));
       return { ...d, abilityScores: newScores, skills };
     });
-  }, [customClassMap]);
+  }, [customClassMap, pointBuySystem]);
 
   const setLevelUp = useCallback((key: AbilityKey, value: number) => {
     setDraft((d) => {
@@ -925,8 +947,11 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
 
   const setRace = useCallback((race: CharacterDraft['race']) => {
     setDraft((d) => {
-      const prevAdj = RACIAL_ABILITY_ADJUSTMENTS[d.race] ?? {};
-      const nextAdj = RACIAL_ABILITY_ADJUSTMENTS[race] ?? {};
+      // When switching to a non-flexible race or a different flexible race, reset the choice
+      const isFlexible = isPathfinderSystem(pointBuySystem) && PATHFINDER_FLEXIBLE_RACES.has(race);
+      const newChoice = isFlexible ? (d.racialAbilityChoice ?? null) : null;
+      const prevAdj = getRacialAdjFor(d.race, pointBuySystem, d.racialAbilityChoice);
+      const nextAdj = getRacialAdjFor(race, pointBuySystem, newChoice);
       // Remove old racial bonus, apply new one
       const newScores = { ...d.abilityScores };
       (Object.keys(newScores) as AbilityKey[]).forEach((key) => {
@@ -942,9 +967,28 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
       }));
       const derivedFeats = deriveSelectableFeats(d.classes, race);
       const feats = mergeSelectableFeats(d.feats, derivedFeats);
-      return { ...d, race, size: RACIAL_SIZES[race], baseSpeed: String(BASE_SPEED_BY_RACE[race] ?? BASE_SPEED_BY_SIZE[RACIAL_SIZES[race]] ?? 30), abilityScores: newScores, skills, feats };
+      return { ...d, race, racialAbilityChoice: newChoice, size: RACIAL_SIZES[race], baseSpeed: String(BASE_SPEED_BY_RACE[race] ?? BASE_SPEED_BY_SIZE[RACIAL_SIZES[race]] ?? 30), abilityScores: newScores, skills, feats };
     });
-  }, [customClassMap]);
+  }, [customClassMap, pointBuySystem]);
+
+  const setRacialAbilityChoice = useCallback((choice: string) => {
+    setDraft((d) => {
+      const prevAdj = getRacialAdjFor(d.race, pointBuySystem, d.racialAbilityChoice);
+      const nextAdj = getRacialAdjFor(d.race, pointBuySystem, choice);
+      const newScores = { ...d.abilityScores };
+      (Object.keys(newScores) as AbilityKey[]).forEach((key) => {
+        newScores[key] = {
+          ...newScores[key],
+          racial: (newScores[key].racial - (prevAdj[key] ?? 0)) + (nextAdj[key] ?? 0),
+        };
+      });
+      const skills = applyClassAndRacialSkillRules(d.skills, d.classes, d.race, customClassMap).map((sk) => ({
+        ...sk,
+        bonus: computeSkillBonus(sk, newScores),
+      }));
+      return { ...d, racialAbilityChoice: choice, abilityScores: newScores, skills };
+    });
+  }, [customClassMap, pointBuySystem]);
 
   const setClasses = useCallback((classes: CharacterDraft['classes']) => {
     setDraft((d) => {
@@ -1243,6 +1287,9 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             onRaceChange={setRace}
             onAlignmentChange={(value) => setField('alignment', value)}
             onTextFieldChange={(field, value) => setField(field, value)}
+            showRacialChoice={!isEdit && isPathfinderSystem(pointBuySystem) && PATHFINDER_FLEXIBLE_RACES.has(draft.race)}
+            racialAbilityChoice={draft.racialAbilityChoice ?? null}
+            onRacialAbilityChoiceChange={setRacialAbilityChoice}
           />
         </Accordion>
 
@@ -1292,6 +1339,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             onLevelUpChange={setLevelUp}
             onEnhancementChange={setEnhancement}
             onTempScoreChange={(key, val) => setAbilityTempScore(key, val)}
+            pointBuySystem={pointBuySystem}
           />
         </Accordion>
 

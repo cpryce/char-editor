@@ -524,10 +524,11 @@ app.get('/api/campaigns/:id', async (req, res) => {
 app.put('/api/campaigns/:id', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  const { name, description } = req.body as { name?: string; description?: string };
+  const { name, description, pointBuySystem } = req.body as { name?: string; description?: string; pointBuySystem?: string | null };
   const update: Record<string, unknown> = {};
   if (name !== undefined) update.name = name.trim();
   if (description !== undefined) update.description = description;
+  if (pointBuySystem !== undefined) update.pointBuySystem = pointBuySystem;
   const campaign = await Campaign.findOneAndUpdate(
     { _id: req.params.id, owner: u._id },
     { $set: update },

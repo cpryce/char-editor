@@ -1,8 +1,9 @@
 import type { CharacterDraft, AbilityScore } from '../../types/character';
 import {
-  ABILITY_POINT_BUY_BUDGET,
   abilityModifier,
   totalScore,
+  type PointBuySystem,
+  POINT_BUY_CONFIGS,
 } from '../../utils/characterHelpers';
 import './AbilityScoresSection.css';
 import { ABILITY_KEYS } from './abilityKeys';
@@ -30,6 +31,7 @@ function AbilityScoreRow({
   onEnhancementChange,
   tempScore,
   onTempScoreChange,
+  minBase = 8,
 }: {
   label: string;
   score: AbilityScore;
@@ -42,6 +44,7 @@ function AbilityScoreRow({
   onEnhancementChange?: (value: number) => void;
   tempScore: number | null;
   onTempScoreChange: (v: number | null) => void;
+  minBase?: number;
 }) {
   const total = totalScore(score);
   const mod = abilityModifier(total);
@@ -64,7 +67,7 @@ function AbilityScoreRow({
           type="number"
           aria-label={`${label} base score`}
           value={score.base}
-          min={8}
+          min={minBase}
           max={18}
           onChange={(e) => onBaseChange(e.target.valueAsNumber)}
           className="ability-number-input"
@@ -178,6 +181,7 @@ export function AbilityScoresSection({
   onLevelUpChange,
   onEnhancementChange,
   onTempScoreChange,
+  pointBuySystem = 'adnd28',
 }: {
   abilityScores: CharacterDraft['abilityScores'];
   isEdit: boolean;
@@ -189,11 +193,12 @@ export function AbilityScoresSection({
   onLevelUpChange: (key: AbilityKey, value: number) => void;
   onEnhancementChange: (key: AbilityKey, value: number) => void;
   onTempScoreChange: (key: AbilityKey, value: number | null) => void;
+  pointBuySystem?: PointBuySystem;
 }) {
   return (
     <>
       <p className="text-sm ability-fg-muted">
-        {spentAbilityPoints} / {ABILITY_POINT_BUY_BUDGET} points spent · {remainingAbilityPoints} remaining
+        {spentAbilityPoints} / {POINT_BUY_CONFIGS[pointBuySystem].budget} points spent · {remainingAbilityPoints} remaining
         {isEdit && earnedLevelUpPoints > 0 && (
           <> · Level-up: {spentLevelUpPoints} / {earnedLevelUpPoints} assigned</>
         )}
@@ -213,6 +218,7 @@ export function AbilityScoresSection({
             onEnhancementChange={(value) => onEnhancementChange(key, value)}
             tempScore={abilityScores[key].temp}
             onTempScoreChange={(value) => onTempScoreChange(key, value)}
+            minBase={POINT_BUY_CONFIGS[pointBuySystem].minBase}
           />
         ))}
       </div>

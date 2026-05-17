@@ -17,6 +17,43 @@ export const RACIAL_ABILITY_ADJUSTMENTS: Readonly<Record<string, AbilityAdj>> = 
   'Half-Orc': { ...ZERO, strength: +2, intelligence: -2, charisma: -2 },
 };
 
+/** Pathfinder-specific fixed racial adjustments.
+ *  Flexible races (Human, Half-Elf, Half-Orc) get +2 to a player-chosen ability,
+ *  tracked separately via racialAbilityChoice — so their entry here is all zeros. */
+export const PATHFINDER_RACIAL_ADJUSTMENTS: Readonly<Record<string, AbilityAdj>> = {
+  Human:      { ...ZERO },
+  Elf:        { ...ZERO, dexterity: +2, intelligence: +2, constitution: -2 },
+  Dwarf:      { ...ZERO, constitution: +2, wisdom: +2, charisma: -2 },
+  Gnome:      { ...ZERO, constitution: +2, charisma: +2, strength: -2 },
+  Halfling:   { ...ZERO, dexterity: +2, charisma: +2, strength: -2 },
+  'Half-Elf': { ...ZERO },
+  'Half-Orc': { ...ZERO },
+};
+
+/** Races that get a free +2 to any one ability score in Pathfinder. */
+export const PATHFINDER_FLEXIBLE_RACES = new Set<string>(['Human', 'Half-Elf', 'Half-Orc']);
+
+export function isPathfinderSystem(system: PointBuySystem): boolean {
+  return system.startsWith('pathfinder');
+}
+
+/** Returns the racial ability adjustments for a race in the given system.
+ *  For Pathfinder flexible races, `choice` is the ability key receiving the +2. */
+export function getRacialAdjFor(
+  race: string,
+  system: PointBuySystem,
+  choice?: string | null,
+): AbilityAdj {
+  if (isPathfinderSystem(system)) {
+    const base = { ...(PATHFINDER_RACIAL_ADJUSTMENTS[race] ?? ZERO) };
+    if (PATHFINDER_FLEXIBLE_RACES.has(race) && choice) {
+      base[choice] = Math.min(2, (base[choice] ?? 0) + 2);
+    }
+    return base;
+  }
+  return { ...(RACIAL_ABILITY_ADJUSTMENTS[race] ?? ZERO) };
+}
+
 export const RACIAL_SIZES: Readonly<Record<Race, Size>> = {
   Human: 'Medium',
   Elf: 'Medium',
@@ -425,6 +462,36 @@ export const ABILITY_POINT_BUY_COSTS: Readonly<Record<number, number>> = {
   18: 16,
 };
 
+// ── Point-buy system definitions ──────────────────────────────────────────────
+
+export type PointBuySystem = 'adnd28' | 'adnd32' | 'pathfinder10' | 'pathfinder15' | 'pathfinder20' | 'pathfinder25';
+
+export interface PointBuyConfig {
+  label: string;
+  budget: number;
+  minBase: number;
+  maxBase: number;
+  defaultBase: number;
+  costs: Readonly<Record<number, number>>;
+}
+
+const ADND_COSTS: Readonly<Record<number, number>> = {
+  8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 6, 15: 8, 16: 10, 17: 13, 18: 16,
+};
+
+const PATHFINDER_COSTS: Readonly<Record<number, number>> = {
+  7: -4, 8: -2, 9: -1, 10: 0, 11: 1, 12: 2, 13: 3, 14: 5, 15: 7, 16: 10, 17: 13, 18: 17,
+};
+
+export const POINT_BUY_CONFIGS: Readonly<Record<PointBuySystem, PointBuyConfig>> = {
+  adnd28:       { label: 'AD&D 28-point',                     budget: 28, minBase: 8, maxBase: 18, defaultBase: 8,  costs: ADND_COSTS        },
+  adnd32:       { label: 'AD&D 32-point',                     budget: 32, minBase: 8, maxBase: 18, defaultBase: 8,  costs: ADND_COSTS        },
+  pathfinder10: { label: 'Pathfinder Low Fantasy (10-point)',  budget: 10, minBase: 7, maxBase: 18, defaultBase: 10, costs: PATHFINDER_COSTS  },
+  pathfinder15: { label: 'Pathfinder Standard (15-point)',     budget: 15, minBase: 7, maxBase: 18, defaultBase: 10, costs: PATHFINDER_COSTS  },
+  pathfinder20: { label: 'Pathfinder High Fantasy (20-point)', budget: 20, minBase: 7, maxBase: 18, defaultBase: 10, costs: PATHFINDER_COSTS  },
+  pathfinder25: { label: 'Pathfinder Epic Fantasy (25-point)', budget: 25, minBase: 7, maxBase: 18, defaultBase: 10, costs: PATHFINDER_COSTS  },
+};
+
 // Mirrors server SKILL_LIST — keyAbility null = Speak Language
 const SKILL_DEFS: { name: string; keyAbility: string | null; trainedOnly: boolean; armorCheckPenalty: boolean }[] = [
   { name: 'Appraise',                              keyAbility: 'intelligence', trainedOnly: false, armorCheckPenalty: false },
@@ -504,6 +571,43 @@ export function affordableAbilityBaseScore(
   }
 
   return 8;
+}
+
+// ── System-aware point-buy helpers ────────────────────────────────────────────
+
+export function clampAbilityBaseScoreFor(score: number, system: PointBuySystem): number {
+  const { minBase, maxBase, defaultBase } = POINT_BUY_CONFIGS[system];
+  if (Number.isNaN(score)) return defaultBase;
+  return Math.min(maxBase, Math.max(minBase, Math.trunc(score)));
+}
+
+export function abilityPointBuyCostFor(score: number, system: PointBuySystem): number {
+  const { minBase, maxBase, costs } = POINT_BUY_CONFIGS[system];
+  const clamped = Math.min(maxBase, Math.max(minBase, Math.trunc(score)));
+  return costs[clamped] ?? 0;
+}
+
+export function abilityPointBuyTotalFor(scores: CharacterDraft['abilityScores'], system: PointBuySystem): number {
+  return Object.values(scores).reduce((sum, s) => sum + abilityPointBuyCostFor(s.base, system), 0);
+}
+
+export function affordableAbilityBaseScoreFor(
+  scores: CharacterDraft['abilityScores'],
+  key: keyof CharacterDraft['abilityScores'],
+  requestedScore: number,
+  system: PointBuySystem,
+): number {
+  const cfg = POINT_BUY_CONFIGS[system];
+  const clamped = clampAbilityBaseScoreFor(requestedScore, system);
+  const availablePoints = cfg.budget - abilityPointBuyTotalFor(scores, system) + abilityPointBuyCostFor(scores[key].base, system);
+
+  for (let score = clamped; score >= cfg.minBase; score -= 1) {
+    if (abilityPointBuyCostFor(score, system) <= availablePoints) {
+      return score;
+    }
+  }
+
+  return cfg.defaultBase;
 }
 
 export function abilityModifier(score: number) {
@@ -629,6 +733,7 @@ export function newCharacterDraft(): CharacterDraft {
     name: '',
     gender: 'Male',
     race: 'Human',
+    racialAbilityChoice: null,
     alignment: 'True Neutral',
     size: RACIAL_SIZES.Human,
     baseSpeed: '30',

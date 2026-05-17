@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
-import type { ClassName, Race } from './types/character';
+import type { Race } from './types/character';
+import type { PointBuySystem } from './utils/characterHelpers';
 import './App.css';
 
 const CharactersPage = lazy(() => import('./pages/CharactersPage').then((module) => ({ default: module.CharactersPage })));
@@ -170,16 +171,32 @@ function NavDropdown({
 }
 
 // ── Settings flyout ───────────────────────────────────────────────────────────
+function loadGlobalPointBuySystem(): PointBuySystem {
+  const raw = window.localStorage.getItem('char-editor-point-buy');
+  if (
+    raw === 'adnd28' || raw === 'adnd32' ||
+    raw === 'pathfinder10' || raw === 'pathfinder15' ||
+    raw === 'pathfinder20' || raw === 'pathfinder25'
+  ) return raw;
+  // Migrate old 'pathfinder' value
+  if (raw === 'pathfinder') return 'pathfinder15';
+  return 'adnd28';
+}
+
 function SettingsFlyout({
   open,
   onClose,
   theme,
   onThemeChange,
+  pointBuySystem,
+  onPointBuySystemChange,
 }: {
   open: boolean;
   onClose: () => void;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
+  pointBuySystem: PointBuySystem;
+  onPointBuySystemChange: (system: PointBuySystem) => void;
 }) {
   return (
     <>
@@ -292,6 +309,71 @@ function SettingsFlyout({
             )}
           </div>
         </div>
+
+        <div className="px-4 pb-4">
+          <div className="px-3 py-2">
+            <span className="settings-theme-label text-sm font-medium">Point Buy System</span>
+            <div className="flex flex-col gap-3 mt-2">
+
+              {/* AD&D */}
+              <div>
+                <label className="flex items-center gap-2 text-sm cursor-pointer settings-theme-label">
+                  <input
+                    type="radio"
+                    name="pointBuyMain"
+                    checked={pointBuySystem === 'adnd28' || pointBuySystem === 'adnd32'}
+                    onChange={() => {
+                      if (pointBuySystem !== 'adnd28' && pointBuySystem !== 'adnd32') {
+                        onPointBuySystemChange('adnd28');
+                      }
+                    }}
+                  />
+                  AD&amp;D Standard
+                </label>
+                {(pointBuySystem === 'adnd28' || pointBuySystem === 'adnd32') && (
+                  <select
+                    value={pointBuySystem}
+                    onChange={(e) => onPointBuySystemChange(e.target.value as PointBuySystem)}
+                    className="block ml-5 mt-1.5 text-sm settings-theme-label"
+                  >
+                    <option value="adnd28">28-point</option>
+                    <option value="adnd32">32-point</option>
+                  </select>
+                )}
+              </div>
+
+              {/* Pathfinder */}
+              <div>
+                <label className="flex items-center gap-2 text-sm cursor-pointer settings-theme-label">
+                  <input
+                    type="radio"
+                    name="pointBuyMain"
+                    checked={pointBuySystem !== 'adnd28' && pointBuySystem !== 'adnd32'}
+                    onChange={() => {
+                      if (pointBuySystem === 'adnd28' || pointBuySystem === 'adnd32') {
+                        onPointBuySystemChange('pathfinder15');
+                      }
+                    }}
+                  />
+                  Pathfinder
+                </label>
+                {pointBuySystem !== 'adnd28' && pointBuySystem !== 'adnd32' && (
+                  <select
+                    value={pointBuySystem}
+                    onChange={(e) => onPointBuySystemChange(e.target.value as PointBuySystem)}
+                    className="block ml-5 mt-1.5 text-sm settings-theme-label"
+                  >
+                    <option value="pathfinder10">Low Fantasy (10-point)</option>
+                    <option value="pathfinder15">Standard Fantasy (15-point)</option>
+                    <option value="pathfinder20">High Fantasy (20-point)</option>
+                    <option value="pathfinder25">Epic Fantasy (25-point)</option>
+                  </select>
+                )}
+              </div>
+
+            </div>
+          </div>
+        </div>
       </aside>
     </>
   );
@@ -311,10 +393,13 @@ function App() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [initiativeSessionId, setInitiativeSessionId] = useState<string | null>(null);
   const [characterReturnCampaignId, setCharacterReturnCampaignId] = useState<string | null>(null);
-  const [newCharacterClass, setNewCharacterClass] = useState<ClassName | undefined>(undefined);
+  const [newCharacterClass, setNewCharacterClass] = useState<string | undefined>(undefined);
   const [newCharacterName, setNewCharacterName] = useState<string | undefined>(undefined);
   const [newCharacterRace, setNewCharacterRace] = useState<Race | undefined>(undefined);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [globalPointBuySystem, setGlobalPointBuySystem] = useState<PointBuySystem>(() => loadGlobalPointBuySystem());
+  const [campaignPointBuySystem, setCampaignPointBuySystem] = useState<PointBuySystem | null>(null);
+  const effectivePointBuySystem = campaignPointBuySystem ?? globalPointBuySystem;
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -456,6 +541,7 @@ function App() {
                 campaignId={selectedCampaignId}
                 onBack={() => {
                   setSelectedCampaignId(null);
+                  setCampaignPointBuySystem(null);
                   setView('list');
                 }}
                 onStartEncounter={(sessionId) => {
@@ -469,13 +555,15 @@ function App() {
                   setSection('characters');
                   setView('edit');
                 }}
+                onPointBuySystemChange={setCampaignPointBuySystem}
               />
             )}
             {section === 'characters' && view === 'list' && (
               <CharactersPage
                 userId={user.id}
-                onNewCharacter={(initialClass) => {
+                onNewCharacter={(initialClass, initialName) => {
                   setNewCharacterClass(initialClass);
+                  setNewCharacterName(initialName);
                   setSelectedCharacterId(null);
                   setView('new');
                 }}
@@ -496,6 +584,7 @@ function App() {
                   setNewCharacterRace(undefined);
                   setView('list');
                 }}
+                pointBuySystem={effectivePointBuySystem}
               />
             )}
             {section === 'characters' && view === 'edit' && selectedCharacterId && (
@@ -512,6 +601,7 @@ function App() {
                     setView('list');
                   }
                 }}
+                pointBuySystem={effectivePointBuySystem}
               />
             )}
           </div>
@@ -523,6 +613,11 @@ function App() {
         onClose={() => setSettingsOpen(false)}
         theme={theme}
         onThemeChange={setTheme}
+        pointBuySystem={globalPointBuySystem}
+        onPointBuySystemChange={(s) => {
+          setGlobalPointBuySystem(s);
+          window.localStorage.setItem('char-editor-point-buy', s);
+        }}
       />
     </div>
   );

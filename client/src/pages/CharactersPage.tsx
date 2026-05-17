@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CLASSES } from '../types/character';
-import type { ClassName } from '../types/character';
+import { NewCharacterForm } from '../components/NewCharacterForm';
 
 interface CharacterSummary {
   _id: string;
@@ -17,7 +16,7 @@ interface ClassEntry {
 
 interface CharactersPageProps {
   userId: string;
-  onNewCharacter: (initialClass?: ClassName) => void;
+  onNewCharacter: (initialClass?: string, initialName?: string) => void;
   onEditCharacter: (id: string) => void;
 }
 
@@ -302,22 +301,14 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
               </svg>
             </button>
             {newDropdownOpen && (
-              <ul
-                role="listbox"
-                aria-label="New character with class"
-                className="absolute right-0 top-full mt-1 z-20 min-w-36 rounded border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] shadow-md py-1 text-sm text-[color:var(--color-fg-default)]"
-              >
-                {CLASSES.map((cls) => (
-                  <li
-                    key={cls}
-                    role="option"
-                    onClick={() => { setNewDropdownOpen(false); onNewCharacter(cls); }}
-                    className="px-3 py-1.5 cursor-pointer hover:bg-[var(--color-accent-subtle)]"
-                  >
-                    {cls}
-                  </li>
-                ))}
-              </ul>
+              <div className="char-dropdown">
+                <NewCharacterForm
+                  onCreate={(name, className) => {
+                    setNewDropdownOpen(false);
+                    onNewCharacter(className, name || undefined);
+                  }}
+                />
+              </div>
             )}
           </div>
         </div>

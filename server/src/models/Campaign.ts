@@ -6,6 +6,7 @@ export interface ICampaign extends Document {
   description: string;
   characterIds: Types.ObjectId[];
   encounterIds: Types.ObjectId[];
+  pointBuySystem?: string;
 }
 
 const CampaignSchema = new Schema<ICampaign>(
@@ -15,6 +16,7 @@ const CampaignSchema = new Schema<ICampaign>(
     description:  { type: String, default: '' },
     characterIds: [{ type: Schema.Types.ObjectId, ref: 'Character' }],
     encounterIds: [{ type: Schema.Types.ObjectId, ref: 'EncounterSession' }],
+    pointBuySystem: { type: String, enum: ['adnd28', 'adnd32', 'pathfinder10', 'pathfinder15', 'pathfinder20', 'pathfinder25', null], default: null },
   },
   { timestamps: true },
 );

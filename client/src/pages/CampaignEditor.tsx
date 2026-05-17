@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { CLASSES, type ClassName } from '../types/character';
 import './CampaignEditor.css';
-
-const HIT_DIE_BY_CLASS: Record<string, number> = {
-  Barbarian: 12, Fighter: 10, Paladin: 10, Ranger: 8,
-  Bard: 6, Cleric: 8, Druid: 8, Monk: 8,
-  Rogue: 6, Sorcerer: 4, Wizard: 4,
-};
+import { NewCharacterForm } from '../components/NewCharacterForm';
+import { type PointBuySystem } from '../utils/characterHelpers';
 
 const DEFAULT_ABILITY_SCORE = { base: 10, racial: 0, enhancement: 0, misc: 0, temp: null, tempMod: null, levelUp: 0 };
 
@@ -32,6 +27,7 @@ interface CampaignDetail {
   owner: UserSummary | null;
   characters: CharSummary[];
   players: UserSummary[];
+  pointBuySystem?: string;
 }
 
 function formatDate(iso: string) {
@@ -43,11 +39,13 @@ export function CampaignEditor({
   onBack,
   onStartEncounter,
   onEditCharacter,
+  onPointBuySystemChange,
 }: {
   campaignId: string;
   onBack: () => void;
   onStartEncounter: (sessionId: string) => void;
   onEditCharacter: (id: string) => void;
+  onPointBuySystemChange?: (system: PointBuySystem | null) => void;
 }) {
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [name, setName] = useState('');
@@ -56,8 +54,6 @@ export function CampaignEditor({
   const [showCharDropdown, setShowCharDropdown] = useState(false);
   const [charDropdownTab, setCharDropdownTab] = useState<'import' | 'new'>('import');
   const [charPickerSelection, setCharPickerSelection] = useState<Set<string>>(new Set());
-  const [charNewName, setCharNewName] = useState('');
-  const [charNewClass, setCharNewClass] = useState<ClassName | null>(null);
   const [showEncounterDropdown, setShowEncounterDropdown] = useState(false);
   const [encounterNewName, setEncounterNewName] = useState('');
   const [editingDescription, setEditingDescription] = useState(false);
@@ -71,8 +67,9 @@ export function CampaignEditor({
         setCampaign(data);
         setName(data.name);
         setDescription(data.description ?? '');
+        onPointBuySystemChange?.(data.pointBuySystem as PointBuySystem ?? null);
       });
-  }, [campaignId]);
+  }, [campaignId, onPointBuySystemChange]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -98,6 +95,18 @@ export function CampaignEditor({
       body: JSON.stringify({ description }),
     }).then((r) => r.json()).then((updated) => {
       setCampaign((prev) => prev ? { ...prev, description: updated.description ?? '' } : prev);
+    });
+  }
+
+  function savePointBuySystem(system: PointBuySystem | null) {
+    fetch(`/api/campaigns/${campaignId}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pointBuySystem: system ?? null }),
+    }).then((r) => r.json()).then((updated) => {
+      setCampaign((prev) => prev ? { ...prev, pointBuySystem: updated.pointBuySystem } : prev);
+      onPointBuySystemChange?.(system);
     });
   }
 
@@ -129,8 +138,6 @@ export function CampaignEditor({
     setAllChars(await res.json());
     setCharPickerSelection(new Set());
     setCharDropdownTab('import');
-    setCharNewName('');
-    setCharNewClass(null);
     setShowCharDropdown(true);
   }
 
@@ -202,19 +209,17 @@ export function CampaignEditor({
     setCampaign(await res.json());
   }
 
-  async function createNewCharacter() {
-    if (!charNewClass || !charNewName.trim()) return;
-    const hitDieType = HIT_DIE_BY_CLASS[charNewClass] ?? 8;
+  async function createNewCharacter(charName: string, className: string, hitDie: number) {
     const charRes = await fetch('/api/characters', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: charNewName.trim(),
+        name: charName || `New ${className}`,
         gender: 'Male',
         race: 'Human',
         alignment: 'True Neutral',
-        classes: [{ name: charNewClass, level: 1, hitDieType, hpRolled: [hitDieType] }],
+        classes: [{ name: className, level: 1, hitDieType: hitDie, hpRolled: [hitDie] }],
         abilityScores: {
           strength:     { ...DEFAULT_ABILITY_SCORE },
           dexterity:    { ...DEFAULT_ABILITY_SCORE },
@@ -223,7 +228,7 @@ export function CampaignEditor({
           wisdom:       { ...DEFAULT_ABILITY_SCORE },
           charisma:     { ...DEFAULT_ABILITY_SCORE },
         },
-        hitPoints: { max: hitDieType, current: hitDieType, nonlethal: 0 },
+        hitPoints: { max: hitDie, current: hitDie, nonlethal: 0 },
       }),
     });
     if (!charRes.ok) return;
@@ -393,40 +398,7 @@ export function CampaignEditor({
                     </div>
                   )}
                   {charDropdownTab === 'new' && (
-                    <>
-                      <div style={{ padding: '10px 12px 4px' }}>
-                        <input
-                          type="text"
-                          value={charNewName}
-                          onChange={(e) => setCharNewName(e.target.value)}
-                          placeholder="Character Name"
-                          className="char-new-name-input"
-                        />
-                      </div>
-                      <div className="char-dropdown-body char-dropdown-body--classes" style={{ paddingTop: 2 }}>
-                        {CLASSES.map((cls) => (
-                          <label key={cls} className="char-new-class-row">
-                            <input
-                              type="checkbox"
-                              checked={charNewClass === cls}
-                              onChange={() => setCharNewClass(charNewClass === cls ? null : cls)}
-                              className="campaign-picker-checkbox"
-                            />
-                            <span>{cls}</span>
-                          </label>
-                        ))}
-                      </div>
-                      <div className="campaign-picker-footer">
-                        <button
-                          type="button"
-                          className="campaign-picker-add-btn"
-                          disabled={!charNewClass || !charNewName.trim()}
-                          onClick={createNewCharacter}
-                        >
-                          Create character
-                        </button>
-                      </div>
-                    </>
+                    <NewCharacterForm onCreate={createNewCharacter} />
                   )}
                 </div>
               )}
@@ -595,6 +567,33 @@ export function CampaignEditor({
                 ))}
               </div>
             )}
+          </section>
+
+          {/* Rules */}
+          <section className="campaign-rail-section">
+            <h3 className="subsection-header">Rules</h3>
+            <p className="campaign-rail-field-label">Point Buy System</p>
+            <select
+              value={campaign.pointBuySystem ?? ''}
+              onChange={(e) => {
+                const val = e.target.value as PointBuySystem | '';
+                savePointBuySystem(val === '' ? null : val);
+              }}
+              className="campaign-editor-description"
+              style={{ height: 'auto', padding: '4px 8px', fontSize: '13px' }}
+            >
+              <option value="">— Use global setting —</option>
+              <optgroup label="AD&amp;D Standard">
+                <option value="adnd28">28-point</option>
+                <option value="adnd32">32-point</option>
+              </optgroup>
+              <optgroup label="Pathfinder">
+                <option value="pathfinder10">Low Fantasy (10-point)</option>
+                <option value="pathfinder15">Standard Fantasy (15-point)</option>
+                <option value="pathfinder20">High Fantasy (20-point)</option>
+                <option value="pathfinder25">Epic Fantasy (25-point)</option>
+              </optgroup>
+            </select>
           </section>
 
         </aside>
