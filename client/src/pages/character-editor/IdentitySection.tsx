@@ -6,7 +6,6 @@ type IdentityTextField = 'deity' | 'age' | 'height' | 'weight' | 'eyes' | 'hair'
 
 export function IdentitySection({
   draft,
-  isEdit,
   nameError,
   onNameChange,
   onNameBlur,
@@ -16,7 +15,6 @@ export function IdentitySection({
   onTextFieldChange,
 }: {
   draft: CharacterDraft;
-  isEdit: boolean;
   nameError?: string;
   onNameChange: (value: string) => void;
   onNameBlur: () => void;

@@ -1280,7 +1280,6 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
         >
           <IdentitySection
             draft={draft}
-            isEdit={isEdit}
             nameError={nameError}
             onNameChange={(value) => setField('name', value)}
             onNameBlur={() => setNameTouched(true)}

@@ -57,7 +57,6 @@ export function CombatSection({
     sizeMod,
     acArmor,
     acShield,
-    acDodge,
     acNatural,
     acDeflection,
     acMisc,
