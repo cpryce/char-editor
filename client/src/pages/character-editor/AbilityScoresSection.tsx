@@ -32,6 +32,9 @@ function AbilityScoreRow({
   tempScore,
   onTempScoreChange,
   minBase = 8,
+  showFlexibleBonus = false,
+  isFlexibleBonusSelected = false,
+  onFlexibleBonusToggle,
 }: {
   label: string;
   score: AbilityScore;
@@ -45,6 +48,9 @@ function AbilityScoreRow({
   tempScore: number | null;
   onTempScoreChange: (v: number | null) => void;
   minBase?: number;
+  showFlexibleBonus?: boolean;
+  isFlexibleBonusSelected?: boolean;
+  onFlexibleBonusToggle?: () => void;
 }) {
   const total = totalScore(score);
   const mod = abilityModifier(total);
@@ -76,18 +82,33 @@ function AbilityScoreRow({
 
       <div className="flex flex-col items-center gap-0.5 ability-racial-wrap">
         <span className="text-xs ability-fg-subtle">racial</span>
-        <span
-          className={[
-            'text-sm font-medium ability-value ability-value--line',
-            score.racial === 0
-              ? 'ability-value--neutral'
-              : score.racial > 0
-                ? 'ability-value--positive'
-                : 'ability-value--negative',
-          ].join(' ')}
-        >
-          {score.racial === 0 ? '0' : score.racial > 0 ? `+${score.racial}` : `${score.racial}`}
-        </span>
+        {showFlexibleBonus ? (
+          <button
+            type="button"
+            className={[
+              'ability-racial-flex-btn',
+              isFlexibleBonusSelected ? 'ability-racial-flex-btn--selected' : '',
+            ].join(' ')}
+            onClick={onFlexibleBonusToggle}
+            title={isFlexibleBonusSelected ? 'Click to remove +2 racial bonus' : 'Click to assign +2 racial bonus here'}
+          >
+            <span className="ability-racial-flex-dot" aria-hidden="true" />
+            <span>{isFlexibleBonusSelected ? '+2' : '0'}</span>
+          </button>
+        ) : (
+          <span
+            className={[
+              'text-sm font-medium ability-value ability-value--line',
+              score.racial === 0
+                ? 'ability-value--neutral'
+                : score.racial > 0
+                  ? 'ability-value--positive'
+                  : 'ability-value--negative',
+            ].join(' ')}
+          >
+            {score.racial === 0 ? '0' : score.racial > 0 ? `+${score.racial}` : `${score.racial}`}
+          </span>
+        )}
       </div>
 
       {isEdit && (
@@ -182,6 +203,9 @@ export function AbilityScoresSection({
   onEnhancementChange,
   onTempScoreChange,
   pointBuySystem = 'adnd28',
+  isFlexibleRace = false,
+  racialAbilityChoice = null,
+  onRacialAbilityChoiceChange,
 }: {
   abilityScores: CharacterDraft['abilityScores'];
   isEdit: boolean;
@@ -194,6 +218,9 @@ export function AbilityScoresSection({
   onEnhancementChange: (key: AbilityKey, value: number) => void;
   onTempScoreChange: (key: AbilityKey, value: number | null) => void;
   pointBuySystem?: PointBuySystem;
+  isFlexibleRace?: boolean;
+  racialAbilityChoice?: string | null;
+  onRacialAbilityChoiceChange?: (key: AbilityKey | null) => void;
 }) {
   return (
     <>
@@ -219,9 +246,19 @@ export function AbilityScoresSection({
             tempScore={abilityScores[key].temp}
             onTempScoreChange={(value) => onTempScoreChange(key, value)}
             minBase={POINT_BUY_CONFIGS[pointBuySystem].minBase}
+            showFlexibleBonus={isFlexibleRace}
+            isFlexibleBonusSelected={racialAbilityChoice === key}
+            onFlexibleBonusToggle={() =>
+              onRacialAbilityChoiceChange?.(racialAbilityChoice === key ? null : key)
+            }
           />
         ))}
       </div>
+      {isFlexibleRace && (
+        <p className="text-xs mt-1 ability-fg-muted">
+          Click the racial column to assign your +2 racial bonus to one ability score.
+        </p>
+      )}
       {isEdit && (
           <p className="text-xs mt-2 ability-fg-subtle">
           enh = permanent stat enhancement

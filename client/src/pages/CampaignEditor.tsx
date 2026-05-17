@@ -30,6 +30,15 @@ interface CampaignDetail {
   pointBuySystem?: string;
 }
 
+const POINT_BUY_LABELS: Record<PointBuySystem, string> = {
+  adnd28: '28-point',
+  adnd32: '32-point',
+  pathfinder10: 'Low Fantasy (10-point)',
+  pathfinder15: 'Standard Fantasy (15-point)',
+  pathfinder20: 'High Fantasy (20-point)',
+  pathfinder25: 'Epic Fantasy (25-point)',
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
@@ -57,9 +66,11 @@ export function CampaignEditor({
   const [showEncounterDropdown, setShowEncounterDropdown] = useState(false);
   const [encounterNewName, setEncounterNewName] = useState('');
   const [editingDescription, setEditingDescription] = useState(false);
+  const [showPointBuyDropdown, setShowPointBuyDropdown] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const charDropdownRef = useRef<HTMLDivElement>(null);
   const encounterDropdownRef = useRef<HTMLDivElement>(null);
+  const pointBuyDropdownRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {    fetch(`/api/campaigns/${campaignId}`, { credentials: 'include' })
       .then((r) => r.json())
@@ -131,6 +142,17 @@ export function CampaignEditor({
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [showEncounterDropdown]);
+
+  useEffect(() => {
+    if (!showPointBuyDropdown) return;
+    function handleMouseDown(e: MouseEvent) {
+      if (pointBuyDropdownRef.current && !pointBuyDropdownRef.current.contains(e.target as Node)) {
+        setShowPointBuyDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [showPointBuyDropdown]);
 
   async function openCharDropdown() {
     if (showCharDropdown) { setShowCharDropdown(false); return; }
@@ -573,27 +595,49 @@ export function CampaignEditor({
           <section className="campaign-rail-section">
             <h3 className="subsection-header">Rules</h3>
             <p className="campaign-rail-field-label">Point Buy System</p>
-            <select
-              value={campaign.pointBuySystem ?? ''}
-              onChange={(e) => {
-                const val = e.target.value as PointBuySystem | '';
-                savePointBuySystem(val === '' ? null : val);
-              }}
-              className="campaign-editor-description"
-              style={{ height: 'auto', padding: '4px 8px', fontSize: '13px' }}
-            >
-              <option value="">— Use global setting —</option>
-              <optgroup label="AD&amp;D Standard">
-                <option value="adnd28">28-point</option>
-                <option value="adnd32">32-point</option>
-              </optgroup>
-              <optgroup label="Pathfinder">
-                <option value="pathfinder10">Low Fantasy (10-point)</option>
-                <option value="pathfinder15">Standard Fantasy (15-point)</option>
-                <option value="pathfinder20">High Fantasy (20-point)</option>
-                <option value="pathfinder25">Epic Fantasy (25-point)</option>
-              </optgroup>
-            </select>
+            <div className="point-buy-dropdown-wrap" ref={pointBuyDropdownRef}>
+              <button
+                type="button"
+                className="point-buy-trigger"
+                onClick={() => setShowPointBuyDropdown((v) => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={showPointBuyDropdown}
+              >
+                <span>{campaign.pointBuySystem ? POINT_BUY_LABELS[campaign.pointBuySystem as PointBuySystem] : '— Use global setting —'}</span>
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {showPointBuyDropdown && (
+                <ul className="point-buy-menu" role="listbox">
+                  <li role="option" aria-selected={!campaign.pointBuySystem}>
+                    <a href="#" onClick={(e) => { e.preventDefault(); savePointBuySystem(null); setShowPointBuyDropdown(false); }}
+                      className={!campaign.pointBuySystem ? 'point-buy-menu__item--active' : ''}>
+                      — Use global setting —
+                    </a>
+                  </li>
+                  <li className="point-buy-menu__group" aria-disabled="true">AD&amp;D Standard</li>
+                  {(['adnd28', 'adnd32'] as PointBuySystem[]).map((sys) => (
+                    <li key={sys} role="option" aria-selected={campaign.pointBuySystem === sys}>
+                      <a href="#" onClick={(e) => { e.preventDefault(); savePointBuySystem(sys); setShowPointBuyDropdown(false); }}
+                        className={campaign.pointBuySystem === sys ? 'point-buy-menu__item--active' : ''}>
+                        {POINT_BUY_LABELS[sys]}
+                      </a>
+                    </li>
+                  ))}
+                  <li className="point-buy-menu__group" aria-disabled="true">Pathfinder</li>
+                  {(['pathfinder10', 'pathfinder15', 'pathfinder20', 'pathfinder25'] as PointBuySystem[]).map((sys) => (
+                    <li key={sys} role="option" aria-selected={campaign.pointBuySystem === sys}>
+                      <a href="#" onClick={(e) => { e.preventDefault(); savePointBuySystem(sys); setShowPointBuyDropdown(false); }}
+                        className={campaign.pointBuySystem === sys ? 'point-buy-menu__item--active' : ''}>
+                        {POINT_BUY_LABELS[sys]}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <p className="campaign-rail-help-text">Overrides the global setting for characters created in this campaign.</p>
           </section>
 
         </aside>

@@ -314,12 +314,12 @@ function deriveCombatStats({
     .reduce<number | null>((lowest, cap) => (lowest === null ? cap : Math.min(lowest, cap)), null);
   const acDexMod = applyMaxDexCap(dexMod, maxDexCap);
 
-  // Dodge bonus is derived purely from worn-slot dodge bonuses and the Dodge feat.
+  // Dodge bonus: manual entry + worn-slot dodge bonuses + Dodge feat.
   const slotDodge = Object.values(inventory.wornSlots).reduce(
     (acc, b) => (b.acType === 'dodge' ? acc + b.acBonus : acc), 0,
   );
   const dodgeFeatBonus = feats.some((f) => f.name.trim().toLowerCase() === 'dodge') ? 1 : 0;
-  const acDodge = slotDodge + dodgeFeatBonus;
+  const acDodge = safeCombatNumber(combat.armorClass.dodge) + slotDodge + dodgeFeatBonus;
 
   // Misc bonus: manual entry + stacking slot bonuses (insight, luck, sacred, profane).
   const slotMisc = Object.values(inventory.wornSlots).reduce(
@@ -795,6 +795,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
           name: typeof data.name === 'string' ? data.name : '',
           gender: (data.gender as CharacterDraft['gender']) ?? base.gender,
           race: (data.race as CharacterDraft['race']) ?? base.race,
+          racialAbilityChoice: typeof data.racialAbilityChoice === 'string' ? data.racialAbilityChoice : null,
           alignment: (data.alignment as CharacterDraft['alignment']) ?? base.alignment,
           size: (data.size as CharacterDraft['size']) ?? base.size,
           baseSpeed: typeof data.baseSpeed === 'string' ? data.baseSpeed : typeof data.baseSpeed === 'number' ? String(data.baseSpeed) : String(BASE_SPEED_BY_SIZE[(data.size as CharacterDraft['size']) ?? base.size] ?? 30),
@@ -971,7 +972,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
     });
   }, [customClassMap, pointBuySystem]);
 
-  const setRacialAbilityChoice = useCallback((choice: string) => {
+  const setRacialAbilityChoice = useCallback((choice: string | null) => {
     setDraft((d) => {
       const prevAdj = getRacialAdjFor(d.race, pointBuySystem, d.racialAbilityChoice);
       const nextAdj = getRacialAdjFor(d.race, pointBuySystem, choice);
@@ -1287,9 +1288,6 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             onRaceChange={setRace}
             onAlignmentChange={(value) => setField('alignment', value)}
             onTextFieldChange={(field, value) => setField(field, value)}
-            showRacialChoice={!isEdit && isPathfinderSystem(pointBuySystem) && PATHFINDER_FLEXIBLE_RACES.has(draft.race)}
-            racialAbilityChoice={draft.racialAbilityChoice ?? null}
-            onRacialAbilityChoiceChange={setRacialAbilityChoice}
           />
         </Accordion>
 
@@ -1340,6 +1338,9 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             onEnhancementChange={setEnhancement}
             onTempScoreChange={(key, val) => setAbilityTempScore(key, val)}
             pointBuySystem={pointBuySystem}
+            isFlexibleRace={isPathfinderSystem(pointBuySystem) && PATHFINDER_FLEXIBLE_RACES.has(draft.race)}
+            racialAbilityChoice={draft.racialAbilityChoice ?? null}
+            onRacialAbilityChoiceChange={setRacialAbilityChoice}
           />
         </Accordion>
 

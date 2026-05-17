@@ -4,15 +4,6 @@ import './IdentitySection.css';
 
 type IdentityTextField = 'deity' | 'age' | 'height' | 'weight' | 'eyes' | 'hair' | 'skin' | 'languages' | 'baseSpeed';
 
-const ABILITY_OPTIONS: { key: string; label: string }[] = [
-  { key: 'strength',     label: 'Strength' },
-  { key: 'dexterity',    label: 'Dexterity' },
-  { key: 'constitution', label: 'Constitution' },
-  { key: 'intelligence', label: 'Intelligence' },
-  { key: 'wisdom',       label: 'Wisdom' },
-  { key: 'charisma',     label: 'Charisma' },
-];
-
 export function IdentitySection({
   draft,
   isEdit,
@@ -23,9 +14,6 @@ export function IdentitySection({
   onRaceChange,
   onAlignmentChange,
   onTextFieldChange,
-  showRacialChoice = false,
-  racialAbilityChoice,
-  onRacialAbilityChoiceChange,
 }: {
   draft: CharacterDraft;
   isEdit: boolean;
@@ -36,9 +24,6 @@ export function IdentitySection({
   onRaceChange: (value: CharacterDraft['race']) => void;
   onAlignmentChange: (value: CharacterDraft['alignment']) => void;
   onTextFieldChange: (field: IdentityTextField, value: string) => void;
-  showRacialChoice?: boolean;
-  racialAbilityChoice?: string | null;
-  onRacialAbilityChoiceChange?: (choice: string) => void;
 }) {
   return (
     <>
@@ -79,31 +64,12 @@ export function IdentitySection({
             value={draft.race}
             onChange={(e) => onRaceChange(e.target.value as CharacterDraft['race'])}
             className="identity-input"
-            disabled={isEdit}
           >
             {RACES.map((race) => (
               <option key={race} value={race}>{race}</option>
             ))}
           </select>
         </label>
-
-        {showRacialChoice && (
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium identity-label-text">
-              Racial +2 Bonus
-            </span>
-            <select
-              value={racialAbilityChoice ?? ''}
-              onChange={(e) => onRacialAbilityChoiceChange?.(e.target.value)}
-              className="identity-input"
-            >
-              <option value="">— choose ability —</option>
-              {ABILITY_OPTIONS.map(({ key, label }) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </label>
-        )}
 
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium identity-label-text">Alignment</span>

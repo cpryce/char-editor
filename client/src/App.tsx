@@ -171,6 +171,15 @@ function NavDropdown({
 }
 
 // ── Settings flyout ───────────────────────────────────────────────────────────
+const POINT_BUY_LABELS: Record<PointBuySystem, string> = {
+  adnd28: '28-point',
+  adnd32: '32-point',
+  pathfinder10: 'Low Fantasy (10-point)',
+  pathfinder15: 'Standard Fantasy (15-point)',
+  pathfinder20: 'High Fantasy (20-point)',
+  pathfinder25: 'Epic Fantasy (25-point)',
+};
+
 function loadGlobalPointBuySystem(): PointBuySystem {
   const raw = window.localStorage.getItem('char-editor-point-buy');
   if (
@@ -198,6 +207,20 @@ function SettingsFlyout({
   pointBuySystem: PointBuySystem;
   onPointBuySystemChange: (system: PointBuySystem) => void;
 }) {
+  const [showPointBuyDropdown, setShowPointBuyDropdown] = useState(false);
+  const pointBuyDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showPointBuyDropdown) return;
+    function handleMouseDown(e: MouseEvent) {
+      if (pointBuyDropdownRef.current && !pointBuyDropdownRef.current.contains(e.target as Node)) {
+        setShowPointBuyDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [showPointBuyDropdown]);
+
   return (
     <>
       {open && (
@@ -312,65 +335,43 @@ function SettingsFlyout({
 
         <div className="px-4 pb-4">
           <div className="px-3 py-2">
-            <span className="settings-theme-label text-sm font-medium">Point Buy System</span>
-            <div className="flex flex-col gap-3 mt-2">
-
-              {/* AD&D */}
-              <div>
-                <label className="flex items-center gap-2 text-sm cursor-pointer settings-theme-label">
-                  <input
-                    type="radio"
-                    name="pointBuyMain"
-                    checked={pointBuySystem === 'adnd28' || pointBuySystem === 'adnd32'}
-                    onChange={() => {
-                      if (pointBuySystem !== 'adnd28' && pointBuySystem !== 'adnd32') {
-                        onPointBuySystemChange('adnd28');
-                      }
-                    }}
-                  />
-                  AD&amp;D Standard
-                </label>
-                {(pointBuySystem === 'adnd28' || pointBuySystem === 'adnd32') && (
-                  <select
-                    value={pointBuySystem}
-                    onChange={(e) => onPointBuySystemChange(e.target.value as PointBuySystem)}
-                    className="block ml-5 mt-1.5 text-sm settings-theme-label"
-                  >
-                    <option value="adnd28">28-point</option>
-                    <option value="adnd32">32-point</option>
-                  </select>
-                )}
-              </div>
-
-              {/* Pathfinder */}
-              <div>
-                <label className="flex items-center gap-2 text-sm cursor-pointer settings-theme-label">
-                  <input
-                    type="radio"
-                    name="pointBuyMain"
-                    checked={pointBuySystem !== 'adnd28' && pointBuySystem !== 'adnd32'}
-                    onChange={() => {
-                      if (pointBuySystem === 'adnd28' || pointBuySystem === 'adnd32') {
-                        onPointBuySystemChange('pathfinder15');
-                      }
-                    }}
-                  />
-                  Pathfinder
-                </label>
-                {pointBuySystem !== 'adnd28' && pointBuySystem !== 'adnd32' && (
-                  <select
-                    value={pointBuySystem}
-                    onChange={(e) => onPointBuySystemChange(e.target.value as PointBuySystem)}
-                    className="block ml-5 mt-1.5 text-sm settings-theme-label"
-                  >
-                    <option value="pathfinder10">Low Fantasy (10-point)</option>
-                    <option value="pathfinder15">Standard Fantasy (15-point)</option>
-                    <option value="pathfinder20">High Fantasy (20-point)</option>
-                    <option value="pathfinder25">Epic Fantasy (25-point)</option>
-                  </select>
-                )}
-              </div>
-
+            <h3 className="settings-rules-header">Rules</h3>
+            <p className="settings-field-label">Point Buy System</p>
+            <div className="point-buy-dropdown-wrap" ref={pointBuyDropdownRef}>
+              <button
+                type="button"
+                className="point-buy-trigger"
+                onClick={() => setShowPointBuyDropdown((v) => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={showPointBuyDropdown}
+              >
+                <span>{POINT_BUY_LABELS[pointBuySystem]}</span>
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {showPointBuyDropdown && (
+                <ul className="point-buy-menu" role="listbox">
+                  <li className="point-buy-menu__group" aria-disabled="true">AD&amp;D Standard</li>
+                  {(['adnd28', 'adnd32'] as PointBuySystem[]).map((sys) => (
+                    <li key={sys} role="option" aria-selected={pointBuySystem === sys}>
+                      <a href="#" onClick={(e) => { e.preventDefault(); onPointBuySystemChange(sys); setShowPointBuyDropdown(false); }}
+                        className={pointBuySystem === sys ? 'point-buy-menu__item--active' : ''}>
+                        {POINT_BUY_LABELS[sys]}
+                      </a>
+                    </li>
+                  ))}
+                  <li className="point-buy-menu__group" aria-disabled="true">Pathfinder</li>
+                  {(['pathfinder10', 'pathfinder15', 'pathfinder20', 'pathfinder25'] as PointBuySystem[]).map((sys) => (
+                    <li key={sys} role="option" aria-selected={pointBuySystem === sys}>
+                      <a href="#" onClick={(e) => { e.preventDefault(); onPointBuySystemChange(sys); setShowPointBuyDropdown(false); }}
+                        className={pointBuySystem === sys ? 'point-buy-menu__item--active' : ''}>
+                        {POINT_BUY_LABELS[sys]}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>

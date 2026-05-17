@@ -144,6 +144,7 @@ export interface ICharacter extends Document {
   owner?: Types.ObjectId;
   gender: 'Male' | 'Female' | 'Gender Neutral';
   race: string;
+  racialAbilityChoice?: string | null;
   alignment: string;
   deity?: string;
   age?: number;
@@ -259,6 +260,7 @@ const characterSchema = new Schema<ICharacter>(
     owner:       { type: Schema.Types.ObjectId, ref: 'User', default: null },
     gender:      { type: String, enum: ['Male', 'Female', 'Gender Neutral'], required: true },
     race:        { type: String, enum: RACES, required: true },
+    racialAbilityChoice: { type: String, default: null },
     alignment:   { type: String, enum: ALIGNMENTS, required: true },
     deity:       { type: String },
     age:         { type: Number },

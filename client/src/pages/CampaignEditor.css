@@ -528,3 +528,12 @@
   color: var(--color-fg-default);
   font-weight: 500;
 }
+
+.campaign-rail-help-text {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: var(--color-fg-muted);
+  line-height: 1.4;
+}
+
+

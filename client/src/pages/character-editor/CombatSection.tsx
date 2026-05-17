@@ -177,7 +177,7 @@ export function CombatSection({
             {modInput('Armor', acArmor, (v) => updateNumeric('armorClass.armor', v))}
             {modInput('Shield', acShield, (v) => updateNumeric('armorClass.shield', v))}
             {modInput('Dex', acDexMod)}
-            {modInput('Dodge', acDodge)}
+            {modInput('Dodge', combat.armorClass.dodge, (v) => updateNumeric('armorClass.dodge', v))}
             {modInput('Deflection', acDeflection)}
             {modInput('Natural', acNatural)}
             {modInput('Misc', acMisc, (v) => updateNumeric('armorClass.misc', v))}
