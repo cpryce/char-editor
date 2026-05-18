@@ -134,41 +134,34 @@ function getTwfFeatOptions(params: {
   const hasITWF = hasFeat(characterFeats, 'Improved Two-Weapon Fighting');
   const hasGTWF = hasFeat(characterFeats, 'Greater Two-Weapon Fighting');
 
-  // TWF: (feat OR ranger 3+) AND Dex 15
+  // TWF: has feat (Dex was met when taking it) OR ranger 2+ (class grants without prerequisites)
   const twfDexOk = dexterity >= 15;
-  const twfAvail = (hasTWF || rangerLevel > 2) && twfDexOk;
+  const twfAvail = hasTWF || rangerLevel >= 2;
   const twfReason = !twfAvail
-    ? (!twfDexOk
-        ? `Dex 15 required (current: ${dexterity})`
-        : 'Requires Two-Weapon Fighting feat (or Ranger level 3+)')
+    ? 'Requires Two-Weapon Fighting feat (or Ranger level 2+)'
     : undefined;
 
-  // ITWF: ((feat + twf-applied + bab6) OR ranger 7+) AND Dex 17
+  // ITWF: has feat + twf-applied + bab6 (Dex met when taking) OR ranger 6+ with twf-applied (class grants without prerequisites)
   const itwfDexOk  = dexterity >= 17;
-  const rangerItwf = rangerLevel > 6;
-  const itwfByFeat = hasITWF && (twfApplied || rangerLevel > 2) && bab >= 6;
-  const itwfAvail  = (rangerItwf || itwfByFeat) && itwfDexOk;
+  const rangerItwf = rangerLevel >= 6 && twfApplied;
+  const itwfByFeat = hasITWF && (twfApplied || rangerLevel >= 2) && bab >= 6;
+  const itwfAvail  = itwfByFeat || rangerItwf;
   const itwfReason = !itwfAvail
-    ? (!itwfDexOk
-        ? `Dex 17 required (current: ${dexterity})`
-        : !hasITWF
-          ? 'Requires Improved Two-Weapon Fighting feat (or Ranger level 7+)'
-          : !twfApplied && rangerLevel <= 2
-            ? 'Two-Weapon Fighting must be applied first'
-            : `BAB +6 required (current: +${bab})`)
+    ? (!hasITWF && rangerLevel < 6
+        ? 'Requires Improved Two-Weapon Fighting feat (or Ranger level 6+)'
+        : !twfApplied
+          ? 'Two-Weapon Fighting must be applied first'
+          : `BAB +6 required (current: +${bab})`)
     : undefined;
 
-  // GTWF: feat + itwf-applied + bab11 + Dex 19 (no ranger exception)
-  const gtwfDexOk = dexterity >= 19;
-  const gtwfAvail = hasGTWF && itwfApplied && bab >= 11 && gtwfDexOk;
+  // GTWF: has feat + itwf-applied + bab11 (Dex was met when taking feat)
+  const gtwfAvail = hasGTWF && itwfApplied && bab >= 11;
   const gtwfReason = !gtwfAvail
-    ? (!gtwfDexOk
-        ? `Dex 19 required (current: ${dexterity})`
-        : !hasGTWF
-          ? 'Requires Greater Two-Weapon Fighting feat'
-          : !itwfApplied
-            ? 'Improved Two-Weapon Fighting must be applied first'
-            : `BAB +11 required (current: +${bab})`)
+    ? (!hasGTWF
+        ? 'Requires Greater Two-Weapon Fighting feat'
+        : !itwfApplied
+          ? 'Improved Two-Weapon Fighting must be applied first'
+          : `BAB +11 required (current: +${bab})`)
     : undefined;
 
   return [

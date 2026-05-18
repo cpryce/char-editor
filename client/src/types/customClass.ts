@@ -22,4 +22,6 @@ export interface CustomClass {
   features: CustomClassFeature[];
   updatedAt: string;
   createdAt: string;
+  /** True when the current user owns this class (server-computed). */
+  isOwner?: boolean;
 }

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NewCharacterForm } from '../components/NewCharacterForm';
+import { DelegatePopover } from '../components/DelegatePopover';
+import { EndDelegationPopover } from '../components/EndDelegationPopover';
 
 interface CharacterSummary {
   _id: string;
@@ -7,6 +9,10 @@ interface CharacterSummary {
   race: string;
   classes: ClassEntry[];
   updatedAt: string;
+  isDelegated?: boolean;
+  owner?: string | null;
+  delegatedTo?: string | null;
+  pendingInviteEmail?: string | null;
 }
 
 interface ClassEntry {
@@ -102,6 +108,10 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
   const [classFilter, setClassFilter] = useState<string | null>(null);
   const [newDropdownOpen, setNewDropdownOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CharacterSummary | null>(null);
+  const [delegatePopoverCharId, setDelegatePopoverCharId] = useState<string | null>(null);
+  const [endDelegationPopoverCharId, setEndDelegationPopoverCharId] = useState<string | null>(null);
+  const delegateBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const endDelegationBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const newRef = useRef<HTMLDivElement>(null);
 
@@ -404,10 +414,61 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = idx % 2 === 0 ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)'; }}
                   onClick={() => onEditCharacter(char._id)}
                 >
-                  <td
-                    className="px-4 py-2 font-medium"
-                  >
-                    {char.name}
+                  <td className="px-4 py-2 font-medium">
+                    <span className="inline-flex items-center gap-2 flex-wrap">
+                      {char.name}
+                      {char.isDelegated && (
+                        <>
+                          <button
+                            ref={(el) => { if (el) endDelegationBtnRefs.current.set(char._id, el); else endDelegationBtnRefs.current.delete(char._id); }}
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setEndDelegationPopoverCharId(endDelegationPopoverCharId === char._id ? null : char._id); }}
+                            className="text-xs px-1.5 py-0.5 rounded bg-[var(--color-accent-subtle)] text-[color:var(--color-accent-fg)] hover:opacity-80 cursor-pointer border-none"
+                          >
+                            Delegated to you ▾
+                          </button>
+                          {endDelegationPopoverCharId === char._id && (
+                            <EndDelegationPopover
+                              characterId={char._id}
+                              isDelegate={true}
+                              anchorRef={{ current: endDelegationBtnRefs.current.get(char._id) ?? null }}
+                              onClose={() => setEndDelegationPopoverCharId(null)}
+                              onEnded={() => setCharacters((prev) => prev.filter((c) => c._id !== char._id))}
+                            />
+                          )}
+                        </>
+                      )}
+                      {!char.isDelegated && char.delegatedTo && (
+                        <>
+                          <button
+                            ref={(el) => { if (el) endDelegationBtnRefs.current.set(char._id, el); else endDelegationBtnRefs.current.delete(char._id); }}
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setEndDelegationPopoverCharId(endDelegationPopoverCharId === char._id ? null : char._id); }}
+                            className="text-xs px-1.5 py-0.5 rounded bg-[var(--color-accent-subtle)] text-[color:var(--color-accent-fg)] hover:opacity-80 cursor-pointer border-none"
+                          >
+                            Delegated ▾
+                          </button>
+                          {endDelegationPopoverCharId === char._id && (
+                            <EndDelegationPopover
+                              characterId={char._id}
+                              isDelegate={false}
+                              anchorRef={{ current: endDelegationBtnRefs.current.get(char._id) ?? null }}
+                              onClose={() => setEndDelegationPopoverCharId(null)}
+                              onEnded={() => {
+                                setCharacters((prev) => prev.map((c) =>
+                                  c._id === char._id ? { ...c, delegatedTo: null } : c,
+                                ));
+                              }}
+                            />
+                          )}
+                        </>
+                      )}
+                      {!char.isDelegated && !char.delegatedTo && char.pendingInviteEmail && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--color-attention-subtle)] text-[color:var(--color-attention-fg)]">
+                          Invite pending
+                        </span>
+                      )}
+                    </span>
                   </td>
                   <td className="px-4 py-2 text-[color:var(--color-fg-default)]">
                     {char.race}
@@ -422,22 +483,64 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
                     {formatDate(char.updatedAt)}
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setDeleteTarget(char);
-                      }}
-                      title="Delete character"
-                      aria-label={`Delete ${char.name}`}
-                      className="inline-flex items-center justify-center w-6 h-6 text-black"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <path d="M4 2H1V4H15V2H12V0H4V2Z"/>
-                        <path fillRule="evenodd" clipRule="evenodd" d="M3 6H13V16H3V6ZM7 9H9V13H7V9Z"/>
-                      </svg>
-                    </a>
+                    <div className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      {/* Delegate button (owner, no delegate) */}
+                      {!char.isDelegated && !char.delegatedTo && (
+                        <>
+                          <button
+                            ref={(el) => { if (el) delegateBtnRefs.current.set(char._id, el); else delegateBtnRefs.current.delete(char._id); }}
+                            type="button"
+                            title={char.pendingInviteEmail ? `Pending invite to ${char.pendingInviteEmail}` : 'Delegate character'}
+                            aria-label={`Delegate ${char.name}`}
+                            onClick={() => setDelegatePopoverCharId(delegatePopoverCharId === char._id ? null : char._id)}
+                            className={`inline-flex items-center justify-center w-6 h-6 ${char.pendingInviteEmail ? 'text-[color:var(--color-attention-fg)]' : 'text-[color:var(--color-fg-muted)] hover:text-[color:var(--color-fg-default)]'}`}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                              <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+                              <path d="M2 13c0-2.76 2.24-5 6-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                              <path d="M12 10l2 2-2 2M10 12h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
+                            </svg>
+                          </button>
+                          {delegatePopoverCharId === char._id && (
+                            <DelegatePopover
+                              characterId={char._id}
+                              pendingInviteEmail={char.pendingInviteEmail}
+                              anchorRef={{ current: delegateBtnRefs.current.get(char._id) ?? null }}
+                              onClose={() => setDelegatePopoverCharId(null)}
+                              onInviteSent={(email) => {
+                                setCharacters((prev) => prev.map((c) =>
+                                  c._id === char._id ? { ...c, pendingInviteEmail: email } : c,
+                                ));
+                                setDelegatePopoverCharId(null);
+                              }}
+                              onInviteCancelled={() => {
+                                setCharacters((prev) => prev.map((c) =>
+                                  c._id === char._id ? { ...c, pendingInviteEmail: null } : c,
+                                ));
+                              }}
+                            />
+                          )}
+                        </>
+                      )}
+                      {/* Delete button (owner only, no delegate active) */}
+                      {!char.isDelegated && !char.delegatedTo && (
+                        <a
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setDeleteTarget(char);
+                          }}
+                          title="Delete character"
+                          aria-label={`Delete ${char.name}`}
+                          className="inline-flex items-center justify-center w-6 h-6 text-black"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M4 2H1V4H15V2H12V0H4V2Z"/>
+                            <path fillRule="evenodd" clipRule="evenodd" d="M3 6H13V16H3V6ZM7 9H9V13H7V9Z"/>
+                          </svg>
+                        </a>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

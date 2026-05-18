@@ -1,5 +1,6 @@
 // Webhook test - if this deploys automatically, the GitHub integration is working
 import 'dotenv/config';
+import crypto from 'crypto';
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
@@ -112,6 +113,21 @@ app.get('/api/health', (_req, res) => {
 
 app.get(
   '/auth/google',
+  (req, res, next) => {
+    const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : null;
+    if (returnTo && /^\/invite\/[a-f0-9]+$/.test(returnTo)) {
+      (req.session as { returnTo?: string }).returnTo = returnTo;
+      // Explicitly save before handing off to Passport so the redirect doesn't
+      // race the session store write (auto-save fires at response-end, which
+      // may be too late when Passport sends the Google redirect immediately).
+      req.session.save((err) => {
+        if (err) { next(err); return; }
+        next();
+      });
+    } else {
+      next();
+    }
+  },
   passport.authenticate('google', {
     scope: ['profile', 'email'],
     prompt: 'select_account',
@@ -122,11 +138,18 @@ app.get(
   '/auth/google/callback',
   passport.authenticate('google', {
     failureRedirect: `${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=auth_failed`,
+    // Passport ≥ 0.6 regenerates the session after login (session-fixation protection),
+    // which destroys the returnTo value saved before the OAuth redirect. keepSessionInfo
+    // preserves the pre-auth session data so returnTo survives the round-trip.
+    keepSessionInfo: true,
   }),
   (req, res) => {
     req.session.save((err) => {
       if (err) return res.redirect(`${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=session_failed`);
-      res.redirect(process.env.CLIENT_URL ?? 'http://localhost:5173');
+      const returnTo = (req.session as { returnTo?: string }).returnTo;
+      delete (req.session as { returnTo?: string }).returnTo;
+      const base = process.env.CLIENT_URL ?? 'http://localhost:5173';
+      res.redirect(returnTo ? `${base}${returnTo}` : base);
     });
   },
 );
@@ -159,10 +182,14 @@ app.get('/api/characters', async (req, res) => {
   }
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const characters = await Character.find(
-    { owner: u._id },
-    { name: 1, race: 1, classes: 1, updatedAt: 1, 'abilityScores.dexterity': 1, 'combat.initiative.miscBonus': 1 },
+    { $or: [{ owner: u._id }, { delegatedTo: u._id }] },
+    { name: 1, race: 1, classes: 1, updatedAt: 1, 'abilityScores.dexterity': 1, 'combat.initiative.miscBonus': 1, owner: 1, delegatedTo: 1, pendingInviteEmail: 1 },
   ).sort({ updatedAt: -1 });
-  res.json(characters);
+  const userId = u._id.toString();
+  res.json(characters.map(c => ({
+    ...c.toObject(),
+    isDelegated: c.delegatedTo?.toString() === userId,
+  })));
 });
 
 app.post('/api/characters', async (req, res) => {
@@ -187,7 +214,7 @@ app.post('/api/characters', async (req, res) => {
 app.get('/api/characters/:id/export-pdf', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  const character = await Character.findOne({ _id: req.params.id, owner: u._id });
+  const character = await Character.findOne({ _id: req.params.id, $or: [{ owner: u._id }, { delegatedTo: u._id }] });
   if (!character) { res.status(404).json({ error: 'Not found' }); return; }
   try {
     const pdfBytes = await fillCharacterPdf(character);
@@ -204,17 +231,34 @@ app.get('/api/characters/:id/export-pdf', async (req, res) => {
 app.get('/api/characters/:id', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  const character = await Character.findOne({ _id: req.params.id, owner: u._id });
+  const character = await Character.findOne({ _id: req.params.id, $or: [{ owner: u._id }, { delegatedTo: u._id }] });
   if (!character) { res.status(404).json({ error: 'Not found' }); return; }
-  res.json(character);
+  // Include custom class definitions for any non-standard classes used by the character.
+  // This ensures the delegate (or anyone viewing the character) can compute correct BAB/saves
+  // even if those custom classes belong to a different user.
+  const classNames = ((character.classes ?? []) as Array<{ name: string }>).map((c) => c.name).filter(Boolean);
+  const ownerId = character.owner instanceof mongoose.Types.ObjectId ? character.owner : new mongoose.Types.ObjectId(String(character.owner));
+  const characterCustomClasses = classNames.length > 0
+    ? await CustomClass.find({ name: { $in: classNames }, owner: ownerId })
+    : [];
+  const userId = u._id.toString();
+  res.json({ ...character.toObject(), isDelegated: character.delegatedTo?.toString() === userId, characterCustomClasses });
 });
 
 app.put('/api/characters/:id', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
+  // Owner is read-only while a delegate is active; only the delegate may edit
+  const existing = await Character.findOne({ _id: req.params.id, $or: [{ owner: u._id }, { delegatedTo: u._id }] });
+  if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
+  const isOwner = existing.owner?.toString() === u._id.toString();
+  if (isOwner && existing.delegatedTo) {
+    res.status(403).json({ error: 'Character is currently delegated. Revoke delegation before editing.' });
+    return;
+  }
   try {
     const character = await Character.findOneAndUpdate(
-      { _id: req.params.id, owner: u._id },
+      { _id: req.params.id, $or: [{ owner: u._id }, { delegatedTo: u._id }] },
       { $set: req.body },
       { returnDocument: 'after', runValidators: true },
     );
@@ -227,6 +271,81 @@ app.put('/api/characters/:id', async (req, res) => {
       throw err;
     }
   }
+});
+
+// ── Delegation / Invite routes ────────────────────────────────────────────────
+
+app.get('/api/characters/:id/invite', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const character = await Character.findOne({ _id: req.params.id, owner: u._id });
+  if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+  if (!character.pendingInviteToken) { res.status(404).json({ error: 'No pending invite' }); return; }
+  res.json({ token: character.pendingInviteToken });
+});
+
+app.post('/api/characters/:id/invite', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const { email } = req.body as { email?: string };
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400).json({ error: 'Invalid email address' }); return;
+  }
+  const character = await Character.findOne({ _id: req.params.id, owner: u._id });
+  if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+  const token = crypto.randomBytes(32).toString('hex');
+  character.pendingInviteToken = token;
+  character.pendingInviteEmail = email;
+  await character.save();
+  res.json({ token });
+});
+
+app.delete('/api/characters/:id/invite', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const character = await Character.findOne({ _id: req.params.id, owner: u._id });
+  if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+  character.pendingInviteToken = null;
+  character.pendingInviteEmail = null;
+  await character.save();
+  res.status(204).end();
+});
+
+app.delete('/api/characters/:id/delegate', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  // Allow either the owner or the current delegate to end delegation
+  const character = await Character.findOne({
+    _id: req.params.id,
+    $or: [{ owner: u._id }, { delegatedTo: u._id }],
+  });
+  if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+  character.delegatedTo = null;
+  await character.save();
+  res.status(204).end();
+});
+
+app.get('/api/invite/:token', async (req, res) => {
+  const character = await Character.findOne({ pendingInviteToken: req.params.token }).populate<{ owner: { name?: string } }>('owner', 'name');
+  if (!character) { res.status(404).json({ error: 'Invite not found or already accepted' }); return; }
+  const owner = character.owner as unknown as { name?: string };
+  res.json({ characterId: character._id, characterName: character.name, ownerName: owner?.name ?? 'Unknown' });
+});
+
+app.post('/api/invite/:token/accept', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const character = await Character.findOne({ pendingInviteToken: req.params.token });
+  if (!character) { res.status(404).json({ error: 'Invite not found or already accepted' }); return; }
+  if (character.delegatedTo) { res.status(409).json({ error: 'Character already has an active delegate' }); return; }
+  if (character.owner?.toString() === u._id.toString()) {
+    res.status(400).json({ error: 'You cannot accept an invite to your own character' }); return;
+  }
+  character.delegatedTo = u._id;
+  character.pendingInviteToken = null;
+  character.pendingInviteEmail = null;
+  await character.save();
+  res.json({ characterId: character._id });
 });
 
 app.delete('/api/characters/:id', async (req, res) => {
@@ -242,8 +361,8 @@ app.delete('/api/characters/:id', async (req, res) => {
 app.get('/api/custom-feats', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  const feats = await CustomFeat.find({ owner: u._id }).sort({ name: 1 });
-  res.json(feats);
+  const feats = await CustomFeat.find({}).sort({ name: 1 }).lean();
+  res.json(feats.map((f) => ({ ...f, isOwner: f.owner?.toString() === u._id.toString() })));
 });
 
 app.post('/api/custom-feats', async (req, res) => {
@@ -266,9 +385,9 @@ app.post('/api/custom-feats', async (req, res) => {
 app.get('/api/custom-feats/:id', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  const feat = await CustomFeat.findOne({ _id: req.params.id, owner: u._id });
+  const feat = await CustomFeat.findById(req.params.id).lean();
   if (!feat) { res.status(404).json({ error: 'Not found' }); return; }
-  res.json(feat);
+  res.json({ ...feat, isOwner: feat.owner?.toString() === u._id.toString() });
 });
 
 app.put('/api/custom-feats/:id', async (req, res) => {
@@ -306,8 +425,8 @@ app.delete('/api/custom-feats/:id', async (req, res) => {
 app.get('/api/custom-classes', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  const classes = await CustomClass.find({ owner: u._id }).sort({ name: 1 });
-  res.json(classes);
+  const classes = await CustomClass.find({}).sort({ name: 1 }).lean();
+  res.json(classes.map((c) => ({ ...c, isOwner: c.owner?.toString() === u._id.toString() })));
 });
 
 app.post('/api/custom-classes', async (req, res) => {
@@ -330,9 +449,9 @@ app.post('/api/custom-classes', async (req, res) => {
 app.get('/api/custom-classes/:id', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  const cls = await CustomClass.findOne({ _id: req.params.id, owner: u._id });
+  const cls = await CustomClass.findById(req.params.id).lean();
   if (!cls) { res.status(404).json({ error: 'Not found' }); return; }
-  res.json(cls);
+  res.json({ ...cls, isOwner: cls.owner?.toString() === u._id.toString() });
 });
 
 app.put('/api/custom-classes/:id', async (req, res) => {
@@ -462,7 +581,7 @@ async function getCampaignDetail(campaignId: string, ownerId: mongoose.Types.Obj
   const [characters, encounters, ownerUser] = await Promise.all([
     Character.find(
       { _id: { $in: campaign.characterIds } },
-      { name: 1, race: 1, classes: 1, owner: 1 },
+      { name: 1, race: 1, classes: 1, owner: 1, delegatedTo: 1, pendingInviteEmail: 1, 'abilityScores.dexterity': 1, 'combat.initiative': 1 },
     ).lean(),
     EncounterSession.find(
       { _id: { $in: campaign.encounterIds } },
@@ -481,7 +600,29 @@ async function getCampaignDetail(campaignId: string, ownerId: mongoose.Types.Obj
     owner: ownerUser
       ? { _id: ownerUser._id.toString(), name: ownerUser.name, email: ownerUser.email, avatar: ownerUser.avatar }
       : null,
-    characters: characters.map((c) => ({ _id: c._id.toString(), name: c.name, race: c.race, classes: c.classes })),
+    characters: characters.map((c) => {
+      const raw = c as unknown as {
+        delegatedTo?: { toString(): string };
+        pendingInviteEmail?: string;
+        abilityScores?: { dexterity?: { base?: number; racial?: number; enhancement?: number; misc?: number; tempMod?: number; levelUp?: number; temp?: number } };
+        combat?: { initiative?: { miscBonus?: number } };
+      };
+      const dex = raw.abilityScores?.dexterity;
+      const dexTotal = dex
+        ? (dex.temp ?? ((dex.base ?? 10) + (dex.racial ?? 0) + (dex.enhancement ?? 0) + (dex.misc ?? 0) + (dex.tempMod ?? 0) + (dex.levelUp ?? 0)))
+        : 10;
+      const initiativeModifier = Math.floor((dexTotal - 10) / 2) + Number(raw.combat?.initiative?.miscBonus ?? 0);
+      return {
+        _id: c._id.toString(),
+        name: c.name,
+        race: c.race,
+        classes: c.classes,
+        owner: c.owner?.toString() ?? null,
+        delegatedTo: raw.delegatedTo?.toString() ?? null,
+        pendingInviteEmail: raw.pendingInviteEmail ?? null,
+        initiativeModifier,
+      };
+    }),
     encounters: encounters.map((e) => ({ _id: e._id.toString(), id: e._id.toString(), name: e.name })),
     players: playerUsers.map((u) => ({ _id: u._id.toString(), name: u.name, email: u.email, avatar: u.avatar })),
   };
@@ -551,7 +692,7 @@ app.post('/api/campaigns/:id/characters', async (req, res) => {
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const { characterId } = req.body as { characterId?: string };
   if (!characterId) { res.status(400).json({ error: 'characterId is required.' }); return; }
-  const char = await Character.findOne({ _id: characterId, owner: u._id });
+  const char = await Character.findOne({ _id: characterId, $or: [{ owner: u._id }, { delegatedTo: u._id }] });
   if (!char) { res.status(404).json({ error: 'Character not found.' }); return; }
   await Campaign.updateOne(
     { _id: req.params.id, owner: u._id },

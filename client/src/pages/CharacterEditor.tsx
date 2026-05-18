@@ -48,6 +48,8 @@ import { CombatSection } from './character-editor/CombatSection';
 import type { CombatDerivedStats } from './character-editor/CombatSection';
 import { InventorySection } from './character-editor/InventorySection';
 import { SkillsSection } from './character-editor/SkillsSection';
+import { DelegatePopover } from '../components/DelegatePopover';
+import { EndDelegationPopover } from '../components/EndDelegationPopover';
 import type { AbilityKey } from './character-editor/AbilityScoresSection';
 import { generateStatBlock, statBlockToPlainText, statBlockToRtf } from '../utils/statBlock';
 import type { StatBlockData } from '../utils/statBlock';
@@ -496,21 +498,43 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
   });
   const [customFeats, setCustomFeats] = useState<CustomFeat[]>([]);
   const [customClasses, setCustomClasses] = useState<CustomClass[]>([]);
+  // Custom classes embedded in the character response (may belong to a different user, e.g. the
+  // owner's classes when the delegate is viewing, or classes the delegate added that the owner
+  // doesn't have). Merged into customClassMap so BAB/saves are always computed correctly.
+  const [characterCustomClasses, setCharacterCustomClasses] = useState<CustomClass[]>([]);
 
   const customClassMap = useMemo<Map<string, CustomClassLookup>>(() => {
-    return new Map(customClasses.map((cc) => [cc.name, {
+    // Owned classes take priority over same-named classes from other users.
+    // characterCustomClasses override everything so the class embedded in the character
+    // (e.g. the owner's definition when a delegate is viewing) is always canonical.
+    const map = new Map<string, CustomClassLookup>();
+    const toEntry = (cc: CustomClass): CustomClassLookup => ({
       babProgression: cc.babProgression,
       fortitudeSave: cc.fortitudeSave,
       reflexSave: cc.reflexSave,
       willSave: cc.willSave,
       classSkills: cc.classSkills,
       features: cc.features,
-    }]));
-  }, [customClasses]);
+    });
+    for (const cc of customClasses) {
+      if (!map.has(cc.name) || cc.isOwner) map.set(cc.name, toEntry(cc));
+    }
+    for (const cc of characterCustomClasses) {
+      map.set(cc.name, toEntry(cc));
+    }
+    return map;
+  }, [customClasses, characterCustomClasses]);
 
   const [nameTouched, setNameTouched] = useState(false);
   const [showStatBlock, setShowStatBlock] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [isDelegated, setIsDelegated] = useState(false);
+  const [delegatedTo, setDelegatedTo] = useState<string | null>(null);
+  const [pendingInviteEmail, setPendingInviteEmail] = useState<string | null>(null);
+  const [delegatePopoverOpen, setDelegatePopoverOpen] = useState(false);
+  const delegateBtnRef = useRef<HTMLButtonElement>(null);
+  const [endDelegationOpen, setEndDelegationOpen] = useState(false);
+  const endDelegationBtnRef = useRef<HTMLButtonElement>(null);
   const saveSequenceRef = useRef(0);
   const initialSaveRef = useRef(false);
   const nameError = nameTouched && !draft.name.trim() ? 'Name is required.' : undefined;
@@ -871,6 +895,12 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
         setDraft(loadedDraft);
         setAutoSaveCharacterId(characterId);
         setInitialDraftFingerprint(JSON.stringify(loadedDraft));
+        setIsDelegated(Boolean(data.isDelegated));
+        setDelegatedTo(typeof data.delegatedTo === 'string' ? data.delegatedTo : null);
+        setPendingInviteEmail(typeof data.pendingInviteEmail === 'string' ? data.pendingInviteEmail : null);
+        if (Array.isArray(data.characterCustomClasses)) {
+          setCharacterCustomClasses(data.characterCustomClasses as CustomClass[]);
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -1259,6 +1289,80 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
               )}
             </button>
           )}
+          {/* Delegate button — only for existing owned characters */}
+          {autoSaveCharacterId && !isDelegated && !delegatedTo && (
+            <>
+              <button
+                ref={delegateBtnRef}
+                type="button"
+                onClick={() => setDelegatePopoverOpen((o) => !o)}
+                className="stat-block-open-btn"
+                title={pendingInviteEmail ? `Pending invite to ${pendingInviteEmail}` : 'Delegate character'}
+              >
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+                  <path d="M2 13c0-2.76 2.24-5 6-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                  <path d="M12 10l2 2-2 2M10 12h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
+                </svg>
+                {pendingInviteEmail ? 'Invite Pending' : 'Delegate'}
+              </button>
+              {delegatePopoverOpen && (
+                <DelegatePopover
+                  characterId={autoSaveCharacterId}
+                  pendingInviteEmail={pendingInviteEmail}
+                  anchorRef={delegateBtnRef}
+                  onClose={() => setDelegatePopoverOpen(false)}
+                  onInviteSent={(email) => { setPendingInviteEmail(email); setDelegatePopoverOpen(false); }}
+                  onInviteCancelled={() => setPendingInviteEmail(null)}
+                />
+              )}
+            </>
+          )}
+          {/* Owner view when delegation is active — read-only, can revoke */}
+          {autoSaveCharacterId && !isDelegated && delegatedTo && (
+            <>
+              <button
+                ref={delegateBtnRef}
+                type="button"
+                onClick={() => setDelegatePopoverOpen((o) => !o)}
+                className="stat-block-open-btn text-[color:var(--color-done-fg)]"
+                title="Character is delegated to another player"
+              >
+                Delegated ▾
+              </button>
+              {delegatePopoverOpen && (
+                <EndDelegationPopover
+                  characterId={autoSaveCharacterId}
+                  isDelegate={false}
+                  anchorRef={delegateBtnRef}
+                  onClose={() => setDelegatePopoverOpen(false)}
+                  onEnded={() => { setDelegatedTo(null); setDelegatePopoverOpen(false); }}
+                />
+              )}
+            </>
+          )}
+          {isDelegated && (
+            <>
+              <button
+                ref={endDelegationBtnRef}
+                type="button"
+                onClick={() => setEndDelegationOpen((o) => !o)}
+                className="stat-block-open-btn text-[color:var(--color-accent-fg)]"
+                title="You are editing this character as a delegate"
+              >
+                Delegated ▾
+              </button>
+              {endDelegationOpen && autoSaveCharacterId && (
+                <EndDelegationPopover
+                  characterId={autoSaveCharacterId}
+                  isDelegate={true}
+                  anchorRef={endDelegationBtnRef}
+                  onClose={() => setEndDelegationOpen(false)}
+                  onEnded={() => { setIsDelegated(false); setEndDelegationOpen(false); }}
+                />
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -1268,8 +1372,18 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
         </p>
       )}
 
+      {!loadingCharacter && !isDelegated && delegatedTo && (
+        <p className="text-sm px-3 py-2 rounded bg-[var(--color-attention-subtle)] text-[color:var(--color-attention-fg)] border border-[var(--color-attention-muted)]">
+          This character is currently delegated. Fields are read-only until access is revoked.
+        </p>
+      )}
+
       {!loadingCharacter && (
       <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-4">
+        <div
+          className={!isDelegated && delegatedTo ? 'char-editor-readonly' : ''}
+          style={!isDelegated && delegatedTo ? { opacity: 0.65 } : undefined}
+        >
 
         {/* ── Identity ── */}
         {/* ── Identity ── */}
@@ -1425,12 +1539,13 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             {error ?? 'Saving...'}
           </p>
         )}
+        </div>
       </form>
       )}
 
       {showStatBlock && (
         <StatBlockModal
-          data={generateStatBlock(draft)}
+          data={generateStatBlock(draft, combatStats)}
           name={draft.name.trim() || 'character'}
           onClose={() => setShowStatBlock(false)}
         />
