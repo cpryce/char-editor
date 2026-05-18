@@ -391,6 +391,13 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState<Section>('characters');
   const [view, setView] = useState<View>('list');
+  // Tracks whether the current URL is an /invite/:token path. Stored as state so
+  // setting it to false in onAccepted guarantees a re-render (setSection/setView
+  // are no-ops when already at their defaults, which skips the render and leaves
+  // InvitePage on screen even after the URL has been changed to '/').
+  const [showingInvite, setShowingInvite] = useState(
+    () => /^\/invite\/[a-f0-9]+$/.test(window.location.pathname),
+  );
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [initiativeSessionId, setInitiativeSessionId] = useState<string | null>(null);
@@ -423,7 +430,9 @@ function App() {
   if (loading) return null;
 
   // Handle /invite/:token before auth check — InvitePage handles its own 401 redirect
-  const inviteMatch = window.location.pathname.match(/^\/invite\/([a-f0-9]+)$/);
+  const inviteMatch = showingInvite
+    ? window.location.pathname.match(/^\/invite\/([a-f0-9]+)$/)
+    : null;
   if (inviteMatch) {
     const token = inviteMatch[1];
     return (
@@ -432,8 +441,7 @@ function App() {
           token={token}
           onAccepted={() => {
             window.history.replaceState(null, '', '/');
-            setSection('characters');
-            setView('list');
+            setShowingInvite(false); // guaranteed state change → triggers re-render
           }}
         />
       </Suspense>

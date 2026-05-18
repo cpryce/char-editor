@@ -7,6 +7,12 @@
   text-align: left;
 }
 
+/* Read-only state: body content is non-interactive; accordion triggers remain clickable */
+.char-editor-readonly .character-editor-accordion-body {
+  pointer-events: none;
+  user-select: none;
+}
+
 .character-editor-accordion-trigger--open {
   border-bottom: 2px solid var(--fgColor-accent);
 }

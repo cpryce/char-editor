@@ -24,6 +24,7 @@ export function DelegatePopover({
 }: DelegatePopoverProps) {
   const [email, setEmail] = useState('');
   const [copied, setCopied] = useState(false);
+  const [reCopied, setReCopied] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
@@ -76,6 +77,21 @@ export function DelegatePopover({
     }
   }
 
+  async function handleRecopyUrl() {
+    setError(null);
+    try {
+      const res = await fetch(`/api/characters/${characterId}/invite`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to retrieve invite link');
+      const { token } = await res.json() as { token: string };
+      const url = `${window.location.origin}/invite/${token}`;
+      await navigator.clipboard.writeText(url);
+      setReCopied(true);
+      setTimeout(() => setReCopied(false), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to copy link');
+    }
+  }
+
   async function handleCancelInvite() {
     setCancelling(true);
     setError(null);
@@ -119,6 +135,13 @@ export function DelegatePopover({
           <p className="text-xs text-[color:var(--color-fg-muted)]">
             Pending invite sent to <strong>{pendingInviteEmail}</strong>.
           </p>
+          <button
+            type="button"
+            onClick={handleRecopyUrl}
+            className="btn btn-secondary text-xs h-7"
+          >
+            {reCopied ? '✓ Copied!' : 'Copy Link'}
+          </button>
           <button
             type="button"
             disabled={cancelling}

@@ -180,16 +180,6 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
     }
   }
 
-  async function revokeDelegate(id: string) {
-    try {
-      const res = await fetch(`/api/characters/${id}/delegate`, { method: 'DELETE', credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to revoke delegate');
-      setCharacters((prev) => prev.map((c) => c._id === id ? { ...c, delegatedTo: null } : c));
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to revoke delegate');
-    }
-  }
-
   useEffect(() => {
     if (!newDropdownOpen) return;
     function handleClickOutside(e: MouseEvent) {

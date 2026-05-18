@@ -1,10 +1,9 @@
 import type { CharacterDraft } from '../types/character';
 import { getWeaponAttackClass } from '../data/weapons';
+import type { CombatDerivedStats } from '../pages/character-editor/CombatSection';
 import {
   totalScore,
   abilityModifier,
-  baseAttackBonusFromClasses,
-  baseSaveBonusFromClasses,
   totalCharacterLevel,
   deriveAutoFeats,
   deriveClassFeatures,
@@ -38,11 +37,6 @@ function safe(v: unknown): number {
 }
 
 // ── Lookup tables ─────────────────────────────────────────────────────────────
-
-const SIZE_AC_MOD: Record<CharacterDraft['size'], number> = {
-  Fine: 8, Diminutive: 4, Tiny: 2, Small: 1, Medium: 0,
-  Large: -1, Huge: -2, Gargantuan: -4, Colossal: -8,
-};
 
 const SIZE_GRAPPLE_MOD: Record<CharacterDraft['size'], number> = {
   Fine: -16, Diminutive: -12, Tiny: -8, Small: -4, Medium: 0,
@@ -141,7 +135,7 @@ function buildHDExpression(classes: CharacterDraft['classes'], conMod: number, c
  *   Para 1 — Abilities
  *   Para 2 — Skills & Feats
  */
-export function generateStatBlock(draft: CharacterDraft): StatBlockData {
+export function generateStatBlock(draft: CharacterDraft, combatStats: CombatDerivedStats): StatBlockData {
   const charLevel = totalCharacterLevel(draft.classes);
 
   // Ability score totals
@@ -153,30 +147,18 @@ export function generateStatBlock(draft: CharacterDraft): StatBlockData {
   const cha  = totalScore(draft.abilityScores.charisma);
 
   const strMod = abilityModifier(str);
-  const dexMod = abilityModifier(dex);
   const conMod = abilityModifier(con);
-  const wisMod = abilityModifier(wis);
 
-  const sizeACMod     = SIZE_AC_MOD[draft.size] ?? 0;
   const sizeGrappleMod = SIZE_GRAPPLE_MOD[draft.size] ?? 0;
 
-  // AC
-  const acArmor      = safe(draft.combat.armorClass.armor);
-  const acShield     = safe(draft.combat.armorClass.shield);
-  const acDodge      = safe(draft.combat.armorClass.dodge);
-  const acNatural    = safe(draft.combat.armorClass.natural);
-  const acDeflection = safe(draft.combat.armorClass.deflection);
-  const acMisc       = safe(draft.combat.armorClass.misc);
+  // AC — use combatStats (includes max-dex cap, Dodge feat, worn slot bonuses)
+  const { totalAC, touchAC, flatFootedAC } = combatStats;
 
-  const totalAC      = 10 + acArmor + acShield + dexMod + sizeACMod + acDodge + acNatural + acDeflection + acMisc;
-  const touchAC      = 10 + dexMod + sizeACMod + acDodge + acDeflection + acMisc;
-  const flatFootedAC = 10 + acArmor + acShield + sizeACMod + acNatural + acDeflection + acMisc;
-
-  // Attack
-  const bab         = baseAttackBonusFromClasses(draft.classes);
+  // Attack — use combatStats (correctly computed with customClassMap, live from current draft)
+  const bab         = combatStats.bab;
   const grapple     = bab + strMod + sizeGrappleMod;
-  const meleeBonus  = bab + strMod + sizeACMod;
-  const rangedBonus = bab + dexMod + sizeACMod;
+  const meleeBonus  = combatStats.meleeAttack;
+  const rangedBonus = combatStats.rangedAttack;
   const mainHandWeapon = draft.inventory.mainHand?.name?.trim() ? draft.inventory.mainHand : null;
   const offHandWeapon = draft.inventory.offHandWeapon?.name?.trim() ? draft.inventory.offHandWeapon : null;
 
@@ -209,25 +191,17 @@ export function generateStatBlock(draft: CharacterDraft): StatBlockData {
     fullAtkText = formatWeaponAttack(offHandWeapon, weaponAttackString(offHandWeapon, meleeBonus, rangedBonus, bab));
   }
 
-  // Speed — derive from baseSpeed + worn armor, matching CharacterEditor derivation
-  const speedBase = parseInt(draft.baseSpeed ?? '') || 30;
-  const armoredSpeedFt = draft.inventory.body?.speed ? parseInt(draft.inventory.body.speed) : NaN;
-  const speedArmorAdjust = draft.inventory.body?.speed && !isNaN(armoredSpeedFt) ? armoredSpeedFt - speedBase : 0;
-  const speedFeet = Math.max(0, speedBase + speedArmorAdjust);
-  const speedFly  = safe(draft.combat.speed.fly);
-  const speedSwim = safe(draft.combat.speed.swim);
+  // Speed — use combatStats values (already computed, consistent with the editor)
+  const { speedFeet, speedFly, speedSwim } = combatStats;
   const speedParts: string[] = [`${speedFeet} ft.`];
   if (speedFly > 0)  speedParts.push(`fly ${speedFly} ft.`);
   if (speedSwim > 0) speedParts.push(`swim ${speedSwim} ft.`);
 
-  // Initiative & saves
-  const initTotal = dexMod + safe(draft.combat.initiative.miscBonus);
-  const fort = baseSaveBonusFromClasses(draft.classes, 'fortitude') + conMod
-    + safe(draft.combat.saves.fortitude.magic) + safe(draft.combat.saves.fortitude.misc) + safe(draft.combat.saves.fortitude.temp);
-  const ref = baseSaveBonusFromClasses(draft.classes, 'reflex') + dexMod
-    + safe(draft.combat.saves.reflex.magic) + safe(draft.combat.saves.reflex.misc) + safe(draft.combat.saves.reflex.temp);
-  const will = baseSaveBonusFromClasses(draft.classes, 'will') + wisMod
-    + safe(draft.combat.saves.will.magic) + safe(draft.combat.saves.will.misc) + safe(draft.combat.saves.will.temp);
+  // Initiative & saves — use combatStats (live, correctly computed with customClassMap)
+  const initTotal = combatStats.initiativeTotal;
+  const fort = combatStats.fortitudeTotal;
+  const ref  = combatStats.reflexTotal;
+  const will = combatStats.willTotal;
 
   // Descriptor strings
   const classStr  = draft.classes.filter((c) => c.name && c.level > 0).map((c) => `${c.name} ${c.level}`).join('/');

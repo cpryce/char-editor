@@ -117,8 +117,16 @@ app.get(
     const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : null;
     if (returnTo && /^\/invite\/[a-f0-9]+$/.test(returnTo)) {
       (req.session as { returnTo?: string }).returnTo = returnTo;
+      // Explicitly save before handing off to Passport so the redirect doesn't
+      // race the session store write (auto-save fires at response-end, which
+      // may be too late when Passport sends the Google redirect immediately).
+      req.session.save((err) => {
+        if (err) { next(err); return; }
+        next();
+      });
+    } else {
+      next();
     }
-    next();
   },
   passport.authenticate('google', {
     scope: ['profile', 'email'],
@@ -130,6 +138,10 @@ app.get(
   '/auth/google/callback',
   passport.authenticate('google', {
     failureRedirect: `${process.env.CLIENT_URL ?? 'http://localhost:5173'}/?error=auth_failed`,
+    // Passport ≥ 0.6 regenerates the session after login (session-fixation protection),
+    // which destroys the returnTo value saved before the OAuth redirect. keepSessionInfo
+    // preserves the pre-auth session data so returnTo survives the round-trip.
+    keepSessionInfo: true,
   }),
   (req, res) => {
     req.session.save((err) => {
@@ -221,8 +233,16 @@ app.get('/api/characters/:id', async (req, res) => {
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const character = await Character.findOne({ _id: req.params.id, $or: [{ owner: u._id }, { delegatedTo: u._id }] });
   if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+  // Include custom class definitions for any non-standard classes used by the character.
+  // This ensures the delegate (or anyone viewing the character) can compute correct BAB/saves
+  // even if those custom classes belong to a different user.
+  const classNames = ((character.classes ?? []) as Array<{ name: string }>).map((c) => c.name).filter(Boolean);
+  const ownerId = character.owner instanceof mongoose.Types.ObjectId ? character.owner : new mongoose.Types.ObjectId(String(character.owner));
+  const characterCustomClasses = classNames.length > 0
+    ? await CustomClass.find({ name: { $in: classNames }, owner: ownerId })
+    : [];
   const userId = u._id.toString();
-  res.json({ ...character.toObject(), isDelegated: character.delegatedTo?.toString() === userId });
+  res.json({ ...character.toObject(), isDelegated: character.delegatedTo?.toString() === userId, characterCustomClasses });
 });
 
 app.put('/api/characters/:id', async (req, res) => {
@@ -254,6 +274,15 @@ app.put('/api/characters/:id', async (req, res) => {
 });
 
 // ── Delegation / Invite routes ────────────────────────────────────────────────
+
+app.get('/api/characters/:id/invite', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const character = await Character.findOne({ _id: req.params.id, owner: u._id });
+  if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+  if (!character.pendingInviteToken) { res.status(404).json({ error: 'No pending invite' }); return; }
+  res.json({ token: character.pendingInviteToken });
+});
 
 app.post('/api/characters/:id/invite', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
