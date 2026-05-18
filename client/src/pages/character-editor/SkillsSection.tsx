@@ -121,7 +121,7 @@ export function SkillsSection({
           {skills.map((sk, i) => {
             const bonus = computeSkillBonus(sk, abilityScores);
             const abilityBonus = sk.keyAbility
-              ? abilityModifier(totalScore(abilityScores[sk.keyAbility as keyof CharacterDraft['abilityScores']]))
+              ? (() => { const s = abilityScores[sk.keyAbility as keyof CharacterDraft['abilityScores']]; return abilityModifier(s.temp ?? totalScore(s)); })()
               : 0;
             const bonusStr = `${bonus}`;
             const abilityBonusStr = abilityBonus >= 0 ? `+${abilityBonus}` : `${abilityBonus}`;

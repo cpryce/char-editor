@@ -515,6 +515,8 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
       willSave: cc.willSave,
       classSkills: cc.classSkills,
       features: cc.features,
+      skillsAtFirst: cc.skillsAtFirst,
+      skillsPerLevel: cc.skillsPerLevel,
     });
     for (const cc of customClasses) {
       if (!map.has(cc.name) || cc.isOwner) map.set(cc.name, toEntry(cc));
@@ -562,7 +564,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
   }, [draft.abilityScores, abilityTotals]);
 
   const intelligenceMod = abilityMods.intelligence;
-  const availableSkillPoints = totalSkillPointsAvailable(draft.classes, intelligenceMod, draft.race);
+  const availableSkillPoints = totalSkillPointsAvailable(draft.classes, intelligenceMod, draft.race, customClassMap);
   const spentPoints = spentSkillPoints(draft.skills);
   const selectedClass = draft.classes[0];
   const calculatedCreateHitPoints = selectedClass

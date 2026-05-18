@@ -149,6 +149,8 @@ export interface CustomClassLookup {
   willSave: 'good' | 'poor';
   classSkills?: string;        // comma/newline-separated skill names
   features?: Array<{ name: string; level: number; description: string }>;
+  skillsAtFirst?: number;      // base skill points at 1st level (before ×4)
+  skillsPerLevel?: number;     // base skill points per level after 1st
 }
 
 function babProgressionFromRate(rate: number): ProgressionRate {
@@ -623,8 +625,9 @@ export function computeSkillBonus(
   scores: CharacterDraft['abilityScores'],
 ): number {
   if (!skill.keyAbility) return Math.floor(skill.ranks + skill.miscBonus);
-  const score = totalScore(scores[skill.keyAbility as keyof CharacterDraft['abilityScores']]);
-  return Math.floor(skill.ranks + abilityModifier(score) + skill.miscBonus);
+  const s = scores[skill.keyAbility as keyof CharacterDraft['abilityScores']];
+  const effectiveScore = s.temp ?? totalScore(s);
+  return Math.floor(skill.ranks + abilityModifier(effectiveScore) + skill.miscBonus);
 }
 
 export function totalCharacterLevel(classes: CharacterDraft['classes']) {
@@ -651,6 +654,7 @@ export function totalSkillPointsAvailable(
   classes: CharacterDraft['classes'],
   intelligenceModifier: number,
   race: Race,
+  customClassMap: Map<string, CustomClassLookup> = new Map(),
 ) {
   const classSequence: ClassName[] = [];
   classes.forEach((entry) => {
@@ -666,7 +670,17 @@ export function totalSkillPointsAvailable(
   const racialPerLevel = race === 'Human' ? 1 : 0;
 
   return classSequence.reduce((total, className, index) => {
-    const classBase = CLASS_SKILL_POINTS_PER_LEVEL[className] ?? 0;
+    const builtIn = CLASS_SKILL_POINTS_PER_LEVEL[className];
+    let classBase: number;
+    if (builtIn !== undefined) {
+      classBase = builtIn;
+    } else {
+      const custom = customClassMap.get(className);
+      // Use skillsAtFirst for the first character level, skillsPerLevel for all others
+      classBase = index === 0
+        ? (custom?.skillsAtFirst ?? custom?.skillsPerLevel ?? 0)
+        : (custom?.skillsPerLevel ?? custom?.skillsAtFirst ?? 0);
+    }
     const perLevel = Math.max(1, classBase + intelligenceModifier + racialPerLevel);
     return total + (index === 0 ? perLevel * 4 : perLevel);
   }, 0);
