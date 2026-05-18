@@ -248,6 +248,11 @@ export interface ICharacter extends Document {
   feats:  { name: string; category: string; source?: string; sourceLabel?: string; shortDescription?: string; notes?: string }[];
   equipment: { name: string; type?: string; weight: number; equipped: boolean; notes?: string }[];
   currency: { pp: number; gp: number; sp: number; cp: number };
+
+  // Delegation
+  delegatedTo?: Types.ObjectId | null;
+  pendingInviteToken?: string | null;
+  pendingInviteEmail?: string | null;
 }
 
 // ── Schema ───────────────────────────────────────────────────────────────────
@@ -354,5 +359,11 @@ const characterSchema = new Schema<ICharacter>(
   },
   { timestamps: true },
 );
+
+characterSchema.add({
+  delegatedTo:        { type: Schema.Types.ObjectId, ref: 'User', default: null },
+  pendingInviteToken: { type: String, default: null },
+  pendingInviteEmail: { type: String, default: null },
+});
 
 export const Character = mongoose.model<ICharacter>('Character', characterSchema);

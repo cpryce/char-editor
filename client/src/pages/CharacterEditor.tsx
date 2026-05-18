@@ -48,6 +48,8 @@ import { CombatSection } from './character-editor/CombatSection';
 import type { CombatDerivedStats } from './character-editor/CombatSection';
 import { InventorySection } from './character-editor/InventorySection';
 import { SkillsSection } from './character-editor/SkillsSection';
+import { DelegatePopover } from '../components/DelegatePopover';
+import { EndDelegationPopover } from '../components/EndDelegationPopover';
 import type { AbilityKey } from './character-editor/AbilityScoresSection';
 import { generateStatBlock, statBlockToPlainText, statBlockToRtf } from '../utils/statBlock';
 import type { StatBlockData } from '../utils/statBlock';
@@ -511,6 +513,12 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
   const [nameTouched, setNameTouched] = useState(false);
   const [showStatBlock, setShowStatBlock] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [isDelegated, setIsDelegated] = useState(false);
+  const [pendingInviteEmail, setPendingInviteEmail] = useState<string | null>(null);
+  const [delegatePopoverOpen, setDelegatePopoverOpen] = useState(false);
+  const delegateBtnRef = useRef<HTMLButtonElement>(null);
+  const [endDelegationOpen, setEndDelegationOpen] = useState(false);
+  const endDelegationBtnRef = useRef<HTMLButtonElement>(null);
   const saveSequenceRef = useRef(0);
   const initialSaveRef = useRef(false);
   const nameError = nameTouched && !draft.name.trim() ? 'Name is required.' : undefined;
@@ -871,6 +879,8 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
         setDraft(loadedDraft);
         setAutoSaveCharacterId(characterId);
         setInitialDraftFingerprint(JSON.stringify(loadedDraft));
+        setIsDelegated(Boolean(data.isDelegated));
+        setPendingInviteEmail(typeof data.pendingInviteEmail === 'string' ? data.pendingInviteEmail : null);
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -1258,6 +1268,57 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
                 </>
               )}
             </button>
+          )}
+          {/* Delegate button — only for existing owned characters */}
+          {autoSaveCharacterId && !isDelegated && (
+            <>
+              <button
+                ref={delegateBtnRef}
+                type="button"
+                onClick={() => setDelegatePopoverOpen((o) => !o)}
+                className="stat-block-open-btn"
+                title={pendingInviteEmail ? `Pending invite to ${pendingInviteEmail}` : 'Delegate character'}
+              >
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+                  <path d="M2 13c0-2.76 2.24-5 6-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                  <path d="M12 10l2 2-2 2M10 12h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
+                </svg>
+                {pendingInviteEmail ? 'Invite Pending' : 'Delegate'}
+              </button>
+              {delegatePopoverOpen && (
+                <DelegatePopover
+                  characterId={autoSaveCharacterId}
+                  pendingInviteEmail={pendingInviteEmail}
+                  anchorRef={delegateBtnRef}
+                  onClose={() => setDelegatePopoverOpen(false)}
+                  onInviteSent={(email) => { setPendingInviteEmail(email); setDelegatePopoverOpen(false); }}
+                  onInviteCancelled={() => setPendingInviteEmail(null)}
+                />
+              )}
+            </>
+          )}
+          {isDelegated && (
+            <>
+              <button
+                ref={endDelegationBtnRef}
+                type="button"
+                onClick={() => setEndDelegationOpen((o) => !o)}
+                className="stat-block-open-btn text-[color:var(--color-accent-fg)]"
+                title="You are editing this character as a delegate"
+              >
+                Delegated ▾
+              </button>
+              {endDelegationOpen && autoSaveCharacterId && (
+                <EndDelegationPopover
+                  characterId={autoSaveCharacterId}
+                  isDelegate={true}
+                  anchorRef={endDelegationBtnRef}
+                  onClose={() => setEndDelegationOpen(false)}
+                  onEnded={() => { setIsDelegated(false); setEndDelegationOpen(false); }}
+                />
+              )}
+            </>
           )}
         </div>
       </div>

@@ -11,6 +11,7 @@ const NameGeneratorPage = lazy(() => import('./pages/NameGeneratorPage').then((m
 const CampaignsPage = lazy(() => import('./pages/CampaignsPage').then((module) => ({ default: module.CampaignsPage })));
 const CampaignEditor = lazy(() => import('./pages/CampaignEditor').then((module) => ({ default: module.CampaignEditor })));
 const CustomClassesPage = lazy(() => import('./pages/CustomClassesPage').then((module) => ({ default: module.CustomClassesPage })));
+const InvitePage = lazy(() => import('./pages/InvitePage').then((module) => ({ default: module.InvitePage })));
 
 interface User {
   id: string;
@@ -421,6 +422,24 @@ function App() {
 
   if (loading) return null;
 
+  // Handle /invite/:token before auth check — InvitePage handles its own 401 redirect
+  const inviteMatch = window.location.pathname.match(/^\/invite\/([a-f0-9]+)$/);
+  if (inviteMatch) {
+    const token = inviteMatch[1];
+    return (
+      <Suspense fallback={null}>
+        <InvitePage
+          token={token}
+          onAccepted={() => {
+            window.history.replaceState(null, '', '/');
+            setSection('characters');
+            setView('list');
+          }}
+        />
+      </Suspense>
+    );
+  }
+
   if (!user) {
     return (
       <main className="flex items-center justify-center h-screen app-loading-main">
@@ -540,6 +559,7 @@ function App() {
             {section === 'campaigns' && view === 'edit' && selectedCampaignId && (
               <CampaignEditor
                 campaignId={selectedCampaignId}
+                userId={user.id}
                 onBack={() => {
                   setSelectedCampaignId(null);
                   setCampaignPointBuySystem(null);

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import './CampaignEditor.css';
 import { NewCharacterForm } from '../components/NewCharacterForm';
+import { DelegatePopover } from '../components/DelegatePopover';
 import { type PointBuySystem } from '../utils/characterHelpers';
 
 const DEFAULT_ABILITY_SCORE = { base: 10, racial: 0, enhancement: 0, misc: 0, temp: null, tempMod: null, levelUp: 0 };
@@ -10,6 +11,9 @@ interface CharSummary {
   name: string;
   race?: string;
   classes?: Array<{ name: string; level: number }>;
+  owner?: string | null;
+  delegatedTo?: string | null;
+  pendingInviteEmail?: string | null;
 }
 
 interface UserSummary {
@@ -45,12 +49,14 @@ function formatDate(iso: string) {
 
 export function CampaignEditor({
   campaignId,
+  userId,
   onBack,
   onStartEncounter,
   onEditCharacter,
   onPointBuySystemChange,
 }: {
   campaignId: string;
+  userId: string;
   onBack: () => void;
   onStartEncounter: (sessionId: string) => void;
   onEditCharacter: (id: string) => void;
@@ -67,6 +73,8 @@ export function CampaignEditor({
   const [encounterNewName, setEncounterNewName] = useState('');
   const [editingDescription, setEditingDescription] = useState(false);
   const [showPointBuyDropdown, setShowPointBuyDropdown] = useState(false);
+  const [delegatePopoverCharId, setDelegatePopoverCharId] = useState<string | null>(null);
+  const delegateBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const selectAllRef = useRef<HTMLInputElement>(null);
   const charDropdownRef = useRef<HTMLDivElement>(null);
   const encounterDropdownRef = useRef<HTMLDivElement>(null);
@@ -490,22 +498,79 @@ export function CampaignEditor({
                     className="border-b border-[var(--color-border-muted)] last:border-b-0 cursor-pointer hover:bg-[var(--color-canvas-subtle)] bg-[var(--color-canvas-default)]"
                     onClick={() => onEditCharacter(c._id)}
                   >
-                    <td className="px-4 py-2 font-medium text-[color:var(--color-fg-default)]">{c.name}</td>
+                    <td className="px-4 py-2 font-medium text-[color:var(--color-fg-default)]">
+                      <span className="inline-flex items-center gap-2">
+                        {c.name}
+                        {c.delegatedTo && (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--color-accent-subtle)] text-[color:var(--color-accent-fg)]">
+                            Delegated
+                          </span>
+                        )}
+                        {c.pendingInviteEmail && !c.delegatedTo && (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--color-attention-subtle)] text-[color:var(--color-attention-fg)]">
+                            Invite pending
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td className="px-4 py-2 text-[color:var(--color-fg-default)]">{c.race ?? '—'}</td>
                     <td className="px-4 py-2 text-[color:var(--color-fg-default)]">{classLabel(c.classes)}</td>
                     <td className="px-4 py-2 text-[color:var(--color-fg-default)]">{totalLevel(c.classes)}</td>
                     <td className="px-4 py-2 text-right">
-                      <button
-                        type="button"
-                        className="campaign-editor-remove-btn inline-flex items-center justify-center w-6 h-6"
-                        onClick={(e) => { e.stopPropagation(); removeCharacter(c._id); }}
-                        aria-label={`Remove ${c.name}`}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                          <path d="M4 2H1V4H15V2H12V0H4V2Z"/>
-                          <path fillRule="evenodd" clipRule="evenodd" d="M3 6H13V16H3V6ZM7 9H9V13H7V9Z"/>
-                        </svg>
-                      </button>
+                      <div className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {c.owner === userId && !c.delegatedTo && (
+                          <>
+                            <button
+                              ref={(el) => { if (el) delegateBtnRefs.current.set(c._id, el); else delegateBtnRefs.current.delete(c._id); }}
+                              type="button"
+                              className="campaign-editor-remove-btn inline-flex items-center justify-center w-6 h-6"
+                              onClick={(e) => { e.stopPropagation(); setDelegatePopoverCharId(delegatePopoverCharId === c._id ? null : c._id); }}
+                              aria-label={`Delegate ${c.name}`}
+                              title="Delegate character"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm5 5a5 5 0 0 0-10 0h10z"/>
+                                <path d="M13 7l2 2-2 2M11 9h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                              </svg>
+                            </button>
+                            {delegatePopoverCharId === c._id && (
+                              <DelegatePopover
+                                characterId={c._id}
+                                pendingInviteEmail={c.pendingInviteEmail}
+                                anchorRef={{ current: delegateBtnRefs.current.get(c._id) ?? null }}
+                                onClose={() => setDelegatePopoverCharId(null)}
+                                onInviteSent={(email) => {
+                                  setCampaign((prev) => prev ? {
+                                    ...prev,
+                                    characters: prev.characters.map((ch) =>
+                                      ch._id === c._id ? { ...ch, pendingInviteEmail: email } : ch,
+                                    ),
+                                  } : prev);
+                                }}
+                                onInviteCancelled={() => {
+                                  setCampaign((prev) => prev ? {
+                                    ...prev,
+                                    characters: prev.characters.map((ch) =>
+                                      ch._id === c._id ? { ...ch, pendingInviteEmail: null } : ch,
+                                    ),
+                                  } : prev);
+                                }}
+                              />
+                            )}
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          className="campaign-editor-remove-btn inline-flex items-center justify-center w-6 h-6"
+                          onClick={(e) => { e.stopPropagation(); removeCharacter(c._id); }}
+                          aria-label={`Remove ${c.name}`}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M4 2H1V4H15V2H12V0H4V2Z"/>
+                            <path fillRule="evenodd" clipRule="evenodd" d="M3 6H13V16H3V6ZM7 9H9V13H7V9Z"/>
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
