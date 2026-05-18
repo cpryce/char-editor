@@ -12,4 +12,6 @@ export interface CustomFeat {
   classRestrictions: string[];
   updatedAt: string;
   createdAt: string;
+  /** True when the current user owns this feat (server-computed). */
+  isOwner?: boolean;
 }

@@ -504,17 +504,25 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
   const [characterCustomClasses, setCharacterCustomClasses] = useState<CustomClass[]>([]);
 
   const customClassMap = useMemo<Map<string, CustomClassLookup>>(() => {
-    // User's own classes first, then character-embedded classes override (so the canonical
-    // definition for a class used by THIS character wins, even if the user redefined it locally).
-    const allClasses = [...customClasses, ...characterCustomClasses];
-    return new Map(allClasses.map((cc) => [cc.name, {
+    // Owned classes take priority over same-named classes from other users.
+    // characterCustomClasses override everything so the class embedded in the character
+    // (e.g. the owner's definition when a delegate is viewing) is always canonical.
+    const map = new Map<string, CustomClassLookup>();
+    const toEntry = (cc: CustomClass): CustomClassLookup => ({
       babProgression: cc.babProgression,
       fortitudeSave: cc.fortitudeSave,
       reflexSave: cc.reflexSave,
       willSave: cc.willSave,
       classSkills: cc.classSkills,
       features: cc.features,
-    }]));
+    });
+    for (const cc of customClasses) {
+      if (!map.has(cc.name) || cc.isOwner) map.set(cc.name, toEntry(cc));
+    }
+    for (const cc of characterCustomClasses) {
+      map.set(cc.name, toEntry(cc));
+    }
+    return map;
   }, [customClasses, characterCustomClasses]);
 
   const [nameTouched, setNameTouched] = useState(false);

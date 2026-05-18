@@ -14,6 +14,7 @@ interface CharSummary {
   owner?: string | null;
   delegatedTo?: string | null;
   pendingInviteEmail?: string | null;
+  initiativeModifier?: number;
 }
 
 interface UserSummary {
@@ -192,7 +193,7 @@ export function CampaignEditor({
       id: `c-${Date.now()}-${i}`,
       name: char.name,
       type: 'player',
-      modifier: 0,
+      modifier: char.initiativeModifier ?? 0,
     }));
     await fetch(`/api/encounters/${session.id}`, {
       method: 'PUT',
@@ -224,7 +225,7 @@ export function CampaignEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ characterId: charId }),
       });
-      latest = await res.json();
+      if (res.ok) latest = await res.json();
     }
     setCampaign(latest);
     setShowCharDropdown(false);

@@ -103,12 +103,14 @@ function FeatEditorForm({
   onSaved,
   onDeleted,
   onBack,
+  readOnly = false,
 }: {
   initial: FeatDraft;
   featId: string | null; // null = new feat
   onSaved: (feat: CustomFeat) => void;
   onDeleted?: (id: string) => void;
   onBack: () => void;
+  readOnly?: boolean;
 }) {
   const [draft, setDraft] = useState<FeatDraft>(initial);
   const [saving, setSaving] = useState(false);
@@ -264,9 +266,14 @@ function FeatEditorForm({
           <h2 className="text-xl font-semibold text-[color:var(--color-fg-default)]">
             {featId ? draft.name || 'Edit Custom Feat' : 'New Custom Feat'}
           </h2>
+          {readOnly && (
+            <span className="ml-2 text-xs px-2 py-0.5 rounded-full border border-[var(--color-border-default)] text-[color:var(--color-fg-muted)]">
+              Read only
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          {featId && onDeleted && (
+          {!readOnly && featId && onDeleted && (
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
@@ -276,14 +283,16 @@ function FeatEditorForm({
               Delete
             </button>
           )}
-          <button
-            type="submit"
-            form="custom-feat-form"
-            disabled={saving}
-            className="btn btn-primary"
-          >
-            {saving ? 'Saving…' : 'Save Feat'}
-          </button>
+          {!readOnly && (
+            <button
+              type="submit"
+              form="custom-feat-form"
+              disabled={saving}
+              className="btn btn-primary"
+            >
+              {saving ? 'Saving…' : 'Save Feat'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -297,6 +306,7 @@ function FeatEditorForm({
         )}
 
         <form id="custom-feat-form" onSubmit={handleSave} noValidate>
+          <fieldset disabled={readOnly} style={{ all: 'unset', display: 'contents' }}>
           <div className="flex flex-col gap-5">
 
             {/* Name */}
@@ -418,6 +428,7 @@ function FeatEditorForm({
             </div>
 
           </div>
+          </fieldset>
         </form>
       </div>
     </>
@@ -426,7 +437,7 @@ function FeatEditorForm({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type PageView = 'list' | { mode: 'new' } | { mode: 'edit'; feat: CustomFeat };
+type PageView = 'list' | { mode: 'new' } | { mode: 'edit'; feat: CustomFeat; readOnly: boolean };
 
 export function CustomFeatsPage() {
   const [feats, setFeats] = useState<CustomFeat[]>([]);
@@ -463,8 +474,7 @@ export function CustomFeatsPage() {
   // ── Editor view ────────────────────────────────────────────────────────────
   if (view !== 'list') {
     const isEdit = view.mode === 'edit';
-    const feat = isEdit ? view.feat : null;
-    const initial: FeatDraft = feat
+    const feat = isEdit ? view.feat : null;    const readOnly = isEdit && view.readOnly;    const initial: FeatDraft = feat
       ? {
           name: feat.name,
           shortDescription: feat.shortDescription,
@@ -482,8 +492,9 @@ export function CustomFeatsPage() {
           initial={initial}
           featId={feat?._id ?? null}
           onSaved={handleSaved}
-          onDeleted={isEdit ? handleDeleted : undefined}
+          onDeleted={!readOnly && isEdit ? handleDeleted : undefined}
           onBack={() => setView('list')}
+          readOnly={readOnly}
         />
       </div>
     );
@@ -555,7 +566,7 @@ export function CustomFeatsPage() {
                   <tr
                     key={feat._id}
                     className={`cursor-pointer border-b border-[var(--color-border-muted)] hover:bg-[var(--color-accent-subtle)] ${i % 2 === 0 ? 'bg-[var(--color-canvas-default)]' : 'bg-[var(--color-canvas-subtle)]'}`}
-                    onClick={() => setView({ mode: 'edit', feat })}>
+                    onClick={() => setView({ mode: 'edit', feat, readOnly: feat.isOwner === false })}>
                     <td className="px-4 py-2 font-medium text-[color:var(--color-fg-default)]">
                       {feat.name}
                       {feat.repeatable && (
@@ -586,13 +597,13 @@ export function CustomFeatsPage() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setView({ mode: 'edit', feat });
+                          setView({ mode: 'edit', feat, readOnly: feat.isOwner === false });
                         }}
-                        title="Edit feat"
-                        aria-label={`Edit ${feat.name}`}
+                        title={feat.isOwner === false ? 'View feat' : 'Edit feat'}
+                        aria-label={feat.isOwner === false ? `View ${feat.name}` : `Edit ${feat.name}`}
                         className="text-xs px-2 py-1 rounded cf-row-edit-btn"
                       >
-                        Edit
+                        {feat.isOwner === false ? 'View' : 'Edit'}
                       </button>
                     </td>
                   </tr>

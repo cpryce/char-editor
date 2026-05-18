@@ -24,9 +24,9 @@ export function DelegatePopover({
 }: DelegatePopoverProps) {
   const [email, setEmail] = useState('');
   const [copied, setCopied] = useState(false);
-  const [reCopied, setReCopied] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +53,17 @@ export function DelegatePopover({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [anchorRef, onClose]);
 
+  // Pre-fetch the invite URL when the popover opens with a pending invite so that
+  // the "Copy Link" button can write to the clipboard synchronously (Safari requires
+  // navigator.clipboard.writeText to be called with no preceding awaits in the handler).
+  useEffect(() => {
+    if (!pendingInviteEmail) return;
+    fetch(`/api/characters/${characterId}/invite`, { credentials: 'include' })
+      .then((r) => r.ok ? r.json() as Promise<{ token: string }> : Promise.reject(new Error('Failed')))
+      .then(({ token }) => setPendingUrl(`${window.location.origin}/invite/${token}`))
+      .catch(() => { /* non-critical — Copy Link will show an error if pendingUrl is null */ });
+  }, [characterId, pendingInviteEmail]);
+
   async function handleCopyUrl() {
     setError(null);
     try {
@@ -67,29 +78,19 @@ export function DelegatePopover({
         throw new Error((data as { error?: string }).error ?? 'Failed to create invite');
       }
       const { token } = await res.json() as { token: string };
-      const url = `${window.location.origin}/invite/${token}`;
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
+      setPendingUrl(`${window.location.origin}/invite/${token}`);
       onInviteSent(email);
-      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create invite');
     }
   }
 
-  async function handleRecopyUrl() {
-    setError(null);
-    try {
-      const res = await fetch(`/api/characters/${characterId}/invite`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to retrieve invite link');
-      const { token } = await res.json() as { token: string };
-      const url = `${window.location.origin}/invite/${token}`;
-      await navigator.clipboard.writeText(url);
-      setReCopied(true);
-      setTimeout(() => setReCopied(false), 2000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to copy link');
-    }
+  function handleCopyPendingUrl() {
+    if (!pendingUrl) { setError('Invite URL not ready yet — try again in a moment.'); return; }
+    navigator.clipboard.writeText(pendingUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => setError('Failed to copy link'));
   }
 
   async function handleCancelInvite() {
@@ -137,10 +138,10 @@ export function DelegatePopover({
           </p>
           <button
             type="button"
-            onClick={handleRecopyUrl}
+            onClick={handleCopyPendingUrl}
             className="btn btn-secondary text-xs h-7"
           >
-            {reCopied ? '✓ Copied!' : 'Copy Link'}
+            {copied ? '✓ Copied!' : 'Copy Link'}
           </button>
           <button
             type="button"
@@ -169,7 +170,7 @@ export function DelegatePopover({
             onClick={handleCopyUrl}
             className="btn btn-primary text-xs h-7 disabled:opacity-40"
           >
-            {copied ? '✓ Copied!' : 'Copy Invite URL'}
+            Create Invite Link
           </button>
         </div>
       )}

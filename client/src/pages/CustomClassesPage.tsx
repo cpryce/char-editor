@@ -104,12 +104,14 @@ function ClassEditorForm({
   onSaved,
   onDeleted,
   onBack,
+  readOnly = false,
 }: {
   initial: ClassDraft;
   classId: string | null;
   onSaved: (cls: CustomClass) => void;
   onDeleted?: (id: string) => void;
   onBack: () => void;
+  readOnly?: boolean;
 }) {
   const [draft, setDraft] = useState<ClassDraft>(initial);
   const [autoSaveClassId, setAutoSaveClassId] = useState<string | null>(classId);
@@ -122,6 +124,7 @@ function ClassEditorForm({
   const hasRequiredFields = draft.name.trim().length > 0;
 
   useEffect(() => {
+    if (readOnly) return;
     if (!hasRequiredFields) return;
     const currentFingerprint = JSON.stringify(draft);
     if (currentFingerprint === initialDraftFingerprint) return;
@@ -261,17 +264,22 @@ function ClassEditorForm({
             </svg>
           </span>
           <h2 className="text-xl font-semibold text-[color:var(--color-fg-default)]">
-            {classId ? (draft.name || 'Edit Custom Class') : 'New Custom Class'}
+            {classId ? (draft.name || (readOnly ? 'View Custom Class' : 'Edit Custom Class')) : 'New Custom Class'}
           </h2>
+          {readOnly && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-canvas-subtle)] text-[color:var(--color-fg-muted)] border border-[var(--color-border-default)]">
+              Read only
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {saving && (
             <span className="text-xs text-[color:var(--color-fg-muted)]">Saving…</span>
           )}
-          {!saving && autoSaveClassId && (
+          {!saving && autoSaveClassId && !readOnly && (
             <span className="text-xs text-[color:var(--color-fg-muted)]">Saved</span>
           )}
-          {(autoSaveClassId ?? classId) && onDeleted && (
+          {!readOnly && (autoSaveClassId ?? classId) && onDeleted && (
             <button type="button" onClick={() => setConfirmDelete(true)} disabled={saving} className="btn btn-danger">
               Delete
             </button>
@@ -279,12 +287,13 @@ function ClassEditorForm({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      <div className="flex-1 overflow-y-auto px-6 pt-5 pb-12">
         {error && (
           <div className="mb-4 px-3 py-2 rounded text-sm cf-error-alert">{error}</div>
         )}
 
         <form id="custom-class-form" noValidate>
+          <fieldset disabled={readOnly} style={{ all: 'unset', display: 'contents' }}>
           <div className="flex flex-col gap-5">
 
             {/* Name */}
@@ -508,6 +517,7 @@ function ClassEditorForm({
             </div>
 
           </div>
+          </fieldset>
         </form>
       </div>
     </>
@@ -516,7 +526,7 @@ function ClassEditorForm({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type PageView = 'list' | { mode: 'new' } | { mode: 'edit'; cls: CustomClass };
+type PageView = 'list' | { mode: 'new' } | { mode: 'edit'; cls: CustomClass; readOnly: boolean };
 
 export function CustomClassesPage() {
   const [classes, setClasses] = useState<CustomClass[]>([]);
@@ -555,6 +565,7 @@ export function CustomClassesPage() {
   if (view !== 'list') {
     const isEdit = view.mode === 'edit';
     const cls = isEdit ? view.cls : null;
+    const readOnly = isEdit && view.readOnly;
     const initial: ClassDraft = cls
       ? { name: cls.name, description: cls.description ?? '', babProgression: cls.babProgression, hitDice: cls.hitDice ?? 8, fortitudeSave: cls.fortitudeSave ?? 'poor', reflexSave: cls.reflexSave ?? 'poor', willSave: cls.willSave ?? 'poor', skillsAtFirst: cls.skillsAtFirst ?? 4, skillsPerLevel: cls.skillsPerLevel ?? 2, classSkills: cls.classSkills ?? '', features: cls.features.map((f) => ({ ...f })) }
       : blankDraft();
@@ -565,8 +576,9 @@ export function CustomClassesPage() {
           initial={initial}
           classId={cls?._id ?? null}
           onSaved={handleSaved}
-          onDeleted={isEdit ? handleDeleted : undefined}
+          onDeleted={!readOnly && isEdit ? handleDeleted : undefined}
           onBack={() => setView('list')}
+          readOnly={readOnly}
         />
       </div>
     );
@@ -622,7 +634,7 @@ export function CustomClassesPage() {
                   <tr
                     key={cls._id}
                     className={`cursor-pointer border-b border-[var(--color-border-muted)] hover:bg-[var(--color-accent-subtle)] ${i % 2 === 0 ? 'bg-[var(--color-canvas-default)]' : 'bg-[var(--color-canvas-subtle)]'}`}
-                    onClick={() => setView({ mode: 'edit', cls })}
+                    onClick={() => setView({ mode: 'edit', cls, readOnly: cls.isOwner === false })}
                   >
                     <td className="px-4 py-2 font-medium text-[color:var(--color-fg-default)]">{cls.name}</td>
                     <td className="px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">
@@ -637,12 +649,12 @@ export function CustomClassesPage() {
                     <td className="px-4 py-2 text-right">
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); setView({ mode: 'edit', cls }); }}
-                        title="Edit class"
-                        aria-label={`Edit ${cls.name}`}
+                        onClick={(e) => { e.stopPropagation(); setView({ mode: 'edit', cls, readOnly: cls.isOwner === false }); }}
+                        title={cls.isOwner === false ? 'View class' : 'Edit class'}
+                        aria-label={cls.isOwner === false ? `View ${cls.name}` : `Edit ${cls.name}`}
                         className="text-xs px-2 py-1 rounded cf-row-edit-btn"
                       >
-                        Edit
+                        {cls.isOwner === false ? 'View' : 'Edit'}
                       </button>
                     </td>
                   </tr>
