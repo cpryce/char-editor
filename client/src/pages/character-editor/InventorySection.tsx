@@ -129,20 +129,18 @@ function getTwfFeatOptions(params: {
   itwfApplied: boolean;
   dexterity: number;
 }): FeatOption[] {
-  const { characterFeats, bab, rangerLevel, twfApplied, itwfApplied, dexterity } = params;
+  const { characterFeats, bab, rangerLevel, twfApplied, itwfApplied } = params;
   const hasTWF  = hasFeat(characterFeats, 'Two-Weapon Fighting');
   const hasITWF = hasFeat(characterFeats, 'Improved Two-Weapon Fighting');
   const hasGTWF = hasFeat(characterFeats, 'Greater Two-Weapon Fighting');
 
   // TWF: has feat (Dex was met when taking it) OR ranger 2+ (class grants without prerequisites)
-  const twfDexOk = dexterity >= 15;
   const twfAvail = hasTWF || rangerLevel >= 2;
   const twfReason = !twfAvail
     ? 'Requires Two-Weapon Fighting feat (or Ranger level 2+)'
     : undefined;
 
   // ITWF: has feat + twf-applied + bab6 (Dex met when taking) OR ranger 6+ with twf-applied (class grants without prerequisites)
-  const itwfDexOk  = dexterity >= 17;
   const rangerItwf = rangerLevel >= 6 && twfApplied;
   const itwfByFeat = hasITWF && (twfApplied || rangerLevel >= 2) && bab >= 6;
   const itwfAvail  = itwfByFeat || rangerItwf;
