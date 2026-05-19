@@ -358,7 +358,7 @@ function ClassEditorForm({
                 </select>
               </div>
               <div>
-                <label className="cf-field-label" htmlFor="cc-fort">Fortitude Save</label>
+                <label className="cf-field-label" htmlFor="cc-fort">Fortitude</label>
                 <select
                   id="cc-fort"
                   className="cf-input"
@@ -370,7 +370,7 @@ function ClassEditorForm({
                 </select>
               </div>
               <div>
-                <label className="cf-field-label" htmlFor="cc-ref">Reflex Save</label>
+                <label className="cf-field-label" htmlFor="cc-ref">Reflex</label>
                 <select
                   id="cc-ref"
                   className="cf-input"
@@ -382,7 +382,7 @@ function ClassEditorForm({
                 </select>
               </div>
               <div>
-                <label className="cf-field-label" htmlFor="cc-will">Will Save</label>
+                <label className="cf-field-label" htmlFor="cc-will">Will </label>
                 <select
                   id="cc-will"
                   className="cf-input"
@@ -456,7 +456,7 @@ function ClassEditorForm({
                 <div className="rounded overflow-hidden border border-[var(--color-border-default)]">
                   <table className="cc-features-table">
                     <thead>
-                      <tr>
+                      <tr className="bg-[var(--color-canvas-subtle)]">
                         <th style={{ width: '36px' }}>Lvl</th>
                         <th style={{ width: '200px' }}>Feature Name</th>
                         <th>Description</th>

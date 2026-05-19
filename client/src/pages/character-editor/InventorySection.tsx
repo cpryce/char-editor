@@ -12,7 +12,7 @@ import { buildIterativeAttackString } from '../../utils/characterHelpers';
 /** Weapons usable in the off-hand: Light and One-Handed only. */
 const OFF_HAND_WEAPON_CATALOG = WEAPON_CATALOG.filter((w) => w.handedness !== 'Two-Handed');
 import type { MaterialKey } from '../../data/materials';
-import { MATERIALS, ARMOR_MATERIAL_KEYS, applyWeightMultiplier, applyAcpDelta, applyAsfDelta, applyMaxDexDelta } from '../../data/materials';
+import { MATERIALS, ARMOR_MATERIAL_KEYS, applyWeightMultiplier, applyAcpDelta, applyAsfDelta, applyMaxDexDelta, applyArmorCategoryShift } from '../../data/materials';
 import './InventorySection.css';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -562,6 +562,11 @@ export function InventorySection({
     if (field === 'name' && typeof value === 'string' && !value.trim()) {
       updateInventory({ body: null }); return;
     }
+    if (field === 'material') {
+      const mat = typeof value === 'string' && value ? MATERIALS[value as MaterialKey] : undefined;
+      const effectiveCategory = applyArmorCategoryShift(base.category, mat?.categoryShift ?? 0);
+      next.speed = getArmorSpeedForSize(effectiveCategory, size, race);
+    }
     updateInventory({ body: next });
   }
 
@@ -719,7 +724,9 @@ export function InventorySection({
     let changed = false;
 
     if (inventory.body?.name) {
-      const expectedSpeed = getArmorSpeedForSize(inventory.body.category, size, race);
+      const bodyMat = inventory.body.material ? MATERIALS[inventory.body.material as MaterialKey] : undefined;
+      const effectiveCategory = applyArmorCategoryShift(inventory.body.category, bodyMat?.categoryShift ?? 0);
+      const expectedSpeed = getArmorSpeedForSize(effectiveCategory, size, race);
       if (inventory.body.speed !== expectedSpeed) {
         nextPartial.body = { ...inventory.body, speed: expectedSpeed };
         changed = true;
@@ -1082,6 +1089,7 @@ function ArmorRow({
   disabled?: boolean;
 }) {
   const mat = armor?.material ? MATERIALS[armor.material as MaterialKey] : undefined;
+  const effectiveCategory = armor != null ? applyArmorCategoryShift(armor.category, mat?.categoryShift ?? 0) : null;
   const effectiveAcp    = armor != null ? applyAcpDelta(armor.armorCheckPenalty, mat?.acpDelta ?? 0) : null;
   const effectiveAsf    = armor != null ? applyAsfDelta(armor.arcaneSpellFailure, mat?.asfDelta ?? 0) : null;
   const effectiveMaxDex = armor != null ? applyMaxDexDelta(armor.maxDexBonus, mat?.maxDexDelta ?? 0) : null;
@@ -1139,7 +1147,7 @@ function ArmorRow({
         {effectiveAcp ?? '—'}
       </td>
       <td className="inventory-hands-td inventory-hands-stat">{effectiveAsf ?? '—'}</td>
-      <td className="inventory-hands-td inventory-hands-stat">{armor?.speed || '—'}</td>
+      <td className="inventory-hands-td inventory-hands-stat">{armor?.speed || '—'}{effectiveCategory && effectiveCategory !== armor?.category ? <span className="inventory-hands-category-note"> ({effectiveCategory})</span> : null}</td>
       <td className="inventory-hands-td inventory-hands-stat">{effectiveWeight ?? '—'}</td>
       <td className="inventory-hands-td">
         {armor != null && !disabled && (

@@ -22,6 +22,11 @@ export interface MaterialEffect {
   weightMultiplier: number;
   /** Added to the numeric maxDexBonus (only meaningful for armor; 0 = no change). */
   maxDexDelta: number;
+  /**
+   * Number of armor category steps lighter (positive = lighter).
+   * 1 means Heavy→Medium, Medium→Light. 0 = no change.
+   */
+  categoryShift: number;
   /** Short note shown next to the selector. */
   note: string;
 }
@@ -38,6 +43,7 @@ export const MATERIALS: Record<MaterialKey, MaterialEffect> = {
     asfDelta: 0,
     weightMultiplier: 1,
     maxDexDelta: 0,
+    categoryShift: 0,
     note: 'Armor/shields: ACP −1. Weapons: counts as +1 enhancement for attack rolls (not damage).',
   },
   adamantine: {
@@ -46,6 +52,7 @@ export const MATERIALS: Record<MaterialKey, MaterialEffect> = {
     asfDelta: 0,
     weightMultiplier: 1,
     maxDexDelta: 0,
+    categoryShift: 0,
     note: 'Armor: ACP −1, DR 1–3/−. Weapons: bypasses hardness < 20. Always masterwork.',
   },
   mithral: {
@@ -54,7 +61,8 @@ export const MATERIALS: Record<MaterialKey, MaterialEffect> = {
     asfDelta: -10,
     weightMultiplier: 0.5,
     maxDexDelta: 2,
-    note: 'Armor: ACP −3 (min 0), ASF −10%, Max Dex +2, weight ×½. Weapons: weight ×½. Always masterwork.',
+    categoryShift: 1,
+    note: 'Armor: one category lighter (Heavy→Medium, Medium→Light), ACP −3 (min 0), ASF −10%, Max Dex +2, weight ×½. Weapons: weight ×½. Always masterwork.',
   },
   darkwood: {
     label: 'Darkwood',
@@ -62,6 +70,7 @@ export const MATERIALS: Record<MaterialKey, MaterialEffect> = {
     asfDelta: 0,
     weightMultiplier: 0.5,
     maxDexDelta: 0,
+    categoryShift: 0,
     note: 'Wooden/shield items only. ACP −2, weight ×½. Always masterwork.',
   },
   dragonhide: {
@@ -70,6 +79,7 @@ export const MATERIALS: Record<MaterialKey, MaterialEffect> = {
     asfDelta: 0,
     weightMultiplier: 1,
     maxDexDelta: 0,
+    categoryShift: 0,
     note: 'Armor/shields only. Druids may wear without penalty. Always masterwork.',
   },
   'cold-iron': {
@@ -78,6 +88,7 @@ export const MATERIALS: Record<MaterialKey, MaterialEffect> = {
     asfDelta: 0,
     weightMultiplier: 1,
     maxDexDelta: 0,
+    categoryShift: 0,
     note: 'Weapons only. Effective against fey creatures.',
   },
   'alchemical-silver': {
@@ -86,6 +97,7 @@ export const MATERIALS: Record<MaterialKey, MaterialEffect> = {
     asfDelta: 0,
     weightMultiplier: 1,
     maxDexDelta: 0,
+    categoryShift: 0,
     note: 'Weapons only. −1 damage on hit. Effective against lycanthropes.',
   },
 };
@@ -135,4 +147,20 @@ export function applyAsfDelta(asf: string, delta: number): string {
 export function applyMaxDexDelta(maxDex: string | null, delta: number): string | null {
   if (maxDex === null || delta === 0) return maxDex;
   return String(parseInt(maxDex) + delta);
+}
+
+/**
+ * Shift an armor category by the given number of steps lighter (positive = lighter).
+ * 'Shield' is never shifted. Steps: Heavy Armor → Medium Armor → Light Armor.
+ */
+export function applyArmorCategoryShift(
+  category: 'Light Armor' | 'Medium Armor' | 'Heavy Armor' | 'Shield',
+  shift: number,
+): 'Light Armor' | 'Medium Armor' | 'Heavy Armor' | 'Shield' {
+  if (shift === 0 || category === 'Shield') return category;
+  const order: Array<'Light Armor' | 'Medium Armor' | 'Heavy Armor'> = ['Heavy Armor', 'Medium Armor', 'Light Armor'];
+  const idx = order.indexOf(category as 'Light Armor' | 'Medium Armor' | 'Heavy Armor');
+  if (idx === -1) return category;
+  const newIdx = Math.min(order.length - 1, idx + shift);
+  return order[newIdx]!;
 }

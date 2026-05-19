@@ -549,6 +549,23 @@ export const WEAPON_CATALOG: ReadonlyArray<WeaponCatalogEntry> = [
     weight: '½ lb. (5)', damageType: 'Piercing',
     special: 'monk; treated as ammunition',
   },
+  // ── Touch Attacks ───────────────────────────────────────────────────────────
+  {
+    name: 'Melee Touch',
+    proficiency: 'Simple', handedness: 'One-Handed',
+    damageMedium: '—', damageSmall: '—',
+    critical: '×2', rangeIncrement: '—',
+    weight: '—', damageType: '—',
+    special: 'touch attack; ignores armor and natural armor',
+  },
+  {
+    name: 'Ranged Touch',
+    proficiency: 'Simple', handedness: 'One-Handed',
+    damageMedium: '—', damageSmall: '—',
+    critical: '×2', rangeIncrement: '—',
+    weight: '—', damageType: '—',
+    special: 'touch attack; ignores armor and natural armor',
+  },
 ] as const;
 
 export const WEAPON_BY_NAME = new Map<string, WeaponCatalogEntry>(
@@ -557,6 +574,7 @@ export const WEAPON_BY_NAME = new Map<string, WeaponCatalogEntry>(
 
 // Based on the SRD Weapons tables' explicit "Ranged Weapons" sections.
 const SRD_RANGED_WEAPON_NAMES = new Set<string>([
+  'ranged touch',
   'crossbow, heavy',
   'crossbow, light',
   'dart',
