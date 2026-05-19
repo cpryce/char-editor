@@ -106,6 +106,8 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
   const [searchQuery, setSearchQuery] = useState('');
   const [raceFilter, setRaceFilter] = useState<string | null>(null);
   const [classFilter, setClassFilter] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mobileFilterSectionOpen, setMobileFilterSectionOpen] = useState<'race' | 'class' | null>(null);
   const [newDropdownOpen, setNewDropdownOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CharacterSummary | null>(null);
   const [delegatePopoverCharId, setDelegatePopoverCharId] = useState<string | null>(null);
@@ -114,6 +116,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
   const endDelegationBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const newRef = useRef<HTMLDivElement>(null);
+  const filtersRef = useRef<HTMLDivElement>(null);
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -135,6 +138,19 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
       setSearchQuery(value.length >= 3 ? value : '');
       setPage(1);
     }, 250);
+  }
+
+  function executeSearchNow(value: string, closeMobileFilters = false) {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    setSearchQuery(value.length >= 3 ? value : '');
+    setPage(1);
+    if (closeMobileFilters) {
+      setFiltersOpen(false);
+      setMobileFilterSectionOpen(null);
+    }
   }
 
   const allClasses = [...new Set(characters.flatMap((c) => c.classes.map((cl) => cl.name)))].sort();
@@ -192,6 +208,18 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
   }, [newDropdownOpen]);
 
   useEffect(() => {
+    if (!filtersOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (filtersRef.current && !filtersRef.current.contains(e.target as Node)) {
+        setFiltersOpen(false);
+        setMobileFilterSectionOpen(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [filtersOpen]);
+
+  useEffect(() => {
     fetch('/api/characters', { credentials: 'include' })
       .then((r) => {
         if (!r.ok) throw new Error('Failed to load characters');
@@ -211,12 +239,164 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
           Characters
         </h2>
         <div className="flex items-center gap-2">
+          {/* Small-screen filter menu */}
+          <div ref={filtersRef} className="relative sm:hidden">
+            <button
+              type="button"
+              onClick={() => {
+                setFiltersOpen((v) => {
+                  if (v) setMobileFilterSectionOpen(null);
+                  return !v;
+                });
+              }}
+              aria-label="Open filters"
+              aria-expanded={filtersOpen}
+              className="inline-flex items-center justify-center gap-1.5 px-2 h-8 min-w-11 rounded border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M3 5h18l-7 8.4V19l-4-2.1v-3.5L3 5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+              </svg>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+
+            {filtersOpen && (
+              <div className="absolute right-0 top-[calc(100%+6px)] z-[120] w-[min(92vw,320px)] rounded border border-[var(--color-border-default)] bg-[var(--color-canvas-overlay)] p-2 shadow-[var(--shadow-lg)]">
+                <div className="relative flex items-center mb-2">
+                  <input
+                    type="search"
+                    value={searchInput}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        executeSearchNow(e.currentTarget.value, true);
+                      }
+                    }}
+                    placeholder="Search by name…"
+                    aria-label="Search characters by name"
+                    className="w-full pl-3 pr-7 py-[0.375rem] text-sm rounded border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] placeholder:text-[color:var(--color-fg-subtle)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+                  />
+                  <svg className="absolute right-2 text-[color:var(--color-fg-muted)] pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/>
+                    <path d="M16.5 16.5L21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+
+                <div className="relative flex items-center mb-2">
+                  <div className="w-full">
+                    <button
+                      type="button"
+                      aria-expanded={mobileFilterSectionOpen === 'race'}
+                      onClick={() => setMobileFilterSectionOpen((s) => (s === 'race' ? null : 'race'))}
+                      className="w-full h-8 px-2 text-sm rounded border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] inline-flex items-center justify-between"
+                    >
+                      <span className="truncate">Race: {raceFilter ?? 'All races'}</span>
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+
+                    {mobileFilterSectionOpen === 'race' && (
+                      <div className="mt-1 rounded border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] p-1 max-h-40 overflow-auto">
+                        <button
+                          type="button"
+                          onClick={() => { setRaceFilter(null); setPage(1); }}
+                          className={`w-full text-left text-sm px-2 py-1.5 rounded ${!raceFilter ? 'text-[color:var(--color-accent-fg)] bg-[var(--color-accent-subtle)]' : 'text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)]'}`}
+                        >
+                          All races
+                        </button>
+                        {allRaces.map((race) => (
+                          <button
+                            key={race}
+                            type="button"
+                            onClick={() => { setRaceFilter(race); setPage(1); }}
+                            className={`w-full text-left text-sm px-2 py-1.5 rounded ${raceFilter === race ? 'text-[color:var(--color-accent-fg)] bg-[var(--color-accent-subtle)]' : 'text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)]'}`}
+                          >
+                            {race}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="relative flex items-center mb-2">
+                  <div className="w-full">
+                    <button
+                      type="button"
+                      aria-expanded={mobileFilterSectionOpen === 'class'}
+                      onClick={() => setMobileFilterSectionOpen((s) => (s === 'class' ? null : 'class'))}
+                      className="w-full h-8 px-2 text-sm rounded border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] inline-flex items-center justify-between"
+                    >
+                      <span className="truncate">Class: {classFilter ?? 'All classes'}</span>
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+
+                    {mobileFilterSectionOpen === 'class' && (
+                      <div className="mt-1 rounded border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] p-1 max-h-40 overflow-auto">
+                        <button
+                          type="button"
+                          onClick={() => { setClassFilter(null); setPage(1); }}
+                          className={`w-full text-left text-sm px-2 py-1.5 rounded ${!classFilter ? 'text-[color:var(--color-accent-fg)] bg-[var(--color-accent-subtle)]' : 'text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)]'}`}
+                        >
+                          All classes
+                        </button>
+                        {allClasses.map((cls) => (
+                          <button
+                            key={cls}
+                            type="button"
+                            onClick={() => { setClassFilter(cls); setPage(1); }}
+                            className={`w-full text-left text-sm px-2 py-1.5 rounded ${classFilter === cls ? 'text-[color:var(--color-accent-fg)] bg-[var(--color-accent-subtle)]' : 'text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)]'}`}
+                          >
+                            {cls}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  {(searchQuery || raceFilter || classFilter) && (
+                    <button
+                      type="button"
+                      title="Clear all filters"
+                      aria-label="Clear all filters"
+                      onClick={() => {
+                        setSearchInput('');
+                        setSearchQuery('');
+                        setRaceFilter(null);
+                        setClassFilter(null);
+                        setPage(1);
+                      }}
+                      className="inline-flex items-center justify-center h-7 px-2 rounded border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-xs text-[color:var(--color-fg-muted)] hover:text-[color:var(--color-danger-fg)] hover:border-[var(--color-danger-fg)] cursor-pointer"
+                    >
+                      Clear all filters
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop filter controls */}
+          <div className="hidden sm:flex items-center gap-2">
           {/* Search by name */}
           <div className="relative flex items-center">
             <input
               type="search"
               value={searchInput}
               onChange={(e) => handleSearchChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  executeSearchNow(e.currentTarget.value);
+                }
+              }}
               placeholder="Search by name…"
               aria-label="Search characters by name"
               className="pl-3 pr-7 py-[0.375rem] text-sm rounded border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] placeholder:text-[color:var(--color-fg-subtle)] focus:outline-none focus:border-[var(--color-accent-fg)] w-44"
@@ -290,6 +470,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
               </svg>
             </button>
           )}
+          </div>
 
           {/* +New split button */}
           <div ref={newRef} className="btn-group btn-group-primary relative">
@@ -298,7 +479,8 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
               onClick={() => { setNewDropdownOpen(false); onNewCharacter(); }}
               className="btn btn-primary h-8 font-semibold"
             >
-              + New
+              <span className="sm:hidden">+</span>
+              <span className="hidden sm:inline">+ New</span>
             </button>
             <button
               type="button"
@@ -340,22 +522,22 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
         <div
           className="rounded overflow-hidden border border-[var(--color-border-default)]"
         >
-          <table className="w-full text-sm border-collapse">
+          <table className="w-full text-sm border-collapse characters-list-table">
             <thead>
               <tr className="bg-[var(--color-canvas-subtle)]">
                 {(
                   [
-                    { label: 'Name',          key: 'name'      },
-                    { label: 'Race',          key: 'race'      },
-                    { label: 'Class',         key: 'class'     },
-                    { label: 'Level',         key: 'level'     },
-                    { label: 'Last Modified', key: 'updatedAt' },
+                    { label: 'Name',          key: 'name',      colClass: 'char-col-name' },
+                    { label: 'Race',          key: 'race',      colClass: 'char-col-race' },
+                    { label: 'Class',         key: 'class',     colClass: 'char-col-class' },
+                    { label: 'Level',         key: 'level',     colClass: 'char-col-level' },
+                    { label: 'Last Modified', key: 'updatedAt', colClass: 'char-col-updated' },
                   ] as const
-                ).map(({ label, key }) => (
+                ).map(({ label, key, colClass }) => (
                   <th
                     key={key}
                     onClick={() => handleSort(key)}
-                    className="text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)] cursor-pointer select-none hover:text-[color:var(--color-fg-default)]"
+                    className={`text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)] cursor-pointer select-none hover:text-[color:var(--color-fg-default)] ${colClass}`}
                   >
                     <span className="inline-flex items-center gap-1">
                       {label}
@@ -378,7 +560,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
                     </span>
                   </th>
                 ))}
-                <th className="border-b border-[var(--color-border-default)]"></th>
+                <th className="border-b border-[var(--color-border-default)] char-col-actions"></th>
               </tr>
             </thead>
             <tbody>
@@ -414,7 +596,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = idx % 2 === 0 ? 'var(--color-canvas-default)' : 'var(--color-canvas-subtle)'; }}
                   onClick={() => onEditCharacter(char._id)}
                 >
-                  <td className="px-4 py-2 font-medium">
+                  <td className="px-4 py-2 font-medium char-col-name">
                     <span className="inline-flex items-center gap-2 flex-wrap">
                       {char.name}
                       {char.isDelegated && (
@@ -470,19 +652,19 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
                       )}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-[color:var(--color-fg-default)]">
+                  <td className="px-4 py-2 text-[color:var(--color-fg-default)] char-col-race">
                     {char.race}
                   </td>
-                  <td className="px-4 py-2 text-[color:var(--color-fg-default)]">
+                  <td className="px-4 py-2 text-[color:var(--color-fg-default)] char-col-class">
                     {classLabel(char.classes)}
                   </td>
-                  <td className="px-4 py-2 text-[color:var(--color-fg-default)]">
+                  <td className="px-4 py-2 text-[color:var(--color-fg-default)] char-col-level">
                     {totalLevel(char.classes)}
                   </td>
-                  <td className="px-4 py-2 text-[color:var(--color-fg-muted)]">
+                  <td className="px-4 py-2 text-[color:var(--color-fg-muted)] char-col-updated">
                     {formatDate(char.updatedAt)}
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-right char-col-actions">
                     <div className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                       {/* Delegate button (owner, no delegate) */}
                       {!char.isDelegated && !char.delegatedTo && (

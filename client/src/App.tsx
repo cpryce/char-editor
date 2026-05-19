@@ -29,6 +29,7 @@ type Theme = 'light' | 'dark';
 function UserMenu({ user, onLogout, onOpenSettings }: { user: User; onLogout: () => void; onOpenSettings: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const fallbackInitial = (user.name ?? user.email).trim().charAt(0).toUpperCase() || 'U';
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -46,21 +47,22 @@ function UserMenu({ user, onLogout, onOpenSettings }: { user: User; onLogout: ()
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={[
-          'flex items-center gap-2 px-2 py-1 rounded app-user-menu-trigger',
+          'flex items-center gap-1.5 px-2 py-1 rounded app-user-menu-trigger',
           open ? 'app-user-menu-trigger--open' : '',
         ].join(' ')}
       >
-        {user.avatar && (
+        {user.avatar ? (
           <img
             src={user.avatar}
             className="w-7 h-7 rounded-full"
             alt=""
             referrerPolicy="no-referrer"
           />
+        ) : (
+          <span className="app-user-menu-fallback-avatar" aria-hidden="true">
+            {fallbackInitial}
+          </span>
         )}
-        <span className="text-sm app-user-menu-user-text">
-          {user.name ?? user.email}
-        </span>
         <span className="text-xs app-user-menu-caret">▾</span>
       </button>
 
@@ -100,6 +102,85 @@ interface NavDropdownItem {
   id: string;
   label: string;
   placeholder?: boolean;
+}
+
+// ── Mobile nav menu ──────────────────────────────────────────────────────────
+
+interface NavGroup {
+  label: string;
+  items: NavDropdownItem[];
+}
+
+function MobileNavMenu({
+  groups,
+  active,
+  onNavigate,
+}: {
+  groups: NavGroup[];
+  active: string;
+  onNavigate: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="mobile-nav-root">
+      <button
+        type="button"
+        aria-label="Open navigation menu"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="mobile-nav-trigger"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div role="menu" className="mobile-nav-menu">
+          {groups.map((group) => (
+            <div key={group.label} className="mobile-nav-group">
+              <div className="mobile-nav-group-label">{group.label}</div>
+              {group.items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="menuitem"
+                  tabIndex={item.placeholder ? -1 : 0}
+                  aria-disabled={item.placeholder}
+                  onClick={() => {
+                    if (!item.placeholder) {
+                      onNavigate(item.id);
+                      setOpen(false);
+                    }
+                  }}
+                  className={[
+                    'mobile-nav-item',
+                    item.id === active ? 'mobile-nav-item--active' : '',
+                    item.placeholder ? 'mobile-nav-item--disabled' : '',
+                  ].join(' ')}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function NavDropdown({
@@ -474,48 +555,62 @@ function App() {
   }
 
   const activeNav = section;
+  const navGroups: NavGroup[] = [
+    {
+      label: 'Character Editor',
+      items: [
+        { id: 'characters', label: 'Characters' },
+        { id: 'custom-classes', label: 'Custom Classes' },
+        { id: 'custom-feats', label: 'Custom Feats' },
+        { id: 'custom-skills', label: 'Custom Skills', placeholder: true },
+      ],
+    },
+    {
+      label: 'Tools',
+      items: [
+        { id: 'initiative-tracker', label: 'Initiative Tracker' },
+        { id: 'name-generator', label: 'Name Generator' },
+      ],
+    },
+    {
+      label: 'Campaigns',
+      items: [{ id: 'campaigns', label: 'Campaigns' }],
+    },
+  ];
 
   return (
     <div className="flex flex-col h-screen app-root">
       {/* Top bar */}
       <header className="shrink-0 app-topbar">
-        <div className="container-xl flex items-center gap-4 h-full px-4">
-          <span className="font-semibold text-base app-topbar-title mr-4 flex items-center gap-2">
+        <div className="container-xl flex items-center gap-2 h-full px-3 sm:px-4">
+          <MobileNavMenu groups={navGroups} active={activeNav} onNavigate={navigate} />
+
+          <span className="app-topbar-brand" aria-label="Application home">
             <svg fill="currentColor" width="28" height="28" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="pb-1.5">
               <path d="M22.933 24.607h3.972v-1.818c1.232-0.436 2.465-1.219 3.697-2.291-1.236-1.094-2.448-1.703-3.697-1.995v-1.856h-14.575v1.269h-5.549c0.998 2.422 3.198 4.083 5.549 4.636v2.056h3.655c-0.869 2.19-2.502 3.935-4.36 5.44h15.985c-2.216-1.505-3.847-3.248-4.677-5.44zM14.855 15.567l3.076-1.385-1.332-4.39-3.483-3.422-1.996 0.899 1.053 3.473-11.095 4.994 0.783 1.739 11.095-4.995zM22.547 15.462l7.927-3.179-4.418-0.123 2.981-4.286-4.584 2.45 1.34-5.963-4.768 7.585-0.516-2.040-1.886 5.552 3.911-1.833z" />
             </svg>
-            AD&amp;D (3.5e) Tools
+            <span className="app-topbar-title hidden md:inline">AD&amp;D (3.5e) Tools</span>
           </span>
 
           {/* Primary nav */}
-          <nav className="flex items-stretch self-stretch gap-1 flex-1">
+          <nav className="app-topbar-primary-nav flex items-stretch self-stretch gap-1 flex-1">
             <NavDropdown
               label="Character Editor"
               active={activeNav}
               onNavigate={navigate}
-              items={[
-                { id: 'characters',     label: 'Characters' },
-                { id: 'custom-classes', label: 'Custom Classes' },
-                { id: 'custom-feats',   label: 'Custom Feats' },
-                { id: 'custom-skills',  label: 'Custom Skills', placeholder: true },
-              ]}
+              items={navGroups[0].items}
             />
             <NavDropdown
               label="Tools"
               active={activeNav}
               onNavigate={navigate}
-              items={[
-                { id: 'initiative-tracker', label: 'Initiative Tracker' },
-                { id: 'name-generator',     label: 'Name Generator' },
-              ]}
+              items={navGroups[1].items}
             />
             <NavDropdown
               label="Campaigns"
               active={activeNav}
               onNavigate={navigate}
-              items={[
-                { id: 'campaigns', label: 'Campaigns' },
-              ]}
+              items={navGroups[2].items}
             />
           </nav>
 
