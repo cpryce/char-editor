@@ -25,7 +25,7 @@ export function IdentitySection({
 }) {
   return (
     <>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid gap-4 identity-grid">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium identity-label-text">
             Name

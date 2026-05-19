@@ -106,6 +106,23 @@
   background: var(--color-canvas-default);
 }
 
+@media (max-width: 639px) {
+  .character-editor-actions {
+    gap: 6px;
+  }
+
+  .character-editor-action-btn {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .character-editor-action-label {
+    display: none;
+  }
+}
+
 .stat-block-overlay {
   position: fixed;
   inset: 0;

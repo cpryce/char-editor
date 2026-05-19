@@ -2,6 +2,10 @@
   border-bottom: 1px solid var(--color-border-muted);
 }
 
+.ability-score-row--mobile {
+  display: none;
+}
+
 .ability-fg-default {
   color: var(--color-fg-default);
 }
@@ -94,4 +98,107 @@
 .ability-racial-flex-btn--selected .ability-racial-flex-dot {
   background: var(--color-success-fg);
   border-color: var(--color-success-fg);
+}
+
+.ability-mobile-carousel-controls {
+  display: none;
+}
+
+.ability-mobile-swipe-wrap {
+  position: relative;
+}
+
+.ability-mobile-swipe-control {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .ability-score-row--desktop {
+    display: none;
+  }
+
+  .ability-score-row--mobile {
+    display: block;
+    overflow: hidden;
+  }
+
+  .ability-row-carousel {
+    display: flex;
+    width: 200%;
+    transition: transform 180ms ease;
+    will-change: transform;
+  }
+
+  .ability-row-carousel--main {
+    transform: translateX(0);
+  }
+
+  .ability-row-carousel--temp {
+    transform: translateX(-50%);
+  }
+
+  .ability-row-pane {
+    width: 50%;
+    flex: 0 0 50%;
+    min-width: 0;
+  }
+
+  .ability-row-pane-content {
+    min-height: 44px;
+  }
+
+  .ability-number-input {
+    width: 50px;
+  }
+
+  .ability-mobile-carousel-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 2px 0 6px;
+  }
+
+  .ability-mobile-swipe-control {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border-default);
+    background: var(--color-canvas-overlay);
+    color: var(--color-fg-default);
+    font-size: 21px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+    z-index: 3;
+  }
+
+  .ability-mobile-swipe-control--right {
+    right: 2px;
+  }
+
+  .ability-mobile-swipe-control--left {
+    left: 2px;
+  }
+
+  .ability-mobile-carousel-tab {
+    font-size: 12px;
+    border: 1px solid var(--color-border-default);
+    background: var(--color-canvas-subtle);
+    color: var(--color-fg-muted);
+    border-radius: 999px;
+    padding: 2px 10px;
+    cursor: pointer;
+  }
+
+  .ability-mobile-carousel-tab--active {
+    color: var(--color-fg-default);
+    border-color: var(--fgColor-accent);
+    background: var(--color-canvas-default);
+  }
 }

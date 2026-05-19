@@ -1240,12 +1240,13 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
         <h2 className="text-xl font-semibold character-editor-title flex-1">
           {headerTitle}
         </h2>
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 ml-auto character-editor-actions">
           {hasRequiredFields && (
             <button
               type="button"
               onClick={() => setShowStatBlock(true)}
-              className="stat-block-open-btn"
+              aria-label="Open stat block"
+              className="stat-block-open-btn character-editor-action-btn"
             >
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden xmlns="http://www.w3.org/2000/svg">
                 <path d="M0 11H3L3 0H5L5 11H8V12L4 16L0 12V11Z" fill="currentColor"/>
@@ -1253,14 +1254,15 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
                 <path d="M10 6H14V4H10V6Z" fill="currentColor"/>
                 <path d="M12 2H10V0H12V2Z" fill="currentColor"/>
               </svg>
-              Stat Block
+              <span className="character-editor-action-label">Stat Block</span>
             </button>
           )}
           {autoSaveCharacterId && (
             <button
               type="button"
               disabled={exportingPdf}
-              className="stat-block-open-btn"
+              aria-label={exportingPdf ? 'Exporting PDF' : 'Export PDF'}
+              className="stat-block-open-btn character-editor-action-btn"
               onClick={async () => {
                 setExportingPdf(true);
                 try {
@@ -1286,7 +1288,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
                     <path d="M15 16H1L1 9H3L3 14H13V9H15L15 16Z" fill="currentColor"/>
                     <path d="M12 6L9 6L9 1.74846e-07L7 0V6L4 6L4 7L8 11L12 7L12 6Z" fill="currentColor"/>
                   </svg>
-                  Export PDF
+                  <span className="character-editor-action-label">Export PDF</span>
                 </>
               )}
             </button>
@@ -1298,15 +1300,18 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
                 ref={delegateBtnRef}
                 type="button"
                 onClick={() => setDelegatePopoverOpen((o) => !o)}
-                className="stat-block-open-btn"
+                className="stat-block-open-btn character-editor-action-btn"
                 title={pendingInviteEmail ? `Pending invite to ${pendingInviteEmail}` : 'Delegate character'}
+                aria-label={pendingInviteEmail ? 'Invite pending' : 'Delegate character'}
               >
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                   <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
                   <path d="M2 13c0-2.76 2.24-5 6-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
                   <path d="M12 10l2 2-2 2M10 12h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
                 </svg>
-                {pendingInviteEmail ? 'Invite Pending' : 'Delegate'}
+                <span className="character-editor-action-label">
+                  {pendingInviteEmail ? 'Invite Pending' : 'Delegate'}
+                </span>
               </button>
               {delegatePopoverOpen && (
                 <DelegatePopover

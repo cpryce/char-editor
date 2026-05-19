@@ -108,6 +108,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
   const [classFilter, setClassFilter] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mobileFilterSectionOpen, setMobileFilterSectionOpen] = useState<'race' | 'class' | null>(null);
+  const [mobileFiltersTop, setMobileFiltersTop] = useState(58);
   const [newDropdownOpen, setNewDropdownOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CharacterSummary | null>(null);
   const [delegatePopoverCharId, setDelegatePopoverCharId] = useState<string | null>(null);
@@ -117,6 +118,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const newRef = useRef<HTMLDivElement>(null);
   const filtersRef = useRef<HTMLDivElement>(null);
+  const filtersBtnRef = useRef<HTMLButtonElement>(null);
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -209,14 +211,31 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
 
   useEffect(() => {
     if (!filtersOpen) return;
+
+    function updateMobileFiltersTop() {
+      const rect = filtersBtnRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setMobileFiltersTop(Math.round(rect.bottom + 6));
+    }
+
+    updateMobileFiltersTop();
+
     function handleClickOutside(e: MouseEvent) {
       if (filtersRef.current && !filtersRef.current.contains(e.target as Node)) {
         setFiltersOpen(false);
         setMobileFilterSectionOpen(null);
       }
     }
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('resize', updateMobileFiltersTop);
+    window.addEventListener('scroll', updateMobileFiltersTop, true);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', updateMobileFiltersTop);
+      window.removeEventListener('scroll', updateMobileFiltersTop, true);
+    };
   }, [filtersOpen]);
 
   useEffect(() => {
@@ -242,6 +261,7 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
           {/* Small-screen filter menu */}
           <div ref={filtersRef} className="relative sm:hidden">
             <button
+              ref={filtersBtnRef}
               type="button"
               onClick={() => {
                 setFiltersOpen((v) => {
@@ -262,7 +282,10 @@ export function CharactersPage({ userId, onNewCharacter, onEditCharacter }: Char
             </button>
 
             {filtersOpen && (
-              <div className="absolute right-0 top-[calc(100%+6px)] z-[120] w-[min(92vw,320px)] rounded border border-[var(--color-border-default)] bg-[var(--color-canvas-overlay)] p-2 shadow-[var(--shadow-lg)]">
+              <div
+                className="fixed left-1/2 -translate-x-1/2 z-[120] w-[min(86vw,280px)] rounded border border-[var(--color-border-default)] bg-[var(--color-canvas-overlay)] p-2 shadow-[var(--shadow-lg)]"
+                style={{ top: mobileFiltersTop }}
+              >
                 <div className="relative flex items-center mb-2">
                   <input
                     type="search"

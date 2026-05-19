@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import type { CharacterDraft, AbilityScore } from '../../types/character';
 import {
   abilityModifier,
@@ -35,6 +36,8 @@ function AbilityScoreRow({
   showFlexibleBonus = false,
   isFlexibleBonusSelected = false,
   onFlexibleBonusToggle,
+  mobilePane = 0,
+  onNumericFocus,
 }: {
   label: string;
   score: AbilityScore;
@@ -51,6 +54,8 @@ function AbilityScoreRow({
   showFlexibleBonus?: boolean;
   isFlexibleBonusSelected?: boolean;
   onFlexibleBonusToggle?: () => void;
+  mobilePane?: 0 | 1;
+  onNumericFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
 }) {
   const total = totalScore(score);
   const mod = abilityModifier(total);
@@ -61,8 +66,8 @@ function AbilityScoreRow({
   const tempMod = abilityModifier(tempScore !== null ? tempScore : total);
   const tempModStr = tempMod >= 0 ? `+${tempMod}` : `${tempMod}`;
 
-  return (
-    <div className="flex items-center gap-3 py-1 ability-score-row">
+  const mainFields = (
+    <>
       <span className="w-8 text-xs font-semibold ability-fg-default">
         {label}
       </span>
@@ -76,6 +81,7 @@ function AbilityScoreRow({
           min={minBase}
           max={18}
           onChange={(e) => onBaseChange(e.target.valueAsNumber)}
+          onFocus={onNumericFocus}
           className="ability-number-input"
         />
       </div>
@@ -119,6 +125,7 @@ function AbilityScoreRow({
             aria-label={`${label} enhancement bonus`}
             value={score.enhancement}
             onChange={(e) => onEnhancementChange?.(e.target.valueAsNumber || 0)}
+            onFocus={onNumericFocus}
             className="ability-number-input"
           />
         </div>
@@ -137,6 +144,7 @@ function AbilityScoreRow({
               const next = Math.max(0, Math.min(levelUp + availableToAdd, e.target.valueAsNumber || 0));
               onLevelUpChange?.(next);
             }}
+            onFocus={onNumericFocus}
             className="ability-number-input"
           />
         </div>
@@ -160,34 +168,71 @@ function AbilityScoreRow({
           {modStr}
         </span>
       </div>
+    </>
+  );
 
-      <div className="flex items-center gap-3 ml-4 pl-4 ability-temp-divider">
-        <div className="flex flex-col items-center gap-0.5">
-          <span className="text-xs ability-fg-subtle">temp</span>
-          <input
-            type="number"
-            aria-label={`${label} temporary score`}
-            value={tempScore ?? ''}
-            onChange={(e) => {
-              const raw = e.target.value;
-              onTempScoreChange(raw === '' ? null : e.target.valueAsNumber);
-            }}
-            className="ability-number-input"
-          />
-        </div>
-        <div className="flex flex-col items-center gap-0.5">
-          <span className="text-xs ability-fg-subtle">temp mod</span>
-          <span
-            className={[
-              'text-sm font-semibold ability-value ability-value--line',
-              tempMod >= 0 ? 'ability-value--positive' : 'ability-value--negative',
-            ].join(' ')}
-          >
-            {tempModStr}
-          </span>
+  const tempFields = (
+    <>
+      <div className="flex flex-col items-center gap-0.5">
+        <span className="text-xs ability-fg-subtle">temp</span>
+        <input
+          type="number"
+          aria-label={`${label} temporary score`}
+          value={tempScore ?? ''}
+          onChange={(e) => {
+            const raw = e.target.value;
+            onTempScoreChange(raw === '' ? null : e.target.valueAsNumber);
+          }}
+          onFocus={onNumericFocus}
+          className="ability-number-input"
+        />
+      </div>
+      <div className="flex flex-col items-center gap-0.5">
+        <span className="text-xs ability-fg-subtle">temp mod</span>
+        <span
+          className={[
+            'text-sm font-semibold ability-value ability-value--line',
+            tempMod >= 0 ? 'ability-value--positive' : 'ability-value--negative',
+          ].join(' ')}
+        >
+          {tempModStr}
+        </span>
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      <div className="flex items-center gap-3 py-1 ability-score-row ability-score-row--desktop">
+        {mainFields}
+        <div className="flex items-center gap-3 ml-4 pl-4 ability-temp-divider">
+          {tempFields}
         </div>
       </div>
-    </div>
+
+      <div className="ability-score-row ability-score-row--mobile">
+        <div
+          className={[
+            'ability-row-carousel',
+            mobilePane === 1 ? 'ability-row-carousel--temp' : 'ability-row-carousel--main',
+          ].join(' ')}
+        >
+          <div className="ability-row-pane">
+            <div className="flex items-center gap-3 py-1 ability-row-pane-content">
+              {mainFields}
+            </div>
+          </div>
+          <div className="ability-row-pane">
+            <div className="flex items-center gap-3 py-1 ability-row-pane-content">
+              <span className="w-8 text-xs font-semibold ability-fg-default">{label}</span>
+              <div className="flex items-center gap-3 ml-1 pl-3 ability-temp-divider">
+                {tempFields}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -222,6 +267,30 @@ export function AbilityScoresSection({
   racialAbilityChoice?: string | null;
   onRacialAbilityChoiceChange?: (key: AbilityKey | null) => void;
 }) {
+  const [mobilePane, setMobilePane] = useState<0 | 1>(0);
+  const touchStartXRef = useRef<number | null>(null);
+
+  function handleNumericFocus(e: React.FocusEvent<HTMLInputElement>) {
+    if (window.matchMedia('(max-width: 639px)').matches) {
+      e.currentTarget.select();
+    }
+  }
+
+  function handleTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+    touchStartXRef.current = e.touches[0]?.clientX ?? null;
+  }
+
+  function handleTouchEnd(e: React.TouchEvent<HTMLDivElement>) {
+    if (touchStartXRef.current === null) return;
+    const endX = e.changedTouches[0]?.clientX ?? touchStartXRef.current;
+    const delta = endX - touchStartXRef.current;
+    touchStartXRef.current = null;
+
+    if (Math.abs(delta) < 35) return;
+    if (delta < 0) setMobilePane(1);
+    if (delta > 0) setMobilePane(0);
+  }
+
   return (
     <>
       <p className="text-sm ability-fg-muted">
@@ -230,29 +299,61 @@ export function AbilityScoresSection({
           <> · Level-up: {spentLevelUpPoints} / {earnedLevelUpPoints} assigned</>
         )}
       </p>
-      <div className="flex flex-col gap-2">
-        {ABILITY_KEYS.map((key) => (
-          <AbilityScoreRow
-            key={key}
-            label={ABILITY_LABELS[key]}
-            score={abilityScores[key]}
-            onBaseChange={(base) => onBaseChange(key, base)}
-            isEdit={isEdit}
-            levelUp={abilityScores[key].levelUp ?? 0}
-            onLevelUpChange={(value) => onLevelUpChange(key, value)}
-            earnedPoints={earnedLevelUpPoints}
-            spentPoints={spentLevelUpPoints}
-            onEnhancementChange={(value) => onEnhancementChange(key, value)}
-            tempScore={abilityScores[key].temp}
-            onTempScoreChange={(value) => onTempScoreChange(key, value)}
-            minBase={POINT_BUY_CONFIGS[pointBuySystem].minBase}
-            showFlexibleBonus={isFlexibleRace}
-            isFlexibleBonusSelected={racialAbilityChoice === key}
-            onFlexibleBonusToggle={() =>
-              onRacialAbilityChoiceChange?.(racialAbilityChoice === key ? null : key)
-            }
-          />
-        ))}
+      <div className="ability-mobile-carousel-controls">
+        <button
+          type="button"
+          onClick={() => setMobilePane(0)}
+          className={mobilePane === 0 ? 'ability-mobile-carousel-tab ability-mobile-carousel-tab--active' : 'ability-mobile-carousel-tab'}
+        >
+          Scores
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobilePane(1)}
+          className={mobilePane === 1 ? 'ability-mobile-carousel-tab ability-mobile-carousel-tab--active' : 'ability-mobile-carousel-tab'}
+        >
+          Temp
+        </button>
+      </div>
+      <div className="ability-mobile-swipe-wrap">
+        <button
+          type="button"
+          onClick={() => setMobilePane((pane) => (pane === 0 ? 1 : 0))}
+          aria-label={mobilePane === 0 ? 'Show temporary ability stats' : 'Show core ability stats'}
+          className={[
+            'ability-mobile-swipe-control',
+            mobilePane === 0 ? 'ability-mobile-swipe-control--right' : 'ability-mobile-swipe-control--left',
+          ].join(' ')}
+        >
+          {mobilePane === 0 ? '>' : '<'}
+        </button>
+
+        <div className="flex flex-col gap-2" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+          {ABILITY_KEYS.map((key) => (
+            <AbilityScoreRow
+              key={key}
+              label={ABILITY_LABELS[key]}
+              score={abilityScores[key]}
+              onBaseChange={(base) => onBaseChange(key, base)}
+              isEdit={isEdit}
+              levelUp={abilityScores[key].levelUp ?? 0}
+              onLevelUpChange={(value) => onLevelUpChange(key, value)}
+              earnedPoints={earnedLevelUpPoints}
+              spentPoints={spentLevelUpPoints}
+              onEnhancementChange={(value) => onEnhancementChange(key, value)}
+              tempScore={abilityScores[key].temp}
+              onTempScoreChange={(value) => onTempScoreChange(key, value)}
+              minBase={POINT_BUY_CONFIGS[pointBuySystem].minBase}
+              showFlexibleBonus={isFlexibleRace}
+              isFlexibleBonusSelected={racialAbilityChoice === key}
+              mobilePane={mobilePane}
+              onNumericFocus={handleNumericFocus}
+              onFlexibleBonusToggle={() =>
+                onRacialAbilityChoiceChange?.(racialAbilityChoice === key ? null : key)
+              }
+            />
+          ))}
+        </div>
       </div>
       {isFlexibleRace && (
         <p className="text-xs mt-1 ability-fg-muted">
