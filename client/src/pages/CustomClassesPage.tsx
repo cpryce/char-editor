@@ -6,11 +6,17 @@ import './CustomClassesPage.css';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return 'unknown';
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'always' });
+  if (elapsedSeconds < 60) return '1 minute ago';
+  if (elapsedSeconds < 60 * 60) return rtf.format(-Math.floor(elapsedSeconds / 60), 'minute');
+  if (elapsedSeconds < 60 * 60 * 24) return rtf.format(-Math.floor(elapsedSeconds / (60 * 60)), 'hour');
+  if (elapsedSeconds < 60 * 60 * 24 * 7) return rtf.format(-Math.floor(elapsedSeconds / (60 * 60 * 24)), 'day');
+  if (elapsedSeconds < 60 * 60 * 24 * 30) return rtf.format(-Math.floor(elapsedSeconds / (60 * 60 * 24 * 7)), 'week');
+  if (elapsedSeconds < 60 * 60 * 24 * 365) return rtf.format(-Math.floor(elapsedSeconds / (60 * 60 * 24 * 30)), 'month');
+  return rtf.format(-Math.floor(elapsedSeconds / (60 * 60 * 24 * 365)), 'year');
 }
 
 const BAB_OPTIONS: { value: BabProgression; label: string }[] = [
@@ -604,7 +610,7 @@ export function CustomClassesPage() {
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-[var(--color-canvas-subtle)]">
-                {['Name', 'BAB', 'HD', 'Fort', 'Ref', 'Will', 'Features', 'Last Modified', ''].map((h) => (
+                {['Name', 'HD'].map((h) => (
                   <th
                     key={h}
                     className="text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]"
@@ -612,6 +618,13 @@ export function CustomClassesPage() {
                     {h}
                   </th>
                 ))}
+                <th className="hidden sm:table-cell text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">BAB</th>
+                <th className="hidden md:table-cell text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">Fort</th>
+                <th className="hidden md:table-cell text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">Ref</th>
+                <th className="hidden md:table-cell text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">Will</th>
+                <th className="hidden lg:table-cell text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">Features</th>
+                <th className="hidden xl:table-cell text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">Last Modified</th>
+                <th className="hidden sm:table-cell text-left px-4 py-2 border-b border-[var(--color-border-default)]" />
               </tr>
             </thead>
             <tbody>
@@ -637,16 +650,16 @@ export function CustomClassesPage() {
                     onClick={() => setView({ mode: 'edit', cls, readOnly: cls.isOwner === false })}
                   >
                     <td className="px-4 py-2 font-medium text-[color:var(--color-fg-default)]">{cls.name}</td>
-                    <td className="px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">
+                    <td className="px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">d{cls.hitDice ?? 8}</td>
+                    <td className="hidden sm:table-cell px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">
                       {cls.babProgression === 1.0 ? 'Full' : cls.babProgression === 0.75 ? 'Medium' : 'Poor'}
                     </td>
-                    <td className="px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">d{cls.hitDice ?? 8}</td>
-                    <td className="px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap capitalize">{cls.fortitudeSave ?? '—'}</td>
-                    <td className="px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap capitalize">{cls.reflexSave ?? '—'}</td>
-                    <td className="px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap capitalize">{cls.willSave ?? '—'}</td>
-                    <td className="px-4 py-2 text-[color:var(--color-fg-muted)]">{cls.features.length}</td>
-                    <td className="px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">{formatDate(cls.updatedAt)}</td>
-                    <td className="px-4 py-2 text-right">
+                    <td className="hidden md:table-cell px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap capitalize">{cls.fortitudeSave ?? '—'}</td>
+                    <td className="hidden md:table-cell px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap capitalize">{cls.reflexSave ?? '—'}</td>
+                    <td className="hidden md:table-cell px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap capitalize">{cls.willSave ?? '—'}</td>
+                    <td className="hidden lg:table-cell px-4 py-2 text-[color:var(--color-fg-muted)]">{cls.features.length}</td>
+                    <td className="hidden xl:table-cell px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">{formatDate(cls.updatedAt)}</td>
+                    <td className="hidden sm:table-cell px-4 py-2 text-right">
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setView({ mode: 'edit', cls, readOnly: cls.isOwner === false }); }}

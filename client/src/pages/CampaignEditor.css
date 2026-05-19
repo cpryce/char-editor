@@ -536,4 +536,66 @@
   line-height: 1.4;
 }
 
+/* ── Encounter aside flyout (small screens) ─────────────────── */
+
+.encounter-aside-close {
+  display: none;
+}
+
+.encounter-aside-backdrop {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .encounter-aside-flyout {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    width: 280px;
+    overflow-y: auto;
+    background: var(--color-canvas-default);
+    border-left: 1px solid var(--color-border-default);
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.2);
+    padding: 16px;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+  }
+
+  .encounter-aside-flyout.open {
+    transform: translateX(0);
+  }
+
+  .encounter-aside-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  .encounter-aside-close {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+  }
+
+  .encounter-aside-close-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    color: var(--color-fg-muted);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .encounter-aside-close-btn:hover {
+    color: var(--color-fg-default);
+    background: var(--color-canvas-subtle);
+  }
+}
+
 

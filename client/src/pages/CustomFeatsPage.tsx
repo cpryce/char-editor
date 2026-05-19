@@ -17,11 +17,17 @@ const FEAT_CATEGORIES: FeatCategory[] = [
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return 'unknown';
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'always' });
+  if (elapsedSeconds < 60) return '1 minute ago';
+  if (elapsedSeconds < 60 * 60) return rtf.format(-Math.floor(elapsedSeconds / 60), 'minute');
+  if (elapsedSeconds < 60 * 60 * 24) return rtf.format(-Math.floor(elapsedSeconds / (60 * 60)), 'hour');
+  if (elapsedSeconds < 60 * 60 * 24 * 7) return rtf.format(-Math.floor(elapsedSeconds / (60 * 60 * 24)), 'day');
+  if (elapsedSeconds < 60 * 60 * 24 * 30) return rtf.format(-Math.floor(elapsedSeconds / (60 * 60 * 24 * 7)), 'week');
+  if (elapsedSeconds < 60 * 60 * 24 * 365) return rtf.format(-Math.floor(elapsedSeconds / (60 * 60 * 24 * 30)), 'month');
+  return rtf.format(-Math.floor(elapsedSeconds / (60 * 60 * 24 * 365)), 'year');
 }
 
 // ── Blank draft ───────────────────────────────────────────────────────────────
@@ -533,7 +539,7 @@ export function CustomFeatsPage() {
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-[var(--color-canvas-subtle)]">
-                {['Name', 'Type(s)', 'Short Description', 'Restrictions', 'Last Modified', ''].map((h) => (
+                {['Name', 'Type(s)'].map((h) => (
                   <th
                     key={h}
                     className="text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]"
@@ -541,6 +547,16 @@ export function CustomFeatsPage() {
                     {h}
                   </th>
                 ))}
+                <th className="hidden lg:table-cell text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">
+                  Short Description
+                </th>
+                <th className="hidden md:table-cell text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">
+                  Restrictions
+                </th>
+                <th className="hidden xl:table-cell text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">
+                  Last Modified
+                </th>
+                <th className="hidden sm:table-cell text-left px-4 py-2 font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]" />
               </tr>
             </thead>
             <tbody>
@@ -581,18 +597,18 @@ export function CustomFeatsPage() {
                     <td className="px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">
                       {feat.featTypes.join(', ')}
                     </td>
-                    <td className="px-4 py-2 text-[color:var(--color-fg-default)] max-w-[280px]">
+                    <td className="hidden lg:table-cell px-4 py-2 text-[color:var(--color-fg-default)] max-w-[280px]">
                       <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
                         {feat.shortDescription || '—'}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-xs text-[color:var(--color-fg-muted)] whitespace-nowrap">
+                    <td className="hidden md:table-cell px-4 py-2 text-xs text-[color:var(--color-fg-muted)] whitespace-nowrap">
                       {feat.classRestrictions.length === 0 ? 'All classes' : feat.classRestrictions.join(', ')}
                     </td>
-                    <td className="px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">
+                    <td className="hidden xl:table-cell px-4 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">
                       {formatDate(feat.updatedAt)}
                     </td>
-                    <td className="px-4 py-2 text-right">
+                    <td className="hidden sm:table-cell px-4 py-2 text-right">
                       <button
                         type="button"
                         onClick={(e) => {

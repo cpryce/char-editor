@@ -55,6 +55,7 @@ export function EncounterPage({ sessionId, onBack }) {
   const [characters, setCharacters] = useState(null);
   const [notes, setNotes] = useState(() => localStorage.getItem(`encounter-notes-${sessionId}`) ?? '');
   const [editingNotes, setEditingNotes] = useState(false);
+  const [asideOpen, setAsideOpen] = useState(false);
   const [startedAt, setStartedAt] = useState(null);
   const [lastRun, setLastRun] = useState(() => {
     try {
@@ -422,6 +423,18 @@ export function EncounterPage({ sessionId, onBack }) {
       </div>
 
       <div className="px-6 py-6">
+        {/* Aside toggle — visible only on small screens */}
+        <div className="flex justify-end mb-3 sm:hidden">
+          <button
+            type="button"
+            onClick={() => setAsideOpen(true)}
+            aria-label="Open encounter info"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-canvas-default)', cursor: 'pointer', fontSize: '13px', color: 'var(--color-fg-default)' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M0 4.75C0 3.784.784 3 1.75 3h12.5c.966 0 1.75.784 1.75 1.75v6.5A1.75 1.75 0 0 1 14.25 13H1.75A1.75 1.75 0 0 1 0 11.25Zm1.75-.25a.25.25 0 0 0-.25.25v6.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-6.5a.25.25 0 0 0-.25-.25ZM8 6.5a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3A.75.75 0 0 1 8 6.5Zm0-2a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg>
+            Info
+          </button>
+        </div>
         <div className="campaign-editor-body">
           <main className="campaign-editor-main">
         {/* Turn controls */}
@@ -573,7 +586,26 @@ export function EncounterPage({ sessionId, onBack }) {
 
           </main>
 
-          <aside className="campaign-editor-rail">
+          {/* Backdrop for small-screen flyout */}
+          {asideOpen && (
+            <div
+              className="encounter-aside-backdrop"
+              onClick={() => setAsideOpen(false)}
+              aria-hidden="true"
+            />
+          )}
+
+          <aside className={`campaign-editor-rail encounter-aside-flyout${asideOpen ? ' open' : ''}`}>
+            <div className="encounter-aside-close">
+              <button
+                type="button"
+                onClick={() => setAsideOpen(false)}
+                aria-label="Close"
+                className="encounter-aside-close-btn"
+              >
+                ×
+              </button>
+            </div>
             {session?.campaignName && (
               <section className="campaign-rail-section">
                 <div className="campaign-rail-section-header">

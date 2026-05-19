@@ -17,11 +17,14 @@ function ClassFeaturesSection({ features }: { features: DerivedClassFeature[] })
       <table aria-label="Class features" className="w-full text-xs border-collapse">
         <thead>
           <tr className="bg-[var(--color-canvas-subtle)]">
-            {['Feature', 'Class (Level)', 'Description'].map((header) => (
+            {['Feature', 'Class (Level)'].map((header) => (
               <th key={header} className="px-3 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">
                 {header}
               </th>
             ))}
+            <th className="hidden sm:table-cell px-3 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">
+              Description
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -36,7 +39,7 @@ function ClassFeaturesSection({ features }: { features: DerivedClassFeature[] })
               <td className="px-3 py-2 text-[color:var(--color-fg-muted)] whitespace-nowrap">
                 {feature.className} {feature.minLevel}
               </td>
-              <td className="px-3 py-2 text-[color:var(--color-fg-muted)]">
+              <td className="hidden sm:table-cell px-3 py-2 text-[color:var(--color-fg-muted)]">
                 {feature.shortDescription}
               </td>
             </tr>
@@ -78,7 +81,7 @@ function SelectableFeatsSection({
     onChange([...feats, { name: '', type: 'General', source: 'Special', sourceLabel: 'Additional' }]);
   }
 
-  const TABLE_HEADERS = ['Feat', 'Description', 'Type', 'Source', ''];
+  const TABLE_HEADERS = ['Feat', 'Source'];
 
   return (
     <div className="flex flex-col gap-2">
@@ -91,6 +94,13 @@ function SelectableFeatsSection({
                   {header}
                 </th>
               ))}
+              <th className="hidden sm:table-cell px-3 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">
+                Type
+              </th>
+              <th className="hidden sm:table-cell px-3 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">
+                Description
+              </th>
+              <th className="px-3 py-2 border-b border-[var(--color-border-default)]" aria-hidden="true"></th>
             </tr>
           </thead>
           <tbody>
@@ -102,7 +112,8 @@ function SelectableFeatsSection({
               </tr>
             )}
             {feats.map((feat, i) => (
-              <tr key={i}
+              <tr
+                key={i}
                 className={`border-b border-[var(--color-border-muted)] ${i % 2 === 0 ? 'bg-[var(--color-canvas-default)]' : 'bg-[var(--color-canvas-subtle)]'}`}
               >
                 <td className="px-3 py-1">
@@ -122,14 +133,14 @@ function SelectableFeatsSection({
                     }
                   />
                 </td>
-                <td className="px-3 py-1 text-[color:var(--color-fg-muted)] text-[11px]">
-                  {feat.shortDescription ?? ''}
-                </td>
-                <td className="px-3 py-1 text-[color:var(--color-fg-default)] whitespace-nowrap">
+                <td className="hidden sm:table-cell px-3 py-1 text-[color:var(--color-fg-default)] whitespace-nowrap">
                   {feat.type}
                 </td>
                 <td className="px-3 py-1 text-[color:var(--color-fg-muted)] whitespace-nowrap">
                   {feat.sourceLabel}
+                </td>
+                <td className="hidden sm:table-cell px-3 py-1 text-[color:var(--color-fg-muted)] text-[11px]">
+                  {feat.shortDescription ?? ''}
                 </td>
                 <td className="px-3 py-1 text-center">
                   {feat.source === 'Special' && (
@@ -177,7 +188,7 @@ export function FeatsSection({
           Class Features
         </p>
         <p className="text-sm mb-2 text-[color:var(--color-fg-subtle)]">
-          Features granted automatically by class. Hover a feature name to see the full description.
+          Features granted automatically by class. Hover a row to see the description on small screens.
         </p>
         <ClassFeaturesSection features={classFeatures} />
       </section>
