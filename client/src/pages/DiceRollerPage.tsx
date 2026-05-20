@@ -33,6 +33,7 @@ interface RollResult {
   modifier: number;
   total: number;
   timestamp: Date;
+  critMultiplier?: number;
 }
 
 let nextId = 1;
@@ -73,6 +74,15 @@ export function DiceRollerPage() {
   const [rollTrigger, setRollTrigger] = useState(0);
   const [diceSelections, setDiceSelections] = useState<Partial<Record<DieType, number>>>({});
   const [selectedModifier, setSelectedModifier] = useState(0);
+  const [attackSequence, setAttackSequence] = useState<{ label: string; bonus: number; critical?: { minRoll: number; multiplier: number } }[] | null>(null);
+  const [currentAttackIdx, setCurrentAttackIdx] = useState(0);
+  const [panelHeight, setPanelHeight] = useState(() => window.innerWidth <= 639 ? 250 : 350);
+
+  useEffect(() => {
+    function onResize() { setPanelHeight(window.innerWidth <= 639 ? 250 : 350); }
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Character picker
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
@@ -105,6 +115,8 @@ export function DiceRollerPage() {
     setCharInput(char.name);
     setCharDropdownOpen(false);
     setWeapons(null);
+    setAttackSequence(null);
+    setCurrentAttackIdx(0);
     fetch(`/api/characters/${char._id}`, { credentials: 'include' })
       .then((r) => r.ok ? r.json() as Promise<Record<string, unknown>> : Promise.resolve(null))
       .then((data) => {
@@ -122,6 +134,8 @@ export function DiceRollerPage() {
     setSelectedChar(null);
     setCharInput('');
     setWeapons(null);
+    setAttackSequence(null);
+    setCurrentAttackIdx(0);
   }
 
   const filteredChars = charInput.trim().length > 0
@@ -200,17 +214,79 @@ export function DiceRollerPage() {
     executeRoll(parsed.sides, dieType, parsed.count, totalMod);
   }
 
+  function parseCritical(critical: string): { minRoll: number; multiplier: number } | null {
+    const m = critical.trim().match(/^(\d+)(?:-\d+)?\s*\/\s*[\u00D7xX](\d+)/);
+    if (!m) return null;
+    return { minRoll: parseInt(m[1]), multiplier: parseInt(m[2]) };
+  }
+
+  function parseAttacks(computedAttack: string, critical?: { minRoll: number; multiplier: number }): { label: string; bonus: number; critical?: { minRoll: number; multiplier: number } }[] {
+    return computedAttack.split('/').map((s, i) => {
+      const trimmed = s.trim();
+      const bonus = parseInt(trimmed, 10);
+      return { label: `Attack ${i + 1} (${trimmed})`, bonus: isNaN(bonus) ? 0 : bonus, critical };
+    });
+  }
+
+  function startAttackSequence() {
+    const computedAttack = weapons?.mainHand?.computedAttack;
+    if (!computedAttack) return;
+    const critical = parseCritical(weapons?.mainHand?.critical ?? '') ?? undefined;
+    const attacks = parseAttacks(computedAttack, critical);
+    if (attacks.length === 0) return;
+    const first = attacks[0];
+    const rolls = [rollDie(20)];
+    const total = rolls[0] + first.bonus;
+    const critMultiplier = first.critical && rolls[0] >= first.critical.minRoll ? first.critical.multiplier : undefined;
+    setAttackSequence(attacks);
+    setCurrentAttackIdx(0);
+    setActiveRoll([{ sides: 20, results: rolls }]);
+    setIsRolling(true);
+    setRollTrigger((t) => t + 1);
+    setTimeout(() => setIsRolling(false), 800);
+    setHistory([{ id: nextId++, label: first.label, rolls, modifier: first.bonus, total, critMultiplier, timestamp: new Date() }]);
+  }
+
+  function advanceAttack() {
+    if (!attackSequence) return;
+    const nextIdx = currentAttackIdx + 1;
+    if (nextIdx >= attackSequence.length) return;
+    const attack = attackSequence[nextIdx];
+    const rolls = [rollDie(20)];
+    const total = rolls[0] + attack.bonus;
+    const critMultiplier = attack.critical && rolls[0] >= attack.critical.minRoll ? attack.critical.multiplier : undefined;
+    setCurrentAttackIdx(nextIdx);
+    setActiveRoll([{ sides: 20, results: rolls }]);
+    setIsRolling(true);
+    setRollTrigger((t) => t + 1);
+    setTimeout(() => setIsRolling(false), 800);
+    setHistory((prev) => [...prev, { id: nextId++, label: attack.label, rolls, modifier: attack.bonus, total, critMultiplier, timestamp: new Date() }]);
+  }
+
   const clearHistory = useCallback(() => {
     setHistory([]);
     setActiveRoll(null);
+    setAttackSequence(null);
+    setCurrentAttackIdx(0);
   }, []);
 
+  const [railOpen, setRailOpen] = useState(false);
   const hasWeapons = weapons && (weapons.mainHand || weapons.offHandWeapon);
 
   return (
     <div className="dice-roller-page p-6">
       <div className="flex items-center gap-3 mb-6">
         <h2 className="dice-roller-page-title">Dice Roller</h2>
+        <button
+          type="button"
+          onClick={() => setRailOpen(true)}
+          aria-label="Open character panel"
+          className="dice-roller-rail-toggle ml-auto items-center justify-center w-8 h-8 rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)]"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+            <path d="M12 12c2.66 0 4.8-2.14 4.8-4.8S14.66 2.4 12 2.4 7.2 4.54 7.2 7.2 9.34 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+          </svg>
+        </button>
       </div>
 
       <div className="dice-roller-body">
@@ -387,12 +463,12 @@ export function DiceRollerPage() {
           </div>
 
           {/* Animation + history, no gap */}
-          <div className="flex items-stretch" style={{ height: 350 }}>
+          <div className="dice-roller-body-panels">
             {/* 3D dice display */}
-            <div className="shrink-0 overflow-y-auto flex flex-col" style={{ background: '#2d5a27', width: 500 }}>
+            <div className="dice-roller-anim-panel" style={{ background: '#2d5a27' }}>
               {activeRoll ? (
                 activeRoll.map((group, i) => {
-                  const groupH = Math.max(120, Math.floor(350 / activeRoll.length));
+                  const groupH = Math.max(120, Math.floor(panelHeight / activeRoll.length));
                   return (
                     <div key={i} style={{ height: groupH, flexShrink: 0 }}>
                       <Dice3D
@@ -416,10 +492,25 @@ export function DiceRollerPage() {
                   </p>
                 </div>
               )}
+              {/* Next attack arrow */}
+              {attackSequence && currentAttackIdx < attackSequence.length - 1 && (
+                <button
+                  type="button"
+                  onClick={advanceAttack}
+                  disabled={isRolling}
+                  aria-label="Next attack"
+                  title={`Next: ${attackSequence[currentAttackIdx + 1].label}`}
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center bg-white/25 hover:bg-white/40 text-white disabled:opacity-50"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+                    <path d="M8 5l8 7-8 7V5z" />
+                  </svg>
+                </button>
+              )}
             </div>
 
             {/* Roll history */}
-            <div className="flex-1 min-w-0 border-l border-[var(--color-border-default)] bg-[var(--color-canvas-default)] overflow-hidden flex flex-col">
+            <div className="dice-roller-history-panel flex-1 min-w-0 bg-[var(--color-canvas-default)] overflow-hidden flex flex-col">
               {history.length === 0 ? (
                 <p className="px-4 py-6 text-sm text-center text-[color:var(--color-fg-muted)]">
                   No rolls yet.
@@ -429,11 +520,20 @@ export function DiceRollerPage() {
                   {history.map((result, index) => (
                     <li
                       key={result.id}
-                      className={`flex items-baseline gap-3 px-4 py-3 ${index === 0 ? 'bg-[var(--color-canvas-subtle)]' : ''}`}
+                      className={`flex items-baseline gap-3 px-4 py-1.5 ${index === 0 ? 'bg-[var(--color-canvas-subtle)]' : ''}`}
                     >
-                      <span className="text-2xl font-bold tabular-nums text-[color:var(--color-fg-default)] w-12 shrink-0 text-right">
+                      <span className="text-xl font-bold tabular-nums text-[color:var(--color-fg-default)] w-10 shrink-0 text-right">
                         {result.total}
                       </span>
+                      {result.critMultiplier && (
+                        <span
+                          className="self-center w-6 h-6 rounded-full border flex items-center justify-center text-[10px] font-bold shrink-0"
+                          style={{ color: 'var(--color-fg-accent)', borderColor: 'var(--color-fg-accent)' }}
+                          title="Critical threat!"
+                        >
+                          ×{result.critMultiplier}
+                        </span>
+                      )}
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm font-medium text-[color:var(--color-fg-default)]">
                           {result.label}
@@ -458,7 +558,17 @@ export function DiceRollerPage() {
       </div>{/* end dice-roller-main */}
 
       {/* Right rail */}
-      <aside className="dice-roller-rail">
+      <aside className={`dice-roller-rail${railOpen ? ' dice-roller-rail--open' : ''}`}>
+        <button
+          type="button"
+          onClick={() => setRailOpen(false)}
+          aria-label="Close character panel"
+          className="dice-roller-rail-close self-end mb-3 w-7 h-7 rounded-md items-center justify-center border border-[var(--color-border-default)] hover:bg-[var(--color-canvas-subtle)] text-[color:var(--color-fg-muted)]"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14" aria-hidden="true">
+            <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+          </svg>
+        </button>
         <div className="dice-roller-rail-section">
           <div className="dice-roller-rail-section-header">
             <h3 className="subsection-header">Character</h3>
@@ -511,6 +621,22 @@ export function DiceRollerPage() {
                   <span className="dice-roller-rail-field-label">Main Hand</span>
                   <span className="text-sm text-[color:var(--color-fg-default)]">{weapons.mainHand.name}</span>
                   <span className="text-xs text-[color:var(--color-fg-muted)]">{weapons.mainHand.damage} · {weapons.mainHand.damageType}</span>
+                  {weapons.mainHand.computedAttack && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs font-mono text-[color:var(--color-fg-default)]">{weapons.mainHand.computedAttack}</span>
+                      <button
+                        type="button"
+                        onClick={startAttackSequence}
+                        aria-label="Roll attack sequence"
+                        title="Roll attack sequence"
+                        className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-btn-primary-bg)] text-[var(--color-btn-primary-text)] hover:bg-[var(--color-btn-primary-hover-bg)]"
+                      >
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="8" height="8" aria-hidden="true">
+                          <path d="M5 3v18l15-9L5 3z" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-xs text-[color:var(--color-fg-muted)]">No main-hand weapon equipped.</p>
@@ -530,6 +656,13 @@ export function DiceRollerPage() {
         </div>
       </aside>
     </div>
+    {railOpen && (
+      <div
+        className="dice-roller-rail-backdrop"
+        onClick={() => setRailOpen(false)}
+        aria-hidden="true"
+      />
+    )}
     </div>
   );
 }
