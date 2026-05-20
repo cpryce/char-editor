@@ -510,7 +510,7 @@ export function DiceRollerPage() {
             </div>
 
             {/* Roll history */}
-            <div className="dice-roller-history-panel flex-1 min-w-0 bg-[var(--color-canvas-default)] overflow-hidden flex flex-col">
+            <div className="dice-roller-history-panel sm:flex-1 min-w-0 bg-[var(--color-canvas-default)] overflow-hidden flex flex-col">
               {history.length === 0 ? (
                 <p className="px-4 py-6 text-sm text-center text-[color:var(--color-fg-muted)]">
                   No rolls yet.
