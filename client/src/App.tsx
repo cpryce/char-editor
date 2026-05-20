@@ -21,7 +21,7 @@ interface User {
   avatar?: string;
 }
 
-type Section = 'characters' | 'custom-feats' | 'custom-classes' | 'initiative-tracker' | 'name-generator' | 'campaigns';
+type Section = 'characters' | 'custom-feats' | 'custom-classes' | 'initiative-tracker' | 'dice-roller' | 'name-generator' | 'campaigns';
 type View = 'list' | 'new' | 'edit';
 type Theme = 'light' | 'dark';
 

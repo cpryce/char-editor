@@ -68,9 +68,11 @@ export function DiceRollerPage() {
   const [selectedDie, setSelectedDie] = useState<DieType>('d20');
   const [modifier, setModifier] = useState(0);
   const [history, setHistory] = useState<RollResult[]>([]);
-  const [activeRoll, setActiveRoll] = useState<{ sides: number; results: number[] } | null>(null);
+  const [activeRoll, setActiveRoll] = useState<{ sides: number; results: number[] }[] | null>(null);
   const [isRolling, setIsRolling] = useState(false);
   const [rollTrigger, setRollTrigger] = useState(0);
+  const [diceSelections, setDiceSelections] = useState<Partial<Record<DieType, number>>>({});
+  const [selectedModifier, setSelectedModifier] = useState(0);
 
   // Character picker
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
@@ -131,7 +133,7 @@ export function DiceRollerPage() {
     const total = rolls.reduce((a, b) => a + b, 0) + mod;
     const label = `${numDice}${dieType}${mod !== 0 ? (mod > 0 ? `+${mod}` : `${mod}`) : ''}`;
 
-    setActiveRoll({ sides, results: rolls });
+    setActiveRoll([{ sides, results: rolls }]);
     setIsRolling(true);
     setRollTrigger((t) => t + 1);
     setTimeout(() => setIsRolling(false), 800);
@@ -147,7 +149,50 @@ export function DiceRollerPage() {
     executeRoll(die.sides, selectedDie, count, modifier);
   }, [count, selectedDie, modifier, executeRoll]);
 
-  function rollWeapon(weapon: WeaponLoadout, label: string) {
+  function selectDie(dieType: DieType) {
+    setDiceSelections((prev) => ({ ...prev, [dieType]: (prev[dieType] ?? 0) + 1 }));
+  }
+
+  function deselectDie(e: React.MouseEvent, dieType: DieType) {
+    e.preventDefault();
+    setDiceSelections((prev) => {
+      const current = prev[dieType] ?? 0;
+      if (current <= 1) {
+        const next = { ...prev };
+        delete next[dieType];
+        return next;
+      }
+      return { ...prev, [dieType]: current - 1 };
+    });
+  }
+
+  const rollSelected = useCallback(() => {
+    const entries = (Object.entries(diceSelections) as [DieType, number][]).filter(([, n]) => n > 0);
+    if (entries.length === 0) return;
+
+    const groups = entries.map(([die, n]) => {
+      const sides = DICE.find((d) => d.type === die)!.sides;
+      const results = Array.from({ length: n }, () => rollDie(sides));
+      return { sides, results };
+    });
+
+    const allRolls = groups.flatMap((g) => g.results);
+    const total = allRolls.reduce((a, b) => a + b, 0) + selectedModifier;
+    const modSuffix = selectedModifier !== 0 ? (selectedModifier > 0 ? `+${selectedModifier}` : `${selectedModifier}`) : '';
+    const label = entries.map(([die, n]) => `${n}${die}`).join('+') + modSuffix;
+
+    setActiveRoll(groups);
+    setIsRolling(true);
+    setRollTrigger((t) => t + 1);
+    setTimeout(() => setIsRolling(false), 800);
+
+    setHistory((prev) => [
+      { id: nextId++, label, rolls: allRolls, modifier: selectedModifier, total, timestamp: new Date() },
+      ...prev,
+    ].slice(0, 50));
+  }, [diceSelections, selectedModifier]);
+
+  function rollWeapon(weapon: WeaponLoadout) {
     const parsed = parseDamage(weapon.damage);
     if (!parsed) return;
     const dieType = nearestDieType(parsed.sides);
@@ -183,7 +228,7 @@ export function DiceRollerPage() {
                   <button
                     type="button"
                     disabled={isRolling}
-                    onClick={() => rollWeapon(weapons!.mainHand!, 'Main Hand')}
+                    onClick={() => rollWeapon(weapons!.mainHand!)}
                     className="dice-roller-weapon-btn"
                   >
                     <span className="font-medium">{weapons!.mainHand.name}</span>
@@ -199,7 +244,7 @@ export function DiceRollerPage() {
                   <button
                     type="button"
                     disabled={isRolling}
-                    onClick={() => rollWeapon(weapons!.offHandWeapon!, 'Off Hand')}
+                    onClick={() => rollWeapon(weapons!.offHandWeapon!)}
                     className="dice-roller-weapon-btn"
                   >
                     <span className="font-medium">{weapons!.offHandWeapon.name}</span>
@@ -267,103 +312,147 @@ export function DiceRollerPage() {
             </div>
           )}
 
-          {/* Quick-roll buttons (always shown) */}
-          <div className="mt-4 flex flex-wrap gap-2">
+        </div>
+
+        {/* Shared container: spanning header + animation + history */}
+        <div className="rounded-md border border-[var(--color-border-default)] overflow-hidden">
+          {/* Header spanning both panels */}
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--color-border-default)] bg-[var(--color-canvas-subtle)]">
             {DICE.map((d) => (
               <button
                 key={d.type}
                 type="button"
                 disabled={isRolling}
-                onClick={() => {
-                  setSelectedDie(d.type);
-                  setCount(1);
-                  setModifier(0);
-                  executeRoll(d.sides, d.type, 1, 0);
-                }}
-                className="h-7 px-3 text-xs font-medium rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)] disabled:opacity-50"
+                onClick={() => selectDie(d.type)}
+                onContextMenu={(e) => deselectDie(e, d.type)}
+                title="Left-click to add · Right-click to remove"
+                className="relative h-7 px-3 text-xs font-medium rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)] disabled:opacity-50"
               >
                 {d.type}
+                {(diceSelections[d.type] ?? 0) > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 text-[10px] font-bold rounded-full bg-[var(--color-btn-primary-bg)] text-[var(--color-btn-primary-text)] flex items-center justify-center leading-none pointer-events-none">
+                    {diceSelections[d.type]}
+                  </span>
+                )}
               </button>
             ))}
-          </div>
-        </div>
-
-        {/* Animation + history side by side */}
-        <div className="flex gap-4 items-start">
-          {/* 3D dice display */}
-          <div
-            className="rounded-md border border-[var(--color-border-default)] overflow-hidden shrink-0"
-            style={{ background: '#2d5a27', width: 500, height: 350 }}
-          >
-            {activeRoll ? (
-              <Dice3D
-                sides={activeRoll.sides}
-                results={activeRoll.results}
-                isRolling={isRolling}
-                rollTrigger={rollTrigger}
-                animationMode="full"
-                height={350}
-                color={0x111111}
-                d6Style="dots"
-                style={{ background: 'transparent' }}
+            <button
+              type="button"
+              disabled={isRolling || !Object.values(diceSelections).some((n) => (n ?? 0) > 0)}
+              onClick={rollSelected}
+              aria-label="Roll selected dice"
+              title="Roll selected dice"
+              className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-btn-primary-bg)] text-[var(--color-btn-primary-text)] hover:bg-[var(--color-btn-primary-hover-bg)] border border-[var(--color-btn-primary-border)] disabled:opacity-40"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+                <path d="M5 3v18l15-9L5 3z" />
+              </svg>
+            </button>
+            {/* Clear selection */}
+            <button
+              type="button"
+              disabled={isRolling || !Object.values(diceSelections).some((n) => (n ?? 0) > 0)}
+              onClick={() => setDiceSelections({})}
+              aria-label="Clear selected dice"
+              title="Clear selection"
+              className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] hover:bg-[var(--color-canvas-subtle)] disabled:opacity-40"
+            >
+              <svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="#e5534b" strokeWidth="2" />
+                <path d="M8 8l8 8M16 8l-8 8" stroke="#e5534b" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+            {/* Modifier input */}
+            <div className="flex items-center gap-1 ml-1">
+              <label htmlFor="sel-modifier" className="text-xs text-[color:var(--color-fg-muted)] shrink-0">Mod</label>
+              <input
+                id="sel-modifier"
+                type="number"
+                min={-100}
+                max={100}
+                value={selectedModifier}
+                onChange={(e) => setSelectedModifier(parseInt(e.target.value) || 0)}
+                className="w-16 h-7 px-2 text-xs rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
               />
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <p className="px-4 text-sm text-center" style={{ color: '#a8d5a2' }}>
-                  Select a die type and click Roll to see the animation.
-                </p>
-              </div>
+            </div>
+            {history.length > 0 && (
+              <button
+                type="button"
+                onClick={clearHistory}
+                className="ml-auto text-xs text-[color:var(--color-fg-muted)] hover:text-[color:var(--color-fg-default)]"
+              >
+                Clear
+              </button>
             )}
           </div>
 
-          {/* Roll history */}
-          <div className="flex-1 min-w-0 rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] overflow-hidden" style={{ height: 350 }}>
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--color-border-default)] bg-[var(--color-canvas-subtle)]">
-              <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]">
-                Roll History
-              </span>
-              {history.length > 0 && (
-                <button
-                  type="button"
-                  onClick={clearHistory}
-                  className="text-xs text-[color:var(--color-fg-muted)] hover:text-[color:var(--color-fg-default)]"
-                >
-                  Clear
-                </button>
+          {/* Animation + history, no gap */}
+          <div className="flex items-stretch" style={{ height: 350 }}>
+            {/* 3D dice display */}
+            <div className="shrink-0 overflow-y-auto flex flex-col" style={{ background: '#2d5a27', width: 500 }}>
+              {activeRoll ? (
+                activeRoll.map((group, i) => {
+                  const groupH = Math.max(120, Math.floor(350 / activeRoll.length));
+                  return (
+                    <div key={i} style={{ height: groupH, flexShrink: 0 }}>
+                      <Dice3D
+                        sides={group.sides}
+                        results={group.results}
+                        isRolling={isRolling}
+                        rollTrigger={rollTrigger}
+                        animationMode="full"
+                        height={groupH}
+                        color={0x111111}
+                        d6Style="dots"
+                        style={{ background: 'transparent' }}
+                      />
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <p className="px-4 text-sm text-center" style={{ color: '#a8d5a2' }}>
+                    Select a die type and click Roll to see the animation.
+                  </p>
+                </div>
               )}
             </div>
-            {history.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-center text-[color:var(--color-fg-muted)]">
-                No rolls yet.
-              </p>
-            ) : (
-              <ul className="divide-y divide-[var(--color-border-default)] overflow-y-auto" style={{ maxHeight: 'calc(350px - 37px)' }}>
-                {history.map((result, index) => (
-                  <li
-                    key={result.id}
-                    className={`flex items-baseline gap-3 px-4 py-3 ${index === 0 ? 'bg-[var(--color-canvas-subtle)]' : ''}`}
-                  >
-                    <span className="text-2xl font-bold tabular-nums text-[color:var(--color-fg-default)] w-12 shrink-0 text-right">
-                      {result.total}
-                    </span>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-medium text-[color:var(--color-fg-default)]">
-                        {result.label}
+
+            {/* Roll history */}
+            <div className="flex-1 min-w-0 border-l border-[var(--color-border-default)] bg-[var(--color-canvas-default)] overflow-hidden flex flex-col">
+              {history.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-center text-[color:var(--color-fg-muted)]">
+                  No rolls yet.
+                </p>
+              ) : (
+                <ul className="divide-y divide-[var(--color-border-default)] overflow-y-auto flex-1">
+                  {history.map((result, index) => (
+                    <li
+                      key={result.id}
+                      className={`flex items-baseline gap-3 px-4 py-3 ${index === 0 ? 'bg-[var(--color-canvas-subtle)]' : ''}`}
+                    >
+                      <span className="text-2xl font-bold tabular-nums text-[color:var(--color-fg-default)] w-12 shrink-0 text-right">
+                        {result.total}
                       </span>
-                      <span className="text-xs text-[color:var(--color-fg-muted)] truncate">
-                        [{result.rolls.join(', ')}]
-                        {result.modifier !== 0 && (
-                          <> {result.modifier > 0 ? '+' : ''}{result.modifier} mod</>
-                        )}
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-medium text-[color:var(--color-fg-default)]">
+                          {result.label}
+                        </span>
+                        <span className="text-xs text-[color:var(--color-fg-muted)] truncate">
+                          [{result.rolls.join(', ')}]
+                          {result.modifier !== 0 && (
+                            <> {result.modifier > 0 ? '+' : ''}{result.modifier} mod</>
+                          )}
+                        </span>
+                      </div>
+                      <span className="ml-auto text-xs text-[color:var(--color-fg-muted)] shrink-0">
+                        {result.timestamp.toLocaleTimeString()}
                       </span>
-                    </div>
-                    <span className="ml-auto text-xs text-[color:var(--color-fg-muted)] shrink-0">
-                      {result.timestamp.toLocaleTimeString()}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
       </div>{/* end dice-roller-main */}
