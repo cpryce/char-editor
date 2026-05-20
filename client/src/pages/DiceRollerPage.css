@@ -160,6 +160,14 @@
   display: none;
 }
 
+/* ── Prevent mobile auto-zoom on typeahead focus ────────────── */
+
+@media (max-width: 639px) {
+  .dice-roller-char-input {
+    font-size: 16px;
+  }
+}
+
 @media (max-width: 639px) {
   .dice-roller-rail {
     position: fixed;
