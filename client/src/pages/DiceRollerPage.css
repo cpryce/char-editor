@@ -1,0 +1,147 @@
+/* ── Page wrapper & header ──────────────────────────────────── */
+
+.dice-roller-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.dice-roller-page-header {
+  display: flex;
+  align-items: center;
+}
+
+.dice-roller-page-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-fg-default);
+  margin: 0;
+}
+
+/* ── Two-column layout ──────────────────────────────────────── */
+
+.dice-roller-body {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.dice-roller-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.dice-roller-rail {
+  width: 260px;
+  flex-shrink: 0;
+}
+
+/* ── Rail sections ──────────────────────────────────────────── */
+
+.dice-roller-rail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.dice-roller-rail-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.dice-roller-rail-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dice-roller-rail-clear-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--color-fg-muted);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.dice-roller-rail-clear-btn:hover {
+  color: var(--color-fg-default);
+  background: var(--color-canvas-subtle);
+}
+
+/* ── Weapon button ──────────────────────────────────────────── */
+
+.dice-roller-weapon-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  font-size: 0.875rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-canvas-default);
+  color: var(--color-fg-default);
+  cursor: pointer;
+  gap: 4px;
+}
+
+.dice-roller-weapon-btn:hover {
+  background: var(--color-canvas-subtle);
+}
+
+.dice-roller-weapon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Character combobox dropdown ────────────────────────────── */
+
+.dice-roller-char-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--color-canvas-overlay);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  max-height: 240px;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.dice-roller-char-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-fg-default);
+}
+
+.dice-roller-char-option:hover {
+  background: var(--color-canvas-subtle);
+}
+
+/* ── Rail weapon summary card ───────────────────────────────── */
+
+.dice-roller-rail-weapon {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-canvas-subtle);
+}

@@ -16,7 +16,9 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-3d-dice": "^0.1.0",
+    "react-dom": "^19.2.5",
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

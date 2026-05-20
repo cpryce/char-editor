@@ -12,6 +12,7 @@ const CampaignsPage = lazy(() => import('./pages/CampaignsPage').then((module) =
 const CampaignEditor = lazy(() => import('./pages/CampaignEditor').then((module) => ({ default: module.CampaignEditor })));
 const CustomClassesPage = lazy(() => import('./pages/CustomClassesPage').then((module) => ({ default: module.CustomClassesPage })));
 const InvitePage = lazy(() => import('./pages/InvitePage').then((module) => ({ default: module.InvitePage })));
+const DiceRollerPage = lazy(() => import('./pages/DiceRollerPage').then((module) => ({ default: module.DiceRollerPage })));
 
 interface User {
   id: string;
@@ -570,6 +571,7 @@ function App() {
       items: [
         { id: 'initiative-tracker', label: 'Initiative Tracker' },
         { id: 'name-generator', label: 'Name Generator' },
+        { id: 'dice-roller', label: 'Dice Roller' },
       ],
     },
     {
@@ -638,6 +640,9 @@ function App() {
             )}
             {section === 'initiative-tracker' && (
               <InitiativeTrackerPage initialSessionId={initiativeSessionId ?? undefined} />
+            )}
+            {section === 'dice-roller' && (
+              <DiceRollerPage />
             )}
             {section === 'name-generator' && (
               <NameGeneratorPage
