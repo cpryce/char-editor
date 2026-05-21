@@ -66,15 +66,12 @@ function nearestDieType(sides: number): DieType {
 }
 
 export function DiceRollerPage() {
-  const [count, setCount] = useState(1);
-  const [selectedDie, setSelectedDie] = useState<DieType>('d20');
-  const [modifier, setModifier] = useState(0);
   const [history, setHistory] = useState<RollResult[]>([]);
   const [activeRoll, setActiveRoll] = useState<{ sides: number; results: number[] }[] | null>(null);
   const [isRolling, setIsRolling] = useState(false);
   const [rollTrigger, setRollTrigger] = useState(0);
   const [diceSelections, setDiceSelections] = useState<Partial<Record<DieType, number>>>({});
-  const [selectedModifier, setSelectedModifier] = useState(0);
+  const [selectedModifier, setSelectedModifier] = useState<number | null>(null);
   const [attackSequence, setAttackSequence] = useState<{ label: string; bonus: number; critical?: { minRoll: number; multiplier: number } }[] | null>(null);
   const [currentAttackIdx, setCurrentAttackIdx] = useState(0);
   const [panelHeight, setPanelHeight] = useState(() => window.innerWidth <= 639 ? 250 : 350);
@@ -159,11 +156,6 @@ export function DiceRollerPage() {
     ].slice(0, 50));
   }, []);
 
-  const roll = useCallback(() => {
-    const die = DICE.find((d) => d.type === selectedDie)!;
-    executeRoll(die.sides, selectedDie, count, modifier);
-  }, [count, selectedDie, modifier, executeRoll]);
-
   function selectDie(dieType: DieType) {
     setDiceSelections((prev) => ({ ...prev, [dieType]: (prev[dieType] ?? 0) + 1 }));
   }
@@ -192,8 +184,9 @@ export function DiceRollerPage() {
     });
 
     const allRolls = groups.flatMap((g) => g.results);
-    const total = allRolls.reduce((a, b) => a + b, 0) + selectedModifier;
-    const modSuffix = selectedModifier !== 0 ? (selectedModifier > 0 ? `+${selectedModifier}` : `${selectedModifier}`) : '';
+    const mod = selectedModifier ?? 0;
+    const total = allRolls.reduce((a, b) => a + b, 0) + mod;
+    const modSuffix = mod !== 0 ? (mod > 0 ? `+${mod}` : `${mod}`) : '';
     const label = entries.map(([die, n]) => `${n}${die}`).join('+') + modSuffix;
 
     setActiveRoll(groups);
@@ -202,7 +195,7 @@ export function DiceRollerPage() {
     setTimeout(() => setIsRolling(false), 800);
 
     setHistory((prev) => [
-      { id: nextId++, label, rolls: allRolls, modifier: selectedModifier, total, timestamp: new Date() },
+      { id: nextId++, label, rolls: allRolls, modifier: mod, total, timestamp: new Date() },
       ...prev,
     ].slice(0, 50));
   }, [diceSelections, selectedModifier]);
@@ -282,6 +275,7 @@ export function DiceRollerPage() {
     setActiveRoll(null);
     setAttackSequence(null);
     setCurrentAttackIdx(0);
+    setSelectedModifier(null);
   }, []);
 
   const [railOpen, setRailOpen] = useState(false);
@@ -346,59 +340,6 @@ export function DiceRollerPage() {
           ) : (
             /* Manual dice controls */
             <div className="flex flex-wrap gap-4 items-end">
-              <div className="flex flex-col gap-1">
-                <label htmlFor="dr-count" className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]">
-                  Number of Dice
-                </label>
-                <input
-                  id="dr-count"
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={count}
-                  onChange={(e) => setCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
-                  className="h-8 px-3 text-sm w-24 rounded-md border border-[var(--color-border-default)] bg-white text-slate-900"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label htmlFor="dr-die" className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]">
-                  Die Type
-                </label>
-                <select
-                  id="dr-die"
-                  value={selectedDie}
-                  onChange={(e) => setSelectedDie(e.target.value as DieType)}
-                  className="h-8 px-3 text-sm rounded-md border border-[var(--color-border-default)] bg-white text-slate-900"
-                >
-                  {DICE.map((d) => (
-                    <option key={d.type} value={d.type}>{d.type}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label htmlFor="dr-modifier" className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]">
-                  Modifier
-                </label>
-                <input
-                  id="dr-modifier"
-                  type="number"
-                  min={-100}
-                  max={100}
-                  value={modifier}
-                  onChange={(e) => setModifier(parseInt(e.target.value) || 0)}
-                  className="h-8 px-3 text-sm w-24 rounded-md border border-[var(--color-border-default)] bg-white text-slate-900"
-                />
-              </div>
-              <div className="flex flex-col justify-end">
-                <button
-                  type="button"
-                  onClick={roll}
-                  disabled={isRolling}
-                  className="h-8 px-4 text-sm font-medium rounded-md bg-[var(--color-btn-primary-bg)] text-[var(--color-btn-primary-text)] hover:bg-[var(--color-btn-primary-hover-bg)] border border-[var(--color-btn-primary-border)] disabled:opacity-50"
-                >
-                  Roll
-                </button>
-              </div>
             </div>
           )}
 
@@ -407,7 +348,7 @@ export function DiceRollerPage() {
         {/* Shared container: spanning header + animation + history */}
         <div className="rounded-md border border-[var(--color-border-default)] overflow-hidden">
           {/* Header spanning both panels */}
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--color-border-default)] bg-[var(--color-canvas-subtle)]">
+          <div className="flex items-center gap-1 sm:gap-2 px-3 py-2 border-b border-[var(--color-border-default)] bg-[var(--color-canvas-subtle)]">
             {DICE.map((d) => (
               <button
                 key={d.type}
@@ -416,7 +357,7 @@ export function DiceRollerPage() {
                 onClick={() => selectDie(d.type)}
                 onContextMenu={(e) => deselectDie(e, d.type)}
                 title="Left-click to add · Right-click to remove"
-                className="relative h-7 px-3 text-xs font-medium rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)] disabled:opacity-50"
+                className="relative h-7 px-1.5 sm:px-3 text-xs font-medium rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)] disabled:opacity-50"
               >
                 {d.type}
                 {(diceSelections[d.type] ?? 0) > 0 && (
@@ -429,7 +370,7 @@ export function DiceRollerPage() {
             <button
               type="button"
               disabled={isRolling || !Object.values(diceSelections).some((n) => (n ?? 0) > 0)}
-              onClick={rollSelected}
+              onClick={() => { rollSelected(); setDiceSelections({}); }}
               aria-label="Roll selected dice"
               title="Roll selected dice"
               className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-btn-primary-bg)] text-[var(--color-btn-primary-text)] hover:bg-[var(--color-btn-primary-hover-bg)] border border-[var(--color-btn-primary-border)] disabled:opacity-40"
@@ -438,33 +379,6 @@ export function DiceRollerPage() {
                 <path d="M5 3v18l15-9L5 3z" />
               </svg>
             </button>
-            {/* Clear selection */}
-            <button
-              type="button"
-              disabled={isRolling || !Object.values(diceSelections).some((n) => (n ?? 0) > 0)}
-              onClick={() => setDiceSelections({})}
-              aria-label="Clear selected dice"
-              title="Clear selection"
-              className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] hover:bg-[var(--color-canvas-subtle)] disabled:opacity-40"
-            >
-              <svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" stroke="#e5534b" strokeWidth="2" />
-                <path d="M8 8l8 8M16 8l-8 8" stroke="#e5534b" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
-            {/* Modifier input */}
-            <div className="flex items-center gap-1 ml-1">
-              <label htmlFor="sel-modifier" className="text-xs text-[color:var(--color-fg-muted)] shrink-0">Mod</label>
-              <input
-                id="sel-modifier"
-                type="number"
-                min={-100}
-                max={100}
-                value={selectedModifier}
-                onChange={(e) => setSelectedModifier(parseInt(e.target.value) || 0)}
-                className="w-16 h-7 px-2 text-xs rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
-              />
-            </div>
             {history.length > 0 && (
               <button
                 type="button"
@@ -477,7 +391,7 @@ export function DiceRollerPage() {
           </div>
 
           {/* Animation + history, no gap */}
-          <div className="dice-roller-body-panels">
+          <div className="dice-roller-body-panels relative">
             {/* 3D dice display */}
             <div className="dice-roller-anim-panel" style={{ background: '#2d5a27' }}>
               {activeRoll ? (
@@ -521,6 +435,23 @@ export function DiceRollerPage() {
                   </svg>
                 </button>
               )}
+            </div>
+
+            {/* Floating modifier input — top-left of animation panel */}
+            <div
+              className="absolute top-0 left-0 z-10 flex items-center gap-1 px-2 py-1 rounded-br-md"
+              style={{ background: 'var(--color-canvas-subtle)' }}
+            >
+              <label htmlFor="sel-modifier" className="text-xs text-[color:var(--color-fg-muted)] shrink-0">+/−</label>
+              <input
+                id="sel-modifier"
+                type="number"
+                min={-100}
+                max={100}
+                value={selectedModifier ?? ''}
+                onChange={(e) => setSelectedModifier(e.target.value === '' ? null : parseInt(e.target.value) || 0)}
+                className="w-14 h-6 px-1.5 text-xs rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
+              />
             </div>
 
             {/* Roll history */}
