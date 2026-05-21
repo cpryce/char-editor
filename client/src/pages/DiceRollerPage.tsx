@@ -271,18 +271,26 @@ export function DiceRollerPage() {
 
   return (
     <div className="dice-roller-page p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <h2 className="dice-roller-page-title">Dice Roller</h2>
-        <button
-          type="button"
-          onClick={() => setRailOpen(true)}
-          aria-label="Open character panel"
-          className="dice-roller-rail-toggle ml-auto items-center justify-center w-8 h-8 rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)]"
-        >
-          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
-            <path d="M12 12c2.66 0 4.8-2.14 4.8-4.8S14.66 2.4 12 2.4 7.2 4.54 7.2 7.2 9.34 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+      {/* Sticky flyout toggle – small view only */}
+      <button
+        type="button"
+        onClick={() => setRailOpen((o) => !o)}
+        aria-label={railOpen ? 'Close character panel' : 'Open character panel'}
+        className="dice-roller-sticky-toggle"
+      >
+        {railOpen ? (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="18" height="18" aria-hidden="true">
+            <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-        </button>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="18" height="18" aria-hidden="true">
+            <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </button>
+
+      <div className="dice-roller-page-header mb-6">
+        <h2 className="dice-roller-page-title">Dice Roller</h2>
       </div>
 
       <div className="dice-roller-body">
