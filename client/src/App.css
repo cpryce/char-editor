@@ -45,7 +45,7 @@
   border: 1px solid var(--color-border-default);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  z-index: 100;
+  z-index: 210;
   overflow: hidden;
 }
 
@@ -82,7 +82,7 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.38);
   border: none;
-  z-index: 120;
+  z-index: 250;
   cursor: pointer;
 }
 

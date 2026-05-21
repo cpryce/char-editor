@@ -184,9 +184,9 @@ export function DiceRollerPage() {
     setTimeout(() => setIsRolling(false), 800);
 
     setHistory((prev) => [
-      { id: nextId++, label, rolls: allRolls, modifier: mod, total, timestamp: new Date() },
       ...prev,
-    ].slice(0, 50));
+      { id: nextId++, label, rolls: allRolls, modifier: mod, total, timestamp: new Date() },
+    ].slice(-50));
   }, [diceSelections, selectedModifier]);
 
   function parseCritical(critical: string): { minRoll: number; multiplier: number } | null {
@@ -229,9 +229,9 @@ export function DiceRollerPage() {
     setRollTrigger((t) => t + 1);
     setTimeout(() => setIsRolling(false), 800);
     setHistory((prev) => [
-      { id: nextId++, label: `${label} save (${sign})`, rolls, modifier: bonus, total, timestamp: new Date() },
       ...prev,
-    ].slice(0, 50));
+      { id: nextId++, label: `${label} save (${sign})`, rolls, modifier: bonus, total, timestamp: new Date() },
+    ].slice(-50));
   }
 
   function advanceAttack() {
@@ -251,11 +251,15 @@ export function DiceRollerPage() {
   }
 
   function confirmCritical(rollId: number) {
+    const confirmD20 = rollDie(20);
+    setActiveRoll([{ sides: 20, results: [confirmD20] }]);
+    setIsRolling(true);
+    setRollTrigger((t) => t + 1);
+    setTimeout(() => setIsRolling(false), 800);
     setHistory((prev) => {
       const idx = prev.findIndex((r) => r.id === rollId);
       if (idx === -1) return prev;
       const original = prev[idx];
-      const confirmD20 = rollDie(20);
       const confirmTotal = confirmD20 + original.modifier;
       const next = [...prev];
       next[idx] = { ...original, confirmRoll: { rolls: [confirmD20], total: confirmTotal } };
@@ -404,7 +408,7 @@ export function DiceRollerPage() {
                 onClick={() => selectDie(d.type)}
                 onContextMenu={(e) => deselectDie(e, d.type)}
                 title="Left-click to add · Right-click to remove"
-                className="relative h-7 px-1.5 sm:px-3 text-xs font-medium rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)] disabled:opacity-50"
+                className="relative h-8 min-w-[43px] px-1.5 sm:px-3 text-m font-medium rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)] disabled:opacity-50"
               >
                 {d.type}
                 {(diceSelections[d.type] ?? 0) > 0 && (
@@ -498,7 +502,7 @@ export function DiceRollerPage() {
                 max={100}
                 value={selectedModifier ?? ''}
                 onChange={(e) => setSelectedModifier(e.target.value === '' ? null : parseInt(e.target.value) || 0)}
-                className="w-14 h-6 px-1.5 text-xs rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
+                className="w-14 h-6 px-1.5 text-m rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
               />
             </div>
 
@@ -510,7 +514,7 @@ export function DiceRollerPage() {
                 </p>
               ) : (
                 <ul className="divide-y divide-[var(--color-border-default)] overflow-y-auto flex-1">
-                  {history.map((result, index) => (
+                  {[...history].reverse().map((result, index) => (
                     <li
                       key={result.id}
                       className={`flex flex-col gap-0.5 px-4 py-1.5 ${index === 0 ? 'bg-[var(--color-canvas-subtle)]' : ''}`}

@@ -249,7 +249,7 @@ body {
   right: 0;
   width: min(420px, 92vw);
   height: 100svh;
-  z-index: 130;
+  z-index: 260;
   background: var(--color-canvas-overlay);
   border-left: 1px solid var(--color-border-default);
   transition: transform 180ms ease, box-shadow 180ms ease;
