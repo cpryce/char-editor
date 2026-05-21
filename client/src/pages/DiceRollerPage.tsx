@@ -61,6 +61,8 @@ export function DiceRollerPage() {
   const [saves, setSaves] = useState<{ fort: number; ref: number; will: number } | null>(null);
   const [mainHandAttackText, setMainHandAttackText] = useState('');
   const [offHandAttackText, setOffHandAttackText] = useState('');
+  const [mainHandMod, setMainHandMod] = useState<number | null>(null);
+  const [offHandMod, setOffHandMod] = useState<number | null>(null);
 
   useEffect(() => {
     function onResize() { setPanelHeight(window.innerWidth <= 639 ? 250 : 350); }
@@ -133,6 +135,8 @@ export function DiceRollerPage() {
     setSaves(null);
     setMainHandAttackText('');
     setOffHandAttackText('');
+    setMainHandMod(null);
+    setOffHandMod(null);
     setAttackSequence(null);
     setCurrentAttackIdx(0);
   }
@@ -199,9 +203,9 @@ export function DiceRollerPage() {
     });
   }
 
-  function startAttackFromText(attackText: string, critical?: { minRoll: number; multiplier: number }) {
+  function startAttackFromText(attackText: string, critical?: { minRoll: number; multiplier: number }, mod?: number) {
     if (!attackText.trim()) return;
-    const attacks = parseAttacks(attackText, critical);
+    const attacks = parseAttacks(attackText, critical).map((a) => ({ ...a, bonus: a.bonus + (mod ?? 0) }));
     if (attacks.length === 0) return;
     const first = attacks[0];
     const rolls = [rollDie(20)];
@@ -271,34 +275,16 @@ export function DiceRollerPage() {
 
   return (
     <div className="dice-roller-page p-6">
-      {/* Sticky flyout toggle – small view only */}
-      <button
-        type="button"
-        onClick={() => setRailOpen((o) => !o)}
-        aria-label={railOpen ? 'Close character panel' : 'Open character panel'}
-        className="dice-roller-sticky-toggle"
-      >
-        {railOpen ? (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="18" height="18" aria-hidden="true">
-            <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="18" height="18" aria-hidden="true">
-            <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
-      </button>
-
       <div className="dice-roller-page-header mb-6">
         <h2 className="dice-roller-page-title">Dice Roller</h2>
       </div>
-
       <div className="dice-roller-body">
       <div className="dice-roller-main">
         {/* Controls */}
-        <div className="rounded-md border p-4 mb-6 bg-[var(--color-canvas-subtle)] border-[var(--color-border-default)]">
+        <div className={`rounded-md border p-4 mb-6 bg-[var(--color-canvas-subtle)] border-[var(--color-border-default)]${selectedChar ? '' : ' hidden'}`}>
             {selectedChar ? (
             <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {weapons?.mainHand && (
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]">
@@ -312,13 +298,28 @@ export function DiceRollerPage() {
                       placeholder="e.g. +8/+3"
                       className="flex-1 h-8 px-2 text-sm font-mono rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
                     />
+                    <input
+                      type="number"
+                      min={-100}
+                      max={100}
+                      value={mainHandMod ?? ''}
+                      onChange={(e) => setMainHandMod(e.target.value === '' ? null : parseInt(e.target.value) || 0)}
+                      placeholder="mod"
+                      title="Attack modifier"
+                      className="w-14 h-8 px-1.5 text-xs rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
+                    />
                     <button
                       type="button"
-                      disabled={isRolling || !mainHandAttackText.trim()}
-                      onClick={() => startAttackFromText(mainHandAttackText, parseCritical(weapons!.mainHand!.critical ?? '') ?? undefined)}
-                      className="dice-roller-weapon-btn"
+                      disabled={isRolling || !mainHandAttackText.trim() || (attackSequence !== null && currentAttackIdx < attackSequence.length - 1)}
+                      onClick={() => startAttackFromText(mainHandAttackText, parseCritical(weapons!.mainHand!.critical ?? '') ?? undefined, mainHandMod ?? 0)}
+                      aria-label="Roll main hand attack sequence"
+                      title="Roll attack sequence"
+                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-0 disabled:opacity-40 cursor-pointer"
+                      style={{ background: '#2d7a3a', color: '#fff' }}
                     >
-                      Attack
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" aria-hidden="true">
+                        <path d="M5 3v18l15-9L5 3z" />
+                      </svg>
                     </button>
                   </div>
                 </div>
@@ -336,17 +337,33 @@ export function DiceRollerPage() {
                       placeholder="e.g. +3"
                       className="flex-1 h-8 px-2 text-sm font-mono rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
                     />
+                    <input
+                      type="number"
+                      min={-100}
+                      max={100}
+                      value={offHandMod ?? ''}
+                      onChange={(e) => setOffHandMod(e.target.value === '' ? null : parseInt(e.target.value) || 0)}
+                      placeholder="mod"
+                      title="Attack modifier"
+                      className="w-14 h-8 px-1.5 text-xs rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
+                    />
                     <button
                       type="button"
-                      disabled={isRolling || !offHandAttackText.trim()}
-                      onClick={() => startAttackFromText(offHandAttackText, parseCritical(weapons!.offHandWeapon!.critical ?? '') ?? undefined)}
-                      className="dice-roller-weapon-btn"
+                      disabled={isRolling || !offHandAttackText.trim() || (attackSequence !== null && currentAttackIdx < attackSequence.length - 1)}
+                      onClick={() => startAttackFromText(offHandAttackText, parseCritical(weapons!.offHandWeapon!.critical ?? '') ?? undefined, offHandMod ?? 0)}
+                      aria-label="Roll off hand attack sequence"
+                      title="Roll attack sequence"
+                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-0 disabled:opacity-40 cursor-pointer"
+                      style={{ background: '#2d7a3a', color: '#fff' }}
                     >
-                      Attack
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" aria-hidden="true">
+                        <path d="M5 3v18l15-9L5 3z" />
+                      </svg>
                     </button>
                   </div>
                 </div>
               )}
+              </div>
               {saves && (
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]">Saving Throws</span>
@@ -458,9 +475,10 @@ export function DiceRollerPage() {
                   disabled={isRolling}
                   aria-label="Next attack"
                   title={`Next: ${attackSequence[currentAttackIdx + 1].label}`}
-                  className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center bg-white/25 hover:bg-white/40 text-white disabled:opacity-50"
+                  className="absolute top-2 right-2 h-8 px-3 rounded-full flex items-center gap-1.5 bg-white/25 hover:bg-white/40 text-white disabled:opacity-50 text-sm font-medium"
                 >
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+                  <span>Continue</span>
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" aria-hidden="true">
                     <path d="M8 5l8 7-8 7V5z" />
                   </svg>
                 </button>
@@ -590,6 +608,24 @@ export function DiceRollerPage() {
 
       {/* Right rail */}
       <aside className={`dice-roller-rail${railOpen ? ' dice-roller-rail--open' : ''}`}>
+        {/* Toggle tab – absolutely positioned on left edge, slides with the rail */}
+        <button
+          type="button"
+          onClick={() => setRailOpen((o) => !o)}
+          aria-label={railOpen ? 'Close character panel' : 'Open character panel'}
+          className="dice-roller-sticky-toggle"
+        >
+          {railOpen ? (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" aria-hidden="true">
+              <path d="M10 5l5 7-5 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" aria-hidden="true">
+              <path d="M14 5l-5 7 5 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </button>
+        <div className="dice-roller-rail-inner">
         <button
           type="button"
           onClick={() => setRailOpen(false)}
@@ -672,6 +708,7 @@ export function DiceRollerPage() {
             <p className="text-xs text-[color:var(--color-fg-muted)] mt-1">Loading weapons…</p>
           )}
         </div>
+        </div>{/* end dice-roller-rail-inner */}
       </aside>
     </div>
     {railOpen && (

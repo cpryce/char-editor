@@ -556,6 +556,15 @@ function App() {
   }
 
   const activeNav = section;
+  const PAGE_LABELS: Record<Section, string> = {
+    'characters': 'Characters',
+    'custom-feats': 'Custom Feats',
+    'custom-classes': 'Custom Classes',
+    'initiative-tracker': 'Initiative Tracker',
+    'dice-roller': 'Dice Roller',
+    'name-generator': 'Name Generator',
+    'campaigns': 'Campaigns',
+  };
   const navGroups: NavGroup[] = [
     {
       label: 'Character Editor',
@@ -615,6 +624,9 @@ function App() {
               items={navGroups[2].items}
             />
           </nav>
+
+          {/* Page title – visible on mobile only where the primary nav is hidden */}
+          <span className="app-topbar-page-title" aria-hidden="true">{PAGE_LABELS[section]}</span>
 
           <UserMenu user={user} onLogout={logout} onOpenSettings={() => setSettingsOpen(true)} />
         </div>
