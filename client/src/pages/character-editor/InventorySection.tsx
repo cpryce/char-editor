@@ -29,6 +29,35 @@ function hasFeat(characterFeats: FeatSlot[], name: string): boolean {
   return characterFeats.some((f) => f.name === name);
 }
 
+/**
+ * Doubles the threat range of a critical string (Improved Critical effect).
+ * e.g. "×2" → "19-20/×2", "19-20/×2" → "17-20/×2", "×3" → "19-20/×3"
+ */
+function doubleThreatRange(critical: string): string {
+  const match = critical.match(/^(?:(\d+)-20\/)?([×x×]\d+)$/);
+  if (!match) return critical;
+  const lowerBound = match[1] ? parseInt(match[1], 10) : 20;
+  const multiplier = match[2];
+  const currentSize = 21 - lowerBound;
+  const newLower = 21 - currentSize * 2;
+  return newLower >= 20 ? multiplier : `${newLower}-20/${multiplier}`;
+}
+
+/**
+ * Halves the threat range of a critical string (removing Improved Critical).
+ * e.g. "19-20/×2" → "×2", "17-20/×2" → "19-20/×2"
+ */
+function halveThreatRange(critical: string): string {
+  const match = critical.match(/^(?:(\d+)-20\/)?([×x×]\d+)$/);
+  if (!match) return critical;
+  const lowerBound = match[1] ? parseInt(match[1], 10) : 20;
+  const multiplier = match[2];
+  const currentSize = 21 - lowerBound;
+  const newSize = Math.max(1, Math.ceil(currentSize / 2));
+  const newLower = 21 - newSize;
+  return newLower >= 20 ? multiplier : `${newLower}-20/${multiplier}`;
+}
+
 function getFighterLevel(classes: ClassEntry[]): number {
   return classes.filter((c) => c.name === 'Fighter').reduce((s, c) => s + c.level, 0);
 }
@@ -42,6 +71,7 @@ function getWeaponFeatOptions(
   weapon: WeaponLoadout | null,
   characterFeats: FeatSlot[],
   fighterLevel: number,
+  bab: number,
 ): FeatOption[] {
   if (!weapon) return [];
   const isRanged = getWeaponAttackClass(weapon.name, weapon.rangeIncrement) === 'Ranged';
@@ -80,6 +110,19 @@ function getWeaponFeatOptions(
     });
   }
 
+  // Improved Critical — doubles the threat range (melee or ranged); BAB +8, proficiency assumed
+  const hasIC = hasFeat(characterFeats, 'Improved Critical');
+  const icBabOk = bab >= 8;
+  options.push({
+    name: 'Improved Critical',
+    available: hasIC && icBabOk,
+    disabledReason: !hasIC
+      ? 'Character does not have Improved Critical'
+      : !icBabOk
+        ? `BAB +8 required (current: +${bab})`
+        : undefined,
+  });
+
   // Rapid Shot handled separately via getRapidShotOption (needs rangerLevel).
 
   return options;
@@ -114,8 +157,9 @@ function getAllWeaponFeatOptions(
   fighterLevel: number,
   rangerLevel: number,
   dexterity: number,
+  bab: number,
 ): FeatOption[] {
-  const base = getWeaponFeatOptions(weapon, characterFeats, fighterLevel);
+  const base = getWeaponFeatOptions(weapon, characterFeats, fighterLevel, bab);
   const rs   = getRapidShotOption(weapon, characterFeats, rangerLevel, dexterity);
   return rs ? [...base, rs] : base;
 }
@@ -367,11 +411,11 @@ export function InventorySection({
 
   const fighterLevel = getFighterLevel(classes);
   const rangerLevel  = getRangerLevel(classes);
-  const mainHandFeatOptions = getAllWeaponFeatOptions(inventory.mainHand, feats, fighterLevel, rangerLevel, dexterity);
-  const offHandFeatOptions  = getAllWeaponFeatOptions(inventory.offHandWeapon, feats, fighterLevel, rangerLevel, dexterity);
+  const mainHandFeatOptions = getAllWeaponFeatOptions(inventory.mainHand, feats, fighterLevel, rangerLevel, dexterity, derivedBaseAttackBonus);
+  const offHandFeatOptions  = getAllWeaponFeatOptions(inventory.offHandWeapon, feats, fighterLevel, rangerLevel, dexterity, derivedBaseAttackBonus);
   const backupWeapons = inventory.backupWeapons ?? [];
   const backupWeaponFeatOptions = backupWeapons.map((slot) =>
-    getAllWeaponFeatOptions(slot.weapon, feats, fighterLevel, rangerLevel, dexterity),
+    getAllWeaponFeatOptions(slot.weapon, feats, fighterLevel, rangerLevel, dexterity, derivedBaseAttackBonus),
   );
   const twfFeatOptions = getTwfFeatOptions({ characterFeats: feats, bab: derivedBaseAttackBonus, rangerLevel, twfApplied: twfFeatApplied, itwfApplied, dexterity });
 
@@ -680,10 +724,14 @@ export function InventorySection({
     const weapon = backupWeapons[index]?.weapon;
     if (!weapon) return;
     const cur = weapon.appliedFeats ?? [];
-    const next = cur.includes(featName) ? cur.filter((f) => f !== featName) : [...cur, featName];
+    const isApplied = cur.includes(featName);
+    const next = isApplied ? cur.filter((f) => f !== featName) : [...cur, featName];
+    const updatedCritical = featName === 'Improved Critical'
+      ? (isApplied ? halveThreatRange(weapon.critical ?? '') : doubleThreatRange(weapon.critical ?? ''))
+      : weapon.critical;
     updateInventory({
       backupWeapons: backupWeapons.map((slot, idx) => (
-        idx === index ? { ...slot, weapon: { ...weapon, appliedFeats: next } } : slot
+        idx === index ? { ...slot, weapon: { ...weapon, appliedFeats: next, critical: updatedCritical } } : slot
       )),
     });
   }
@@ -762,15 +810,23 @@ export function InventorySection({
   function toggleMainHandFeat(featName: string) {
     if (!inventory.mainHand) return;
     const cur = inventory.mainHand.appliedFeats ?? [];
-    const next = cur.includes(featName) ? cur.filter((f) => f !== featName) : [...cur, featName];
-    updateInventory({ mainHand: { ...inventory.mainHand, appliedFeats: next } });
+    const isApplied = cur.includes(featName);
+    const next = isApplied ? cur.filter((f) => f !== featName) : [...cur, featName];
+    const updatedCritical = featName === 'Improved Critical'
+      ? (isApplied ? halveThreatRange(inventory.mainHand.critical ?? '') : doubleThreatRange(inventory.mainHand.critical ?? ''))
+      : inventory.mainHand.critical;
+    updateInventory({ mainHand: { ...inventory.mainHand, appliedFeats: next, critical: updatedCritical } });
   }
 
   function toggleOffHandFeat(featName: string) {
     if (!inventory.offHandWeapon) return;
     const cur = inventory.offHandWeapon.appliedFeats ?? [];
-    const next = cur.includes(featName) ? cur.filter((f) => f !== featName) : [...cur, featName];
-    updateInventory({ offHandWeapon: { ...inventory.offHandWeapon, appliedFeats: next } });
+    const isApplied = cur.includes(featName);
+    const next = isApplied ? cur.filter((f) => f !== featName) : [...cur, featName];
+    const updatedCritical = featName === 'Improved Critical'
+      ? (isApplied ? halveThreatRange(inventory.offHandWeapon.critical ?? '') : doubleThreatRange(inventory.offHandWeapon.critical ?? ''))
+      : inventory.offHandWeapon.critical;
+    updateInventory({ offHandWeapon: { ...inventory.offHandWeapon, appliedFeats: next, critical: updatedCritical } });
   }
 
   function toggleTwfFeat(featName: string) {

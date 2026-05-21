@@ -34,6 +34,7 @@ interface RollResult {
   total: number;
   timestamp: Date;
   critMultiplier?: number;
+  confirmRoll?: { rolls: number[]; total: number };
 }
 
 let nextId = 1;
@@ -261,6 +262,19 @@ export function DiceRollerPage() {
     setRollTrigger((t) => t + 1);
     setTimeout(() => setIsRolling(false), 800);
     setHistory((prev) => [...prev, { id: nextId++, label: attack.label, rolls, modifier: attack.bonus, total, critMultiplier, timestamp: new Date() }]);
+  }
+
+  function confirmCritical(rollId: number) {
+    setHistory((prev) => {
+      const idx = prev.findIndex((r) => r.id === rollId);
+      if (idx === -1) return prev;
+      const original = prev[idx];
+      const confirmD20 = rollDie(20);
+      const confirmTotal = confirmD20 + original.modifier;
+      const next = [...prev];
+      next[idx] = { ...original, confirmRoll: { rolls: [confirmD20], total: confirmTotal } };
+      return next;
+    });
   }
 
   const clearHistory = useCallback(() => {
@@ -520,34 +534,90 @@ export function DiceRollerPage() {
                   {history.map((result, index) => (
                     <li
                       key={result.id}
-                      className={`flex items-baseline gap-3 px-4 py-1.5 ${index === 0 ? 'bg-[var(--color-canvas-subtle)]' : ''}`}
+                      className={`flex flex-col gap-0.5 px-4 py-1.5 ${index === 0 ? 'bg-[var(--color-canvas-subtle)]' : ''}`}
                     >
-                      <span className="text-xl font-bold tabular-nums text-[color:var(--color-fg-default)] w-10 shrink-0 text-right">
-                        {result.total}
-                      </span>
-                      {result.critMultiplier && (
-                        <span
-                          className="self-center w-6 h-6 rounded-full border flex items-center justify-center text-[10px] font-bold shrink-0"
-                          style={{ color: 'var(--color-fg-accent)', borderColor: 'var(--color-fg-accent)' }}
-                          title="Critical threat!"
-                        >
-                          ×{result.critMultiplier}
+                      <div className="flex items-baseline gap-3">
+                        <span className="text-xl font-bold tabular-nums text-[color:var(--color-fg-default)] w-10 shrink-0 text-right">
+                          {result.total}
                         </span>
-                      )}
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-sm font-medium text-[color:var(--color-fg-default)]">
-                          {result.label}
-                        </span>
-                        <span className="text-xs text-[color:var(--color-fg-muted)] truncate">
-                          [{result.rolls.join(', ')}]
-                          {result.modifier !== 0 && (
-                            <> {result.modifier > 0 ? '+' : ''}{result.modifier} mod</>
+                        {result.critMultiplier && (
+                          <span
+                            className="self-center w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold shrink-0"
+                            style={{ color: 'var(--color-attention-fg)', borderColor: 'var(--color-attention-fg)' }}
+                            title="Critical threat!"
+                          >
+                            ×{result.critMultiplier}
+                          </span>
+                        )}
+                        {!result.critMultiplier && result.rolls.length === 1 && result.rolls[0] === 1 && (
+                          <span
+                            className="self-center w-7 h-7 flex items-center justify-center shrink-0"
+                            style={{ color: 'var(--color-attention-fg)' }}
+                            title="Fumble!"
+                          >
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true">
+                              <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+                            </svg>
+                          </span>
+                        )}
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-medium text-[color:var(--color-fg-default)]">
+                            {result.label}
+                          </span>
+                          <span className="text-xs text-[color:var(--color-fg-muted)] truncate">
+                            [{result.rolls.join(', ')}]
+                            {result.modifier !== 0 && (
+                              <> {result.modifier > 0 ? '+' : ''}{result.modifier} mod</>
+                            )}
+                          </span>
+                        </div>
+                        <div className="ml-auto flex items-center gap-2 shrink-0">
+                          {result.critMultiplier && !result.confirmRoll && (
+                            <button
+                              type="button"
+                              onClick={() => confirmCritical(result.id)}
+                              aria-label="Roll to confirm critical"
+                              title="Roll to confirm critical"
+                              className="w-6 h-6 rounded-full flex items-center justify-center border"
+                              style={{ color: 'var(--color-fg-accent)', borderColor: 'var(--color-fg-accent)' }}
+                            >
+                              <svg viewBox="0 0 24 24" fill="currentColor" width="10" height="10" aria-hidden="true">
+                                <path d="M5 3v18l15-9L5 3z" />
+                              </svg>
+                            </button>
                           )}
-                        </span>
+                          <span className="text-xs text-[color:var(--color-fg-muted)]">
+                            {result.timestamp.toLocaleTimeString()}
+                          </span>
+                        </div>
                       </div>
-                      <span className="ml-auto text-xs text-[color:var(--color-fg-muted)] shrink-0">
-                        {result.timestamp.toLocaleTimeString()}
-                      </span>
+                      {result.confirmRoll && (
+                        <div className="flex items-baseline gap-3 pl-2 border-l-2" style={{ borderColor: 'var(--color-fg-accent)' }}>
+                          <span className="text-lg font-bold tabular-nums w-10 shrink-0 text-right" style={{ color: 'var(--color-fg-accent)' }}>
+                            {result.confirmRoll.total}
+                          </span>
+                          {result.confirmRoll.rolls[0] === 1 && (
+                            <span
+                              className="self-center w-7 h-7 flex items-center justify-center shrink-0"
+                              style={{ color: 'var(--color-attention-fg)' }}
+                              title="Fumble!"
+                            >
+                              <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true">
+                                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+                              </svg>
+                            </span>
+                          )}
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-medium" style={{ color: 'var(--color-fg-accent)' }}>Confirm critical</span>
+                            <span className="text-xs" style={{ color: 'var(--color-fg-accent)', opacity: 0.8 }}>
+                              [{result.confirmRoll.rolls.join(', ')}]
+                              {result.modifier !== 0 && (
+                                <> {result.modifier > 0 ? '+' : ''}{result.modifier} mod</>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
