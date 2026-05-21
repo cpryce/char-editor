@@ -43,26 +43,9 @@ function rollDie(sides: number): number {
   return Math.floor(Math.random() * sides) + 1;
 }
 
-/** Parse a damage string like "2d6+3" or "1d8" or "1d4-1" into parts. */
-function parseDamage(damage: string): { count: number; sides: number; mod: number } | null {
-  const m = damage.trim().match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-  if (!m) return null;
-  return {
-    count: parseInt(m[1]),
-    sides: parseInt(m[2]),
-    mod: m[3] ? parseInt(m[3]) : 0,
-  };
-}
-
-/** Return the DieType matching sides, or the nearest supported one. */
-function nearestDieType(sides: number): DieType {
-  const supported: DieType[] = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
-  const nums = [4, 6, 8, 10, 12, 20];
-  let closest = 0;
-  for (let i = 1; i < nums.length; i++) {
-    if (Math.abs(nums[i] - sides) < Math.abs(nums[closest] - sides)) closest = i;
-  }
-  return supported[closest];
+function computeAbilityMod(score: { base: number; racial: number; enhancement: number; misc: number; tempMod: number | null; levelUp: number; temp: number | null }): number {
+  const total = score.temp ?? (score.base + score.racial + score.enhancement + score.misc + (score.tempMod ?? 0) + score.levelUp);
+  return Math.floor((total - 10) / 2);
 }
 
 export function DiceRollerPage() {
@@ -75,6 +58,9 @@ export function DiceRollerPage() {
   const [attackSequence, setAttackSequence] = useState<{ label: string; bonus: number; critical?: { minRoll: number; multiplier: number } }[] | null>(null);
   const [currentAttackIdx, setCurrentAttackIdx] = useState(0);
   const [panelHeight, setPanelHeight] = useState(() => window.innerWidth <= 639 ? 250 : 350);
+  const [saves, setSaves] = useState<{ fort: number; ref: number; will: number } | null>(null);
+  const [mainHandAttackText, setMainHandAttackText] = useState('');
+  const [offHandAttackText, setOffHandAttackText] = useState('');
 
   useEffect(() => {
     function onResize() { setPanelHeight(window.innerWidth <= 639 ? 250 : 350); }
@@ -124,6 +110,18 @@ export function DiceRollerPage() {
           mainHand: inv?.mainHand ?? null,
           offHandWeapon: inv?.offHandWeapon ?? null,
         });
+        setMainHandAttackText(inv?.mainHand?.computedAttack ?? '');
+        setOffHandAttackText(inv?.offHandWeapon?.computedAttack ?? '');
+        const combat = data.combat as { saves?: { fortitude: { base: number; magic: number; misc: number; temp: number }; reflex: { base: number; magic: number; misc: number; temp: number }; will: { base: number; magic: number; misc: number; temp: number } } } | undefined;
+        const abilityScores = data.abilityScores as { constitution: { base: number; racial: number; enhancement: number; misc: number; tempMod: number | null; levelUp: number; temp: number | null }; dexterity: { base: number; racial: number; enhancement: number; misc: number; tempMod: number | null; levelUp: number; temp: number | null }; wisdom: { base: number; racial: number; enhancement: number; misc: number; tempMod: number | null; levelUp: number; temp: number | null } } | undefined;
+        if (combat?.saves && abilityScores) {
+          const s = combat.saves;
+          setSaves({
+            fort: s.fortitude.base + s.fortitude.magic + s.fortitude.misc + s.fortitude.temp + computeAbilityMod(abilityScores.constitution),
+            ref: s.reflex.base + s.reflex.magic + s.reflex.misc + s.reflex.temp + computeAbilityMod(abilityScores.dexterity),
+            will: s.will.base + s.will.magic + s.will.misc + s.will.temp + computeAbilityMod(abilityScores.wisdom),
+          });
+        }
       })
       .catch(() => {});
   }
@@ -132,6 +130,9 @@ export function DiceRollerPage() {
     setSelectedChar(null);
     setCharInput('');
     setWeapons(null);
+    setSaves(null);
+    setMainHandAttackText('');
+    setOffHandAttackText('');
     setAttackSequence(null);
     setCurrentAttackIdx(0);
   }
@@ -139,22 +140,6 @@ export function DiceRollerPage() {
   const filteredChars = charInput.trim().length > 0
     ? characters.filter((c) => c.name.toLowerCase().includes(charInput.toLowerCase()))
     : characters;
-
-  const executeRoll = useCallback((sides: number, dieType: DieType, numDice: number, mod: number) => {
-    const rolls = Array.from({ length: numDice }, () => rollDie(sides));
-    const total = rolls.reduce((a, b) => a + b, 0) + mod;
-    const label = `${numDice}${dieType}${mod !== 0 ? (mod > 0 ? `+${mod}` : `${mod}`) : ''}`;
-
-    setActiveRoll([{ sides, results: rolls }]);
-    setIsRolling(true);
-    setRollTrigger((t) => t + 1);
-    setTimeout(() => setIsRolling(false), 800);
-
-    setHistory((prev) => [
-      { id: nextId++, label, rolls, modifier: mod, total, timestamp: new Date() },
-      ...prev,
-    ].slice(0, 50));
-  }, []);
 
   function selectDie(dieType: DieType) {
     setDiceSelections((prev) => ({ ...prev, [dieType]: (prev[dieType] ?? 0) + 1 }));
@@ -200,14 +185,6 @@ export function DiceRollerPage() {
     ].slice(0, 50));
   }, [diceSelections, selectedModifier]);
 
-  function rollWeapon(weapon: WeaponLoadout) {
-    const parsed = parseDamage(weapon.damage);
-    if (!parsed) return;
-    const dieType = nearestDieType(parsed.sides);
-    const totalMod = parsed.mod + (weapon.enhancementBonus ?? 0) + (weapon.combatMod ?? 0);
-    executeRoll(parsed.sides, dieType, parsed.count, totalMod);
-  }
-
   function parseCritical(critical: string): { minRoll: number; multiplier: number } | null {
     const m = critical.trim().match(/^(\d+)(?:-\d+)?\s*\/\s*[\u00D7xX](\d+)/);
     if (!m) return null;
@@ -222,11 +199,9 @@ export function DiceRollerPage() {
     });
   }
 
-  function startAttackSequence() {
-    const computedAttack = weapons?.mainHand?.computedAttack;
-    if (!computedAttack) return;
-    const critical = parseCritical(weapons?.mainHand?.critical ?? '') ?? undefined;
-    const attacks = parseAttacks(computedAttack, critical);
+  function startAttackFromText(attackText: string, critical?: { minRoll: number; multiplier: number }) {
+    if (!attackText.trim()) return;
+    const attacks = parseAttacks(attackText, critical);
     if (attacks.length === 0) return;
     const first = attacks[0];
     const rolls = [rollDie(20)];
@@ -239,6 +214,20 @@ export function DiceRollerPage() {
     setRollTrigger((t) => t + 1);
     setTimeout(() => setIsRolling(false), 800);
     setHistory([{ id: nextId++, label: first.label, rolls, modifier: first.bonus, total, critMultiplier, timestamp: new Date() }]);
+  }
+
+  function rollSave(label: string, bonus: number) {
+    const rolls = [rollDie(20)];
+    const total = rolls[0] + bonus;
+    const sign = bonus >= 0 ? `+${bonus}` : `${bonus}`;
+    setActiveRoll([{ sides: 20, results: rolls }]);
+    setIsRolling(true);
+    setRollTrigger((t) => t + 1);
+    setTimeout(() => setIsRolling(false), 800);
+    setHistory((prev) => [
+      { id: nextId++, label: `${label} save (${sign})`, rolls, modifier: bonus, total, timestamp: new Date() },
+      ...prev,
+    ].slice(0, 50));
   }
 
   function advanceAttack() {
@@ -279,7 +268,6 @@ export function DiceRollerPage() {
   }, []);
 
   const [railOpen, setRailOpen] = useState(false);
-  const hasWeapons = weapons && (weapons.mainHand || weapons.offHandWeapon);
 
   return (
     <div className="dice-roller-page p-6">
@@ -301,41 +289,76 @@ export function DiceRollerPage() {
       <div className="dice-roller-main">
         {/* Controls */}
         <div className="rounded-md border p-4 mb-6 bg-[var(--color-canvas-subtle)] border-[var(--color-border-default)]">
-          {hasWeapons ? (
-            /* Weapon roll buttons */
-            <div className="flex flex-wrap gap-3">
-              {weapons!.mainHand && (
+            {selectedChar ? (
+            <div className="flex flex-col gap-4">
+              {weapons?.mainHand && (
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]">
-                    Main Hand
+                    Main Hand · {weapons.mainHand.name} ({weapons.mainHand.damage})
                   </span>
-                  <button
-                    type="button"
-                    disabled={isRolling}
-                    onClick={() => rollWeapon(weapons!.mainHand!)}
-                    className="dice-roller-weapon-btn"
-                  >
-                    <span className="font-medium">{weapons!.mainHand.name}</span>
-                    <span className="text-xs opacity-70 ml-1">({weapons!.mainHand.damage})</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={mainHandAttackText}
+                      onChange={(e) => setMainHandAttackText(e.target.value)}
+                      placeholder="e.g. +8/+3"
+                      className="flex-1 h-8 px-2 text-sm font-mono rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
+                    />
+                    <button
+                      type="button"
+                      disabled={isRolling || !mainHandAttackText.trim()}
+                      onClick={() => startAttackFromText(mainHandAttackText, parseCritical(weapons!.mainHand!.critical ?? '') ?? undefined)}
+                      className="dice-roller-weapon-btn"
+                    >
+                      Attack
+                    </button>
+                  </div>
                 </div>
               )}
-              {weapons!.offHandWeapon && (
+              {weapons?.offHandWeapon && (
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]">
-                    Off Hand
+                    Off Hand · {weapons.offHandWeapon.name} ({weapons.offHandWeapon.damage})
                   </span>
-                  <button
-                    type="button"
-                    disabled={isRolling}
-                    onClick={() => rollWeapon(weapons!.offHandWeapon!)}
-                    className="dice-roller-weapon-btn"
-                  >
-                    <span className="font-medium">{weapons!.offHandWeapon.name}</span>
-                    <span className="text-xs opacity-70 ml-1">({weapons!.offHandWeapon.damage})</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={offHandAttackText}
+                      onChange={(e) => setOffHandAttackText(e.target.value)}
+                      placeholder="e.g. +3"
+                      className="flex-1 h-8 px-2 text-sm font-mono rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
+                    />
+                    <button
+                      type="button"
+                      disabled={isRolling || !offHandAttackText.trim()}
+                      onClick={() => startAttackFromText(offHandAttackText, parseCritical(weapons!.offHandWeapon!.critical ?? '') ?? undefined)}
+                      className="dice-roller-weapon-btn"
+                    >
+                      Attack
+                    </button>
+                  </div>
                 </div>
               )}
+              {saves && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]">Saving Throws</span>
+                  <div className="flex gap-2">
+                    {([['Fortitude', saves.fort], ['Reflex', saves.ref], ['Will', saves.will]] as [string, number][]).map(([name, bonus]) => (
+                      <button
+                        key={name}
+                        type="button"
+                        disabled={isRolling}
+                        onClick={() => rollSave(name, bonus)}
+                        className="dice-roller-weapon-btn flex flex-col items-center gap-0.5"
+                      >
+                        <span className="font-medium">{name}</span>
+                        <span className="text-xs opacity-70">{bonus >= 0 ? `+${bonus}` : `${bonus}`}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!weapons && <p className="text-xs text-[color:var(--color-fg-muted)]">Loading character data…</p>}
             </div>
           ) : (
             /* Manual dice controls */
@@ -623,20 +646,7 @@ export function DiceRollerPage() {
                   <span className="text-sm text-[color:var(--color-fg-default)]">{weapons.mainHand.name}</span>
                   <span className="text-xs text-[color:var(--color-fg-muted)]">{weapons.mainHand.damage} · {weapons.mainHand.damageType}</span>
                   {weapons.mainHand.computedAttack && (
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs font-mono text-[color:var(--color-fg-default)]">{weapons.mainHand.computedAttack}</span>
-                      <button
-                        type="button"
-                        onClick={startAttackSequence}
-                        aria-label="Roll attack sequence"
-                        title="Roll attack sequence"
-                        className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-btn-primary-bg)] text-[var(--color-btn-primary-text)] hover:bg-[var(--color-btn-primary-hover-bg)]"
-                      >
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="8" height="8" aria-hidden="true">
-                          <path d="M5 3v18l15-9L5 3z" />
-                        </svg>
-                      </button>
-                    </div>
+                    <span className="text-xs font-mono text-[color:var(--color-fg-default)] mt-1">{weapons.mainHand.computedAttack}</span>
                   )}
                 </div>
               ) : (
