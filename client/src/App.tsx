@@ -64,7 +64,12 @@ function UserMenu({ user, onLogout, onOpenSettings }: { user: User; onLogout: ()
             {fallbackInitial}
           </span>
         )}
-        <span className="text-xs app-user-menu-caret">▾</span>
+        <svg
+          width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true"
+          className={['nav-dropdown-chevron', open ? 'nav-dropdown-chevron--open' : ''].join(' ')}
+        >
+          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
 
       {open && (
