@@ -343,16 +343,15 @@ export function DiceRollerPage() {
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-fg-muted)]">Saving Throws</span>
                   <div className="flex gap-2">
-                    {([['Fortitude', saves.fort], ['Reflex', saves.ref], ['Will', saves.will]] as [string, number][]).map(([name, bonus]) => (
+                    {([['Fortitude', 'Fort', saves.fort], ['Reflex', 'Ref', saves.ref], ['Will', 'Will', saves.will]] as [string, string, number][]).map(([name, abbr, bonus]) => (
                       <button
                         key={name}
                         type="button"
                         disabled={isRolling}
                         onClick={() => rollSave(name, bonus)}
-                        className="dice-roller-weapon-btn flex flex-col items-center gap-0.5"
+                        className="dice-roller-weapon-btn"
                       >
-                        <span className="font-medium">{name}</span>
-                        <span className="text-xs opacity-70">{bonus >= 0 ? `+${bonus}` : `${bonus}`}</span>
+                        <span className="font-medium">{abbr}: {bonus >= 0 ? `+${bonus}` : `${bonus}`}</span>
                       </button>
                     ))}
                   </div>
