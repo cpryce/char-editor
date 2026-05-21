@@ -3,6 +3,7 @@
 .dice-roller-page {
   display: flex;
   flex-direction: column;
+  padding-bottom: 64px;
 }
 
 .dice-roller-page-header {

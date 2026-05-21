@@ -103,6 +103,9 @@ export function DiceRollerPage() {
     setWeapons(null);
     setAttackSequence(null);
     setCurrentAttackIdx(0);
+    setHistory([]);
+    setDiceSelections({});
+    setSelectedModifier(null);
     fetch(`/api/characters/${char._id}`, { credentials: 'include' })
       .then((r) => r.ok ? r.json() as Promise<Record<string, unknown>> : Promise.resolve(null))
       .then((data) => {
@@ -408,7 +411,7 @@ export function DiceRollerPage() {
                 onClick={() => selectDie(d.type)}
                 onContextMenu={(e) => deselectDie(e, d.type)}
                 title="Left-click to add · Right-click to remove"
-                className="relative h-8 min-w-[43px] px-1.5 sm:px-3 text-m font-medium rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)] disabled:opacity-50"
+                className="relative h-8 min-w-[38px] px-1.5 sm:px-3 text-m font-medium rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)] disabled:opacity-50"
               >
                 {d.type}
                 {(diceSelections[d.type] ?? 0) > 0 && (
@@ -704,6 +707,9 @@ export function DiceRollerPage() {
                   <span className="dice-roller-rail-field-label">Off Hand</span>
                   <span className="text-sm text-[color:var(--color-fg-default)]">{weapons.offHandWeapon.name}</span>
                   <span className="text-xs text-[color:var(--color-fg-muted)]">{weapons.offHandWeapon.damage} · {weapons.offHandWeapon.damageType}</span>
+                  {weapons.offHandWeapon.computedAttack && (
+                    <span className="text-xs font-mono text-[color:var(--color-fg-default)] mt-1">{weapons.offHandWeapon.computedAttack}</span>
+                  )}
                 </div>
               )}
             </div>
