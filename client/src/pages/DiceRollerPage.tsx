@@ -392,7 +392,7 @@ export function DiceRollerPage() {
             <button
               type="button"
               disabled={isRolling || !Object.values(diceSelections).some((n) => (n ?? 0) > 0)}
-              onClick={() => { rollSelected(); setDiceSelections({}); }}
+              onClick={() => { rollSelected(); }}
               aria-label="Roll selected dice"
               title="Roll selected dice"
               className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-btn-primary-bg)] text-[var(--color-btn-primary-text)] hover:bg-[var(--color-btn-primary-hover-bg)] border border-[var(--color-btn-primary-border)] disabled:opacity-40"
@@ -401,10 +401,10 @@ export function DiceRollerPage() {
                 <path d="M5 3v18l15-9L5 3z" />
               </svg>
             </button>
-            {history.length > 0 && (
+            {(history.length > 0 || Object.values(diceSelections).some((n) => (n ?? 0) > 0)) && (
               <button
                 type="button"
-                onClick={clearHistory}
+                onClick={() => { clearHistory(); setDiceSelections({}); }}
                 className="ml-auto text-xs text-[color:var(--color-fg-muted)] hover:text-[color:var(--color-fg-default)]"
               >
                 Clear
