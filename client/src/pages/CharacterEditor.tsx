@@ -1459,7 +1459,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
       )}
 
       {!loadingCharacter && !isDelegated && delegatedTo && (
-        <p className="text-sm px-3 py-2 rounded bg-[var(--color-accent-subtle)] text-[color:var(--color-accent-fg)] border border-[var(--color-accent-muted)]">
+        <p className="text-sm px-3 py-2 mb-4 rounded bg-[var(--color-attention-subtle)] text-[color:var(--color-attention-fg)] border border-[var(--color-attention-muted)]">
           A delegate has access to this character. Your edits are locked for them while you are here.
         </p>
       )}
