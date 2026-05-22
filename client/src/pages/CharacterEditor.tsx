@@ -1454,13 +1454,13 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
 
       {!loadingCharacter && isDelegated && delegateLocked && (
         <p className="text-sm px-3 py-2 rounded bg-[var(--color-danger-subtle)] text-[color:var(--color-danger-fg)] border border-[var(--color-danger-muted)]">
-          The owner is currently editing this character. Your latest changes were not saved.
+          The owner is currently editing this character. Your latest changes will not be saved.
         </p>
       )}
 
       {!loadingCharacter && !isDelegated && delegatedTo && (
         <p className="text-sm px-3 py-2 mb-4 rounded bg-[var(--color-attention-subtle)] text-[color:var(--color-attention-fg)] border border-[var(--color-attention-muted)]">
-          A delegate has access to this character. Your edits are locked for them while you are here.
+          You are editing an delegated character. The owner is prevented from making changes while you in this edit session.
         </p>
       )}
 
