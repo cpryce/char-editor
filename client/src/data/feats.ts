@@ -30,6 +30,8 @@ export interface FeatCatalogEntry {
    * (each time applying to a different weapon, school, skill, etc.).
    */
   repeatable?: true;
+  /** Feat names (SRD or custom) that must be taken before this feat. */
+  prerequisiteFeats?: readonly string[];
 }
 
 // ── Catalog ───────────────────────────────────────────────────────────────────

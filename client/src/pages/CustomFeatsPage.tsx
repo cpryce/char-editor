@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
-import type { CustomFeat } from '../types/customFeat';
+import { useEffect, useRef, useState } from 'react';
+import type { CustomFeat, FeatModifier, FeatModifierTarget, WeaponScope } from '../types/customFeat';
 import type { FeatCategory } from '../components/FeatAutocomplete';
 import { CLASSES } from '../types/character';
+import { ALL_FEATS } from '../data/feats';
 import './CustomFeatsPage.css';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -12,6 +13,19 @@ const FEAT_CATEGORIES: FeatCategory[] = [
   'Item Creation',
   'Metamagic',
   'Special',
+];
+
+const MODIFIER_TARGET_LABELS: Record<FeatModifierTarget, string> = {
+  'weapon-attack': 'Weapon Attack',
+  'weapon-damage': 'Weapon Damage',
+  'ac': 'Armor Class',
+  'save-fort': 'Save: Fortitude',
+  'save-ref': 'Save: Reflex',
+  'save-will': 'Save: Will',
+};
+
+const MODIFIER_TARGETS: FeatModifierTarget[] = [
+  'weapon-attack', 'weapon-damage', 'ac', 'save-fort', 'save-ref', 'save-will',
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -39,6 +53,8 @@ function blankDraft(): FeatDraft {
     fullDescription: '',
     featTypes: ['General'],
     prerequisites: '',
+    prerequisiteFeats: [],
+    modifiers: [],
     repeatable: false,
     classRestrictions: [],
   };
@@ -50,6 +66,8 @@ interface FeatDraft {
   fullDescription: string;
   featTypes: FeatCategory[];
   prerequisites: string;
+  prerequisiteFeats: string[];
+  modifiers: FeatModifier[];
   repeatable: boolean;
   classRestrictions: string[];
 }
@@ -98,6 +116,173 @@ function DeleteConfirmModal({
         </div>
       </div>
     </>
+  );
+}
+
+// ── PrerequisiteFeatsField ────────────────────────────────────────────────────
+
+const ALL_FEAT_NAMES = Array.from(
+  new Set(ALL_FEATS.map((f) => f.name)),
+).sort((a, b) => a.localeCompare(b));
+
+function PrerequisiteFeatsField({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const [inputValue, setInputValue] = useState('');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function updateSuggestions(text: string) {
+    const q = text.trim().toLowerCase();
+    if (!q) { setSuggestions([]); return; }
+    setSuggestions(
+      ALL_FEAT_NAMES.filter((n) => n.toLowerCase().includes(q) && !value.includes(n)).slice(0, 8),
+    );
+  }
+
+  function addFeat(name: string) {
+    const trimmed = name.trim();
+    if (trimmed && !value.includes(trimmed)) onChange([...value, trimmed]);
+    setInputValue('');
+    setSuggestions([]);
+  }
+
+  function removeFeat(name: string) {
+    onChange(value.filter((v) => v !== name));
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') { e.preventDefault(); addFeat(inputValue); }
+    if (e.key === 'Backspace' && !inputValue && value.length > 0) {
+      removeFeat(value[value.length - 1]);
+    }
+  }
+
+  return (
+    <div>
+      <span className="cf-field-label">Prerequisite Feats</span>
+      <p className="text-xs mb-2 text-[color:var(--color-fg-muted)]">
+        Feats that must be selected before this feat can be chosen. Type a name and press Enter.
+      </p>
+      <div className="cf-prereq-tag-field" onClick={() => inputRef.current?.focus()}>
+        {value.map((name) => (
+          <span key={name} className="cf-prereq-tag">
+            {name}
+            <button type="button" onClick={() => removeFeat(name)} aria-label={`Remove ${name}`} className="cf-prereq-tag-remove">×</button>
+          </span>
+        ))}
+        <div className="relative flex-1 min-w-[140px]">
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={(e) => { setInputValue(e.target.value); updateSuggestions(e.target.value); }}
+            onKeyDown={handleKeyDown}
+            onBlur={() => setTimeout(() => setSuggestions([]), 150)}
+            placeholder={value.length === 0 ? 'e.g. Weapon Focus' : ''}
+            className="cf-prereq-input"
+          />
+          {suggestions.length > 0 && (
+            <ul className="cf-prereq-suggestions">
+              {suggestions.map((s) => (
+                <li key={s}>
+                  <button type="button" onMouseDown={() => addFeat(s)} className="cf-prereq-suggestion-item">{s}</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ModifiersField ────────────────────────────────────────────────────────────
+
+function ModifiersField({
+  value,
+  onChange,
+}: {
+  value: FeatModifier[];
+  onChange: (v: FeatModifier[]) => void;
+}) {
+  function addModifier() {
+    onChange([...value, { target: 'weapon-attack', value: 1, weaponScope: 'melee' }]);
+  }
+
+  function removeModifier(i: number) {
+    onChange(value.filter((_, idx) => idx !== i));
+  }
+
+  function updateModifier(i: number, patch: Partial<FeatModifier>) {
+    onChange(value.map((m, idx) => {
+      if (idx !== i) return m;
+      const updated = { ...m, ...patch };
+      // Clear weaponScope when switching to a non-weapon target
+      if (patch.target && patch.target !== 'weapon-attack' && patch.target !== 'weapon-damage') {
+        delete updated.weaponScope;
+      }
+      // Default weaponScope when switching to a weapon target
+      if (patch.target && (patch.target === 'weapon-attack' || patch.target === 'weapon-damage') && !updated.weaponScope) {
+        updated.weaponScope = 'melee';
+      }
+      return updated;
+    }));
+  }
+
+  const needsScope = (target: FeatModifierTarget) =>
+    target === 'weapon-attack' || target === 'weapon-damage';
+
+  return (
+    <div>
+      <span className="cf-field-label">Stat Modifiers</span>
+      <p className="text-xs mb-2 text-[color:var(--color-fg-muted)]">
+        Numeric bonuses applied to character stats whenever this feat is selected.
+      </p>
+      {value.length > 0 && (
+        <div className="flex flex-col gap-2 mb-3">
+          {value.map((mod, i) => (
+            <div key={i} className="cf-modifier-row">
+              <select
+                value={mod.target}
+                onChange={(e) => updateModifier(i, { target: e.target.value as FeatModifierTarget })}
+                className="cf-modifier-select"
+              >
+                {MODIFIER_TARGETS.map((t) => (
+                  <option key={t} value={t}>{MODIFIER_TARGET_LABELS[t]}</option>
+                ))}
+              </select>
+              {needsScope(mod.target) && (
+                <select
+                  value={mod.weaponScope ?? 'melee'}
+                  onChange={(e) => updateModifier(i, { weaponScope: e.target.value as WeaponScope })}
+                  className="cf-modifier-scope"
+                >
+                  <option value="melee">Melee</option>
+                  <option value="ranged">Ranged</option>
+                </select>
+              )}
+              <input
+                type="number"
+                value={mod.value}
+                onChange={(e) => updateModifier(i, { value: parseInt(e.target.value) || 0 })}
+                className="cf-modifier-value"
+                min={-100}
+                max={100}
+              />
+              <button type="button" onClick={() => removeModifier(i)} className="cf-modifier-remove" aria-label="Remove modifier">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <button type="button" onClick={addModifier} className="cf-modifier-add-btn">
+        + Add Modifier
+      </button>
+    </div>
   );
 }
 
@@ -160,6 +345,8 @@ function FeatEditorForm({
         fullDescription: draft.fullDescription.trim() || undefined,
         featTypes: draft.featTypes,
         prerequisites: draft.prerequisites.trim() || undefined,
+        prerequisiteFeats: draft.prerequisiteFeats,
+        modifiers: draft.modifiers,
         repeatable: draft.repeatable,
         classRestrictions: draft.classRestrictions,
       };
@@ -302,7 +489,7 @@ function FeatEditorForm({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      <div className="flex-1 overflow-y-auto px-6 py-5 pb-[72px]">
         {error && (
           <div
             className="mb-4 px-3 py-2 rounded text-sm cf-error-alert"
@@ -433,6 +620,18 @@ function FeatEditorForm({
               </div>
             </div>
 
+            {/* Prerequisite Feats */}
+            <PrerequisiteFeatsField
+              value={draft.prerequisiteFeats}
+              onChange={(v) => set('prerequisiteFeats', v)}
+            />
+
+            {/* Modifiers */}
+            <ModifiersField
+              value={draft.modifiers}
+              onChange={(v) => set('modifiers', v)}
+            />
+
           </div>
           </fieldset>
         </form>
@@ -487,6 +686,8 @@ export function CustomFeatsPage() {
           fullDescription: feat.fullDescription ?? '',
           featTypes: feat.featTypes,
           prerequisites: feat.prerequisites ?? '',
+          prerequisiteFeats: feat.prerequisiteFeats ?? [],
+          modifiers: feat.modifiers ?? [],
           repeatable: feat.repeatable,
           classRestrictions: feat.classRestrictions,
         }

@@ -22,6 +22,8 @@ interface FeatAutocompleteProps {
    * filtered out of the dropdown.
    */
   takenNames?: ReadonlySet<string>;
+  /** The set of feat names currently selected across all slots — used for prerequisite enforcement. */
+  selectedFeatNames?: ReadonlySet<string>;
   /** Additional user-defined feats to include alongside the SRD catalog. */
   extraFeats?: ReadonlyArray<FeatCatalogEntry>;
   placeholder?: string;
@@ -64,6 +66,7 @@ export function FeatAutocomplete({
   onChange,
   allowedCategories,
   takenNames,
+  selectedFeatNames,
   extraFeats,
   placeholder,
   ariaLabel,
@@ -82,6 +85,12 @@ export function FeatAutocomplete({
     if (feat.name === value) return false; // current slot's own value — never blocked
     const entry = FEAT_BY_NAME.get(feat.name);
     return !entry?.repeatable;
+  }
+
+  function unmetPrereqs(feat: DisplayFeatEntry): string[] {
+    if (!feat.prerequisiteFeats || feat.prerequisiteFeats.length === 0) return [];
+    const taken = selectedFeatNames ?? new Set<string>();
+    return feat.prerequisiteFeats.filter((p) => !taken.has(p));
   }
 
   // Filtered result set — re-derived whenever the input value or allowed types change
@@ -113,7 +122,7 @@ export function FeatAutocomplete({
     // Filter out non-repeatable feats already taken by other slots
     return candidates.filter((f) => !isBlocked(f)).slice(0, MAX_RESULTS);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, allowedCategories, takenNames, extraFeats]);
+  }, [value, allowedCategories, takenNames, extraFeats, selectedFeatNames]);
 
   function openDropdown() {
     const rect = inputRef.current?.getBoundingClientRect();
@@ -219,6 +228,8 @@ export function FeatAutocomplete({
           {matches.map((feat, idx) => {
             const badge = getBadge(feat);
             const isActive = idx === activeIdx;
+            const missing = unmetPrereqs(feat);
+            const hasUnmet = missing.length > 0;
             return (
               <li
                 key={feat.name}
@@ -227,7 +238,7 @@ export function FeatAutocomplete({
                 ref={(el) => { el?.setAttribute('aria-selected', isActive ? 'true' : 'false'); }}
                 onMouseDown={(e) => { e.preventDefault(); selectFeat(feat); }}
                 onMouseEnter={() => setActiveIdx(idx)}
-                className={`feat-option${isActive ? ' feat-option--active' : ''}`}
+                className={`feat-option${isActive ? ' feat-option--active' : ''}${hasUnmet ? ' feat-option--prereq-unmet' : ''}`}
               >
                 {/* Row 1: name + badge */}
                 <div className="feat-option-header">
@@ -238,13 +249,18 @@ export function FeatAutocomplete({
                     </span>
                   )}
                 </div>
-                {/* Row 2: short description */}
+                {/* Row 2: short description / prereq warning */}
                 <span className="feat-option-desc">
                   {feat.prerequisites !== '—' && (
                     <span className="feat-option-prereq">Req: {feat.prerequisites} · </span>
                   )}
                   {feat.shortDescription}
                 </span>
+                {hasUnmet && (
+                  <span className="feat-option-prereq-warning">
+                    Requires: {missing.join(', ')}
+                  </span>
+                )}
               </li>
             );
           })}

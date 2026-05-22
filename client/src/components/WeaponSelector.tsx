@@ -25,6 +25,7 @@ type WeaponSelectorProps = {
   entries?: ReadonlyArray<WeaponCatalogEntry>;
   maxAttacks?: number;
   twoWeaponPenalty?: number;
+  extraFeatBonus?: number;
   featControl?: ReactNode;
   extraControl?: ReactNode;
 };
@@ -47,6 +48,7 @@ export function WeaponSelector({
   entries = WEAPON_CATALOG,
   maxAttacks,
   twoWeaponPenalty = 0,
+  extraFeatBonus = 0,
   featControl,
   extraControl,
 }: WeaponSelectorProps) {
@@ -63,7 +65,8 @@ export function WeaponSelector({
   const appliedFeats = weapon?.appliedFeats ?? [];
   const featBonus =
     (appliedFeats.includes('Weapon Focus') ? 1 : 0) +
-    (appliedFeats.includes('Greater Weapon Focus') ? 1 : 0);
+    (appliedFeats.includes('Greater Weapon Focus') ? 1 : 0) +
+    extraFeatBonus;
   const isFinesseWeapon = !isRangedWeapon && (weapon?.handedness === 'Light' || weapon?.special?.includes('Weapon Finesse eligible'));
   const usesFinesse = isFinesseWeapon && appliedFeats.includes('Weapon Finesse');
   const hasRapidShot = isRangedWeapon && appliedFeats.includes('Rapid Shot');

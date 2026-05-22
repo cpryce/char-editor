@@ -665,7 +665,7 @@ export function DiceRollerPage() {
                 if (!e.target.value) clearCharacter();
               }}
               onFocus={() => setCharDropdownOpen(true)}
-              className="dice-roller-char-input w-full h-8 px-3 text-sm rounded-md border border-[var(--color-border-default)] bg-white text-slate-900"
+              className="dice-roller-char-input w-full h-8 px-3 text-sm rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
             />
             {charDropdownOpen && filteredChars.length > 0 && (
               <ul className="dice-roller-char-dropdown">

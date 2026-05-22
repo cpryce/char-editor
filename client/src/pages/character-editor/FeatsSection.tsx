@@ -66,6 +66,7 @@ function SelectableFeatsSection({
   extraFeats?: ReadonlyArray<FeatCatalogEntry>;
 }) {
   const takenNames = new Set(feats.map((f) => f.name).filter(Boolean));
+  const selectedFeatNames = takenNames;
 
   function updateName(i: number, name: string, shortDescription?: string) {
     onChange(feats.map((f, idx) =>
@@ -123,6 +124,7 @@ function SelectableFeatsSection({
                     onChange={(name, sd) => updateName(i, name, sd)}
                     allowedCategories={getAllowedCategories(feat)}
                     takenNames={takenNames}
+                    selectedFeatNames={selectedFeatNames}
                     extraFeats={extraFeats}
                     placeholder={
                       feat.type === 'Fighter Bonus Feat'

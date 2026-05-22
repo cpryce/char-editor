@@ -158,10 +158,56 @@ function getAllWeaponFeatOptions(
   rangerLevel: number,
   dexterity: number,
   bab: number,
+  customFeats?: CustomFeat[],
 ): FeatOption[] {
   const base = getWeaponFeatOptions(weapon, characterFeats, fighterLevel, bab);
   const rs   = getRapidShotOption(weapon, characterFeats, rangerLevel, dexterity);
-  return rs ? [...base, rs] : base;
+  const custom = getCustomWeaponFeatOptions(weapon, characterFeats, customFeats ?? []);
+  return rs ? [...base, rs, ...custom] : [...base, ...custom];
+}
+
+/** Returns FeatOptions for custom feats whose modifiers apply to this weapon's scope. */
+function getCustomWeaponFeatOptions(
+  weapon: WeaponLoadout | null,
+  characterFeats: FeatSlot[],
+  customFeats: CustomFeat[],
+): FeatOption[] {
+  if (!weapon) return [];
+  const isRanged = getWeaponAttackClass(weapon.name, weapon.rangeIncrement) === 'Ranged';
+  const weaponScope = isRanged ? 'ranged' : 'melee';
+
+  return customFeats
+    .filter((cf) =>
+      (cf.modifiers ?? []).some(
+        (m) =>
+          (m.target === 'weapon-attack' || m.target === 'weapon-damage') &&
+          m.weaponScope === weaponScope,
+      ),
+    )
+    .map((cf) => {
+      const charHasFeat = hasFeat(characterFeats, cf.name);
+      return {
+        name: cf.name,
+        available: charHasFeat,
+        disabledReason: charHasFeat ? undefined : `Character does not have ${cf.name}`,
+      };
+    });
+}
+
+/** Sum of weapon-attack bonuses from applied custom feats matching the weapon's scope. */
+function getCustomFeatAttackBonus(
+  weapon: WeaponLoadout | null,
+  customFeats: CustomFeat[],
+): number {
+  if (!weapon) return 0;
+  const isRanged = getWeaponAttackClass(weapon.name, weapon.rangeIncrement) === 'Ranged';
+  const weaponScope = isRanged ? 'ranged' : 'melee';
+  const appliedFeats = weapon.appliedFeats ?? [];
+  return customFeats
+    .filter((cf) => appliedFeats.includes(cf.name))
+    .flatMap((cf) => cf.modifiers ?? [])
+    .filter((m) => m.target === 'weapon-attack' && m.weaponScope === weaponScope)
+    .reduce((sum, m) => sum + m.value, 0);
 }
 
 /** Returns the three TWF-mode feats with availability checks. */
@@ -369,6 +415,7 @@ export function InventorySection({
   feats,
   classes,
   dexterity,
+  customFeats = [],
 }: {
   inventory: Inventory;
   combat: CharacterDraft['combat'];
@@ -383,6 +430,8 @@ export function InventorySection({
   classes: ClassEntry[];
   /** Effective dexterity score (temp override if set, otherwise total). */
   dexterity: number;
+  /** Custom feats with weapon modifiers to include in weapon feat popups. */
+  customFeats?: CustomFeat[];
 }) {
   const [offHandMode, setOffHandModeState] = useState<'none' | 'weapon' | 'shield'>(
     inventory.offHandWeapon ? 'weapon' : inventory.offHandShield ? 'shield' : 'none',
@@ -411,12 +460,15 @@ export function InventorySection({
 
   const fighterLevel = getFighterLevel(classes);
   const rangerLevel  = getRangerLevel(classes);
-  const mainHandFeatOptions = getAllWeaponFeatOptions(inventory.mainHand, feats, fighterLevel, rangerLevel, dexterity, derivedBaseAttackBonus);
-  const offHandFeatOptions  = getAllWeaponFeatOptions(inventory.offHandWeapon, feats, fighterLevel, rangerLevel, dexterity, derivedBaseAttackBonus);
+  const mainHandFeatOptions = getAllWeaponFeatOptions(inventory.mainHand, feats, fighterLevel, rangerLevel, dexterity, derivedBaseAttackBonus, customFeats);
+  const offHandFeatOptions  = getAllWeaponFeatOptions(inventory.offHandWeapon, feats, fighterLevel, rangerLevel, dexterity, derivedBaseAttackBonus, customFeats);
   const backupWeapons = inventory.backupWeapons ?? [];
   const backupWeaponFeatOptions = backupWeapons.map((slot) =>
-    getAllWeaponFeatOptions(slot.weapon, feats, fighterLevel, rangerLevel, dexterity, derivedBaseAttackBonus),
+    getAllWeaponFeatOptions(slot.weapon, feats, fighterLevel, rangerLevel, dexterity, derivedBaseAttackBonus, customFeats),
   );
+  const mainHandCustomBonus   = getCustomFeatAttackBonus(inventory.mainHand, customFeats);
+  const offHandCustomBonus    = getCustomFeatAttackBonus(inventory.offHandWeapon, customFeats);
+  const backupCustomBonuses   = backupWeapons.map((slot) => getCustomFeatAttackBonus(slot.weapon, customFeats));
   const twfFeatOptions = getTwfFeatOptions({ characterFeats: feats, bab: derivedBaseAttackBonus, rangerLevel, twfApplied: twfFeatApplied, itwfApplied, dexterity });
 
   const isBodyArmorSelected = Boolean(inventory.body?.name?.trim());
@@ -508,7 +560,13 @@ export function InventorySection({
     const finesse = !isRanged && (weapon.handedness === 'Light' || weapon.special?.includes('Weapon Finesse eligible')) && applied.includes('Weapon Finesse');
     const rapidShot = isRanged && applied.includes('Rapid Shot');
     const primaryBonus = isRanged ? ctx.ranged : (finesse ? ctx.ranged : ctx.melee);
-    const featBonus = (applied.includes('Weapon Focus') ? 1 : 0) + (applied.includes('Greater Weapon Focus') ? 1 : 0);
+    const weaponScope = isRanged ? 'ranged' : 'melee';
+    const customFeatAttackBonus = customFeats
+      .filter((cf) => applied.includes(cf.name))
+      .flatMap((cf) => cf.modifiers ?? [])
+      .filter((m) => m.target === 'weapon-attack' && m.weaponScope === weaponScope)
+      .reduce((sum, m) => sum + m.value, 0);
+    const featBonus = (applied.includes('Weapon Focus') ? 1 : 0) + (applied.includes('Greater Weapon Focus') ? 1 : 0) + customFeatAttackBonus;
     return buildIterativeAttackString(
       primaryBonus,
       ctx.bab,
@@ -731,7 +789,7 @@ export function InventorySection({
       : weapon.critical;
     updateInventory({
       backupWeapons: backupWeapons.map((slot, idx) => (
-        idx === index ? { ...slot, weapon: { ...weapon, appliedFeats: next, critical: updatedCritical } } : slot
+        idx === index ? { ...slot, weapon: { ...weapon, appliedFeats: next, critical: updatedCritical, computedAttack: undefined } } : slot
       )),
     });
   }
@@ -815,7 +873,7 @@ export function InventorySection({
     const updatedCritical = featName === 'Improved Critical'
       ? (isApplied ? halveThreatRange(inventory.mainHand.critical ?? '') : doubleThreatRange(inventory.mainHand.critical ?? ''))
       : inventory.mainHand.critical;
-    updateInventory({ mainHand: { ...inventory.mainHand, appliedFeats: next, critical: updatedCritical } });
+    updateInventory({ mainHand: { ...inventory.mainHand, appliedFeats: next, critical: updatedCritical, computedAttack: undefined } });
   }
 
   function toggleOffHandFeat(featName: string) {
@@ -826,7 +884,7 @@ export function InventorySection({
     const updatedCritical = featName === 'Improved Critical'
       ? (isApplied ? halveThreatRange(inventory.offHandWeapon.critical ?? '') : doubleThreatRange(inventory.offHandWeapon.critical ?? ''))
       : inventory.offHandWeapon.critical;
-    updateInventory({ offHandWeapon: { ...inventory.offHandWeapon, appliedFeats: next, critical: updatedCritical } });
+    updateInventory({ offHandWeapon: { ...inventory.offHandWeapon, appliedFeats: next, critical: updatedCritical, computedAttack: undefined } });
   }
 
   function toggleTwfFeat(featName: string) {
@@ -924,6 +982,7 @@ export function InventorySection({
           onFieldChange={updateMainHandField}
           onClear={() => updateInventory({ mainHand: null })}
           twoWeaponPenalty={twfMainPenalty}
+          extraFeatBonus={mainHandCustomBonus}
           featControl={(
             <FeatPopupButton
               options={mainHandFeatOptions}
@@ -984,6 +1043,7 @@ export function InventorySection({
               entries={OFF_HAND_WEAPON_CATALOG}
               maxAttacks={offHandMaxAttacks}
               twoWeaponPenalty={twfOffPenalty}
+              extraFeatBonus={offHandCustomBonus}
               featControl={(
                 <FeatPopupButton
                   options={offHandFeatOptions}
@@ -1056,6 +1116,7 @@ export function InventorySection({
             onFieldChange={(field, value) => updateBackupWeaponField(idx, field, value)}
             onClear={() => handleBackupWeaponSelect(idx, '')}
             onRemove={() => removeBackupWeapon(idx)}
+            extraFeatBonus={backupCustomBonuses[idx] ?? 0}
             featControl={(
               <FeatPopupButton
                 options={backupWeaponFeatOptions[idx] ?? []}
@@ -1396,7 +1457,7 @@ function FeatPopupButton({
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLSpanElement>(null);
   const activeNames = options.filter((o) => applied.includes(o.name)).map((o) => o.name);
-  const summary = activeNames.length > 0 ? activeNames.join(', ') : 'none';
+  const summary = activeNames.length > 0 ? `(${activeNames.length}) Applied` : 'none';
 
   function handleToggle() {
     if (!open) setAnchorEl(triggerRef.current);

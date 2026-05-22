@@ -277,6 +277,7 @@ function deriveCombatStats({
   abilityMods,
   baseSpeed,
   customClassMap = new Map(),
+  customFeats = [],
 }: {
   combat: CharacterDraft['combat'];
   inventory: CharacterDraft['inventory'];
@@ -286,6 +287,7 @@ function deriveCombatStats({
   abilityMods: Record<AbilityKey, number>;
   baseSpeed: string;
   customClassMap?: Map<string, CustomClassLookup>;
+  customFeats?: CustomFeat[];
 }): CombatDerivedStats {
   const dexMod = abilityMods.dexterity;
   const conMod = abilityMods.constitution;
@@ -316,12 +318,29 @@ function deriveCombatStats({
     .reduce<number | null>((lowest, cap) => (lowest === null ? cap : Math.min(lowest, cap)), null);
   const acDexMod = applyMaxDexCap(dexMod, maxDexCap);
 
-  // Dodge bonus: manual entry + worn-slot dodge bonuses + Dodge feat.
+  // Dodge bonus: manual entry + worn-slot dodge bonuses.
   const slotDodge = Object.values(inventory.wornSlots).reduce(
     (acc, b) => (b.acType === 'dodge' ? acc + b.acBonus : acc), 0,
   );
-  const dodgeFeatBonus = feats.some((f) => f.name.trim().toLowerCase() === 'dodge') ? 1 : 0;
-  const acDodge = safeCombatNumber(combat.armorClass.dodge) + slotDodge + dodgeFeatBonus;
+  const acDodge = safeCombatNumber(combat.armorClass.dodge) + slotDodge;
+
+  // Custom feat modifiers — sum bonuses for each target where the feat is selected
+  const selectedFeatNames = new Set(feats.map((f) => f.name.trim()).filter(Boolean));
+  const activeMods = customFeats
+    .filter((cf) => selectedFeatNames.has(cf.name))
+    .flatMap((cf) => cf.modifiers ?? []);
+  const sumMod = (target: string, scope?: string) =>
+    activeMods
+      .filter((m) => m.target === target && (scope === undefined || m.weaponScope === scope))
+      .reduce((acc, m) => acc + m.value, 0);
+  const featAcMod           = sumMod('ac');
+  const featFortMod         = sumMod('save-fort');
+  const featRefMod          = sumMod('save-ref');
+  const featWillMod         = sumMod('save-will');
+  const featMeleeAttackMod  = sumMod('weapon-attack', 'melee');
+  const featRangedAttackMod = sumMod('weapon-attack', 'ranged');
+  const featMeleeDamageMod  = sumMod('weapon-damage', 'melee');
+  const featRangedDamageMod = sumMod('weapon-damage', 'ranged');
 
   // Misc bonus: manual entry + stacking slot bonuses (insight, luck, sacred, profane).
   const slotMisc = Object.values(inventory.wornSlots).reduce(
@@ -331,14 +350,14 @@ function deriveCombatStats({
 
   const { total: totalAC, touch: touchAC, flatFooted: flatFootedAC } = computeAcTotals({
     armor: acArmor, shield: acShield, acDexMod,
-    sizeMod, dodge: acDodge, natural: acNatural, deflection: acDeflection, misc: acMisc,
+    sizeMod, dodge: acDodge, natural: acNatural, deflection: acDeflection, misc: acMisc + featAcMod,
   });
   const initiativeTotal = dexMod + initMisc;
-  const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc);
-  const reflexTotal = reflexBase + dexMod + safeCombatNumber(combat.saves.reflex.magic) + safeCombatNumber(combat.saves.reflex.misc);
-  const willTotal = willBase + wisMod + safeCombatNumber(combat.saves.will.magic) + safeCombatNumber(combat.saves.will.misc);
-  const meleeAttack = bab + strMod + sizeMod;
-  const rangedAttack = bab + dexMod + sizeMod;
+  const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc) + featFortMod;
+  const reflexTotal = reflexBase + dexMod + safeCombatNumber(combat.saves.reflex.magic) + safeCombatNumber(combat.saves.reflex.misc) + featRefMod;
+  const willTotal = willBase + wisMod + safeCombatNumber(combat.saves.will.magic) + safeCombatNumber(combat.saves.will.misc) + featWillMod;
+  const meleeAttack = bab + strMod + sizeMod + featMeleeAttackMod;
+  const rangedAttack = bab + dexMod + sizeMod + featRangedAttackMod;
   const speedFeet = Math.max(0, speedBase + speedArmorAdjust);
 
   return {
@@ -373,6 +392,8 @@ function deriveCombatStats({
     meleeAttack,
     rangedAttack,
     speedFeet,
+    featMeleeDamageMod,
+    featRangedDamageMod,
   };
 }
 
@@ -381,6 +402,7 @@ function stampComputedAttacksForSave(
   baseAttackBonus: number,
   meleeAttackBonus: number,
   rangedAttackBonus: number,
+  customFeats: CustomFeat[] = [],
 ): CharacterDraft['inventory'] {
   const mainHand = inventory.mainHand;
   const offHandWeapon = inventory.offHandWeapon;
@@ -404,7 +426,6 @@ function stampComputedAttacksForSave(
     maxAttacks?: number,
   ): CharacterDraft['inventory']['mainHand'] {
     if (!weapon?.name?.trim()) return weapon;
-    if (weapon.computedAttack?.trim()) return weapon;
     if (weapon.attackOverride?.trim()) return { ...weapon, computedAttack: weapon.attackOverride.trim() };
     const attackClass = getWeaponAttackClass(weapon.name, weapon.rangeIncrement);
     const isRangedWeapon = attackClass === 'Ranged';
@@ -413,9 +434,16 @@ function stampComputedAttacksForSave(
       && (weapon.handedness === 'Light' || weapon.special?.includes('Weapon Finesse eligible'));
     const usesFinesse = isFinesseWeapon && appliedFeats.includes('Weapon Finesse');
     const hasRapidShot = isRangedWeapon && appliedFeats.includes('Rapid Shot');
+    const weaponScope = isRangedWeapon ? 'ranged' : 'melee';
+    const customFeatAttackBonus = customFeats
+      .filter((cf) => appliedFeats.includes(cf.name))
+      .flatMap((cf) => cf.modifiers ?? [])
+      .filter((m) => m.target === 'weapon-attack' && m.weaponScope === weaponScope)
+      .reduce((sum, m) => sum + m.value, 0);
     const featBonus =
       (appliedFeats.includes('Weapon Focus') ? 1 : 0)
-      + (appliedFeats.includes('Greater Weapon Focus') ? 1 : 0);
+      + (appliedFeats.includes('Greater Weapon Focus') ? 1 : 0)
+      + customFeatAttackBonus;
     const primaryAttackBonus = isRangedWeapon
       ? rangedAttackBonus
       : (usesFinesse ? rangedAttackBonus : meleeAttackBonus);
@@ -579,6 +607,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
     abilityMods,
     baseSpeed: draft.baseSpeed,
     customClassMap,
+    customFeats,
   });
   const combatSummary = `AC ${combatStats.totalAC} · Init ${signed(combatStats.initiativeTotal)} · F/R/W ${signed(combatStats.fortitudeTotal)}/${signed(combatStats.reflexTotal)}/${signed(combatStats.willTotal)}`;
   const inventorySummary = [
@@ -613,6 +642,9 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
         prerequisites: cf.prerequisites ?? '—',
         shortDescription: cf.shortDescription,
         ...(cf.repeatable ? { repeatable: true as const } : {}),
+        ...(cf.prerequisiteFeats && cf.prerequisiteFeats.length > 0
+          ? { prerequisiteFeats: cf.prerequisiteFeats as readonly string[] }
+          : {}),
       })),
     [customFeats, characterClassNames],
   );
@@ -1078,6 +1110,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             combatStats.bab,
             combatStats.meleeAttack,
             combatStats.rangedAttack,
+            customFeats,
           );
           const body = {
             ...draft,
@@ -1472,7 +1505,21 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
           <FeatsSection
             classFeatures={classFeatures}
             feats={draft.feats}
-            onFeatsChange={(feats) => setField('feats', feats)}
+            onFeatsChange={(feats) => {
+              const hadDodge = draft.feats.some((f) => f.name.trim().toLowerCase() === 'dodge');
+              const hasDodge = feats.some((f) => f.name.trim().toLowerCase() === 'dodge');
+              const dodgeAdded = !hadDodge && hasDodge;
+              setDraft((d) => {
+                const nextDraft = { ...d, feats };
+                if (dodgeAdded && (d.combat.armorClass.dodge ?? 0) === 0) {
+                  nextDraft.combat = {
+                    ...d.combat,
+                    armorClass: { ...d.combat.armorClass, dodge: 1 },
+                  };
+                }
+                return nextDraft;
+              });
+            }}
             extraFeats={filteredCustomFeats}
           />
         </Accordion>
@@ -1504,6 +1551,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             feats={draft.feats}
             classes={draft.classes}
             dexterity={draft.abilityScores.dexterity.temp ?? abilityTotals.dexterity}
+            customFeats={customFeats}
             onChange={(inventory, combat) => {
               setField('inventory', inventory);
               setField('combat', combat);

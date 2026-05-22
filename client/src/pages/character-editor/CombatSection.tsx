@@ -37,6 +37,10 @@ export type CombatDerivedStats = {
   meleeAttack: number;
   rangedAttack: number;
   speedFeet: number;
+  /** Sum of custom-feat weapon-damage modifiers for melee weapons. */
+  featMeleeDamageMod: number;
+  /** Sum of custom-feat weapon-damage modifiers for ranged weapons. */
+  featRangedDamageMod: number;
 };
 
 export function CombatSection({

@@ -107,3 +107,16 @@
 .feat-option-prereq {
   opacity: 0.85;
 }
+
+/* ── Prerequisite unmet state ─────────────────────────────────────────────── */
+.feat-option--prereq-unmet {
+  opacity: 0.6;
+}
+
+.feat-option-prereq-warning {
+  display: block;
+  font-size: 10px;
+  color: var(--color-attention-fg, #9a6700);
+  font-style: italic;
+  margin-top: 1px;
+}
