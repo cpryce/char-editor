@@ -253,20 +253,35 @@ app.put('/api/characters/:id', async (req, res) => {
   if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
   const isOwner = existing.owner?.toString() === u._id.toString();
   const OWNER_LOCK_TTL_MS = 3 * 60 * 1000; // 3 minutes
-  if (!isOwner && existing.ownerEditingAt && Date.now() - existing.ownerEditingAt.getTime() < OWNER_LOCK_TTL_MS) {
-    res.status(423).json({ error: 'The owner is currently editing this character.' });
-    return;
-  }
+  const lockExpiry = new Date(Date.now() - OWNER_LOCK_TTL_MS);
+
   const updateBody = isOwner && existing.delegatedTo
     ? { ...req.body, ownerEditingAt: new Date() }
     : req.body;
+
+  // For delegate saves, embed the lock check in the query filter so the
+  // check-and-write is atomic (no TOCTOU window).
+  const lockFilter = isOwner
+    ? {}
+    : { $or: [{ ownerEditingAt: null }, { ownerEditingAt: { $lt: lockExpiry } }] };
+
   try {
     const character = await Character.findOneAndUpdate(
-      { _id: req.params.id, $or: [{ owner: u._id }, { delegatedTo: u._id }] },
+      { _id: req.params.id, $or: [{ owner: u._id }, { delegatedTo: u._id }], ...lockFilter },
       { $set: updateBody },
       { returnDocument: 'after', runValidators: true },
     );
-    if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+    if (!character) {
+      // Distinguish "locked out" from "not found" for the delegate path
+      if (!isOwner) {
+        const stillExists = await Character.exists({ _id: req.params.id, delegatedTo: u._id });
+        if (stillExists) {
+          res.status(423).json({ error: 'The owner is currently editing this character.' });
+          return;
+        }
+      }
+      res.status(404).json({ error: 'Not found' }); return;
+    }
     res.json(character);
   } catch (err: unknown) {
     if (err instanceof mongoose.Error.ValidationError) {
