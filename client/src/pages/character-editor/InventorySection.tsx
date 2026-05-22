@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import type { CharacterDraft, ArmorLoadout, WeaponLoadout, Inventory, AcBonusType, WornSlot, WornSlotKey, FeatSlot, ClassEntry } from '../../types/character';
+import type { CustomFeat } from '../../types/customFeat';
 import { ArmorAutocomplete } from '../../components/ArmorAutocomplete';
 import { WeaponSelector } from '../../components/WeaponSelector';
 import type { ArmorCatalogEntry } from '../../data/armor';
