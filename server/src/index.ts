@@ -252,14 +252,18 @@ app.put('/api/characters/:id', async (req, res) => {
   const existing = await Character.findOne({ _id: req.params.id, $or: [{ owner: u._id }, { delegatedTo: u._id }] });
   if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
   const isOwner = existing.owner?.toString() === u._id.toString();
-  if (isOwner && existing.delegatedTo) {
-    res.status(403).json({ error: 'Character is currently delegated. Revoke delegation before editing.' });
+  const OWNER_LOCK_TTL_MS = 3 * 60 * 1000; // 3 minutes
+  if (!isOwner && existing.ownerEditingAt && Date.now() - existing.ownerEditingAt.getTime() < OWNER_LOCK_TTL_MS) {
+    res.status(423).json({ error: 'The owner is currently editing this character.' });
     return;
   }
+  const updateBody = isOwner && existing.delegatedTo
+    ? { ...req.body, ownerEditingAt: new Date() }
+    : req.body;
   try {
     const character = await Character.findOneAndUpdate(
       { _id: req.params.id, $or: [{ owner: u._id }, { delegatedTo: u._id }] },
-      { $set: req.body },
+      { $set: updateBody },
       { returnDocument: 'after', runValidators: true },
     );
     if (!character) { res.status(404).json({ error: 'Not found' }); return; }
@@ -322,6 +326,31 @@ app.delete('/api/characters/:id/delegate', async (req, res) => {
   if (!character) { res.status(404).json({ error: 'Not found' }); return; }
   character.delegatedTo = null;
   await character.save();
+  res.status(204).end();
+});
+
+// ── Owner edit-lock routes ────────────────────────────────────────────────────
+
+// POST: owner claims (or refreshes) the edit lock
+app.post('/api/characters/:id/owner-lock', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const character = await Character.findOneAndUpdate(
+    { _id: req.params.id, owner: u._id },
+    { $set: { ownerEditingAt: new Date() } },
+  );
+  if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+  res.status(204).end();
+});
+
+// DELETE: owner releases the edit lock
+app.delete('/api/characters/:id/owner-lock', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  await Character.findOneAndUpdate(
+    { _id: req.params.id, owner: u._id },
+    { $set: { ownerEditingAt: null } },
+  );
   res.status(204).end();
 });
 

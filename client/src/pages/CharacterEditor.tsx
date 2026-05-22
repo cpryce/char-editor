@@ -560,6 +560,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
   const [exportingPdf, setExportingPdf] = useState(false);
   const [isDelegated, setIsDelegated] = useState(false);
   const [delegatedTo, setDelegatedTo] = useState<string | null>(null);
+  const [delegateLocked, setDelegateLocked] = useState(false);
   const [pendingInviteEmail, setPendingInviteEmail] = useState<string | null>(null);
   const [delegatePopoverOpen, setDelegatePopoverOpen] = useState(false);
   const delegateBtnRef = useRef<HTMLButtonElement>(null);
@@ -950,6 +951,36 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
     };
   }, [characterId]);
 
+  // Owner edit-lock: claim/refresh when owner has an active delegate; release on unmount or navigation
+  useEffect(() => {
+    const charId = autoSaveCharacterId;
+    if (!charId || isDelegated || !delegatedTo) return;
+
+    // Claim the lock immediately
+    fetch(`/api/characters/${charId}/owner-lock`, { method: 'POST', credentials: 'include' }).catch(() => {});
+
+    // Refresh every 90 s so the 3-minute TTL doesn't expire on long sessions
+    const interval = setInterval(() => {
+      fetch(`/api/characters/${charId}/owner-lock`, { method: 'POST', credentials: 'include' }).catch(() => {});
+    }, 90_000);
+
+    function release() {
+      fetch(`/api/characters/${charId}/owner-lock`, {
+        method: 'DELETE',
+        credentials: 'include',
+        keepalive: true,
+      }).catch(() => {});
+    }
+
+    window.addEventListener('beforeunload', release);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', release);
+      release();
+    };
+  }, [autoSaveCharacterId, isDelegated, delegatedTo]);
+
   function setField<K extends keyof CharacterDraft>(key: K, value: CharacterDraft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
   }
@@ -1178,10 +1209,19 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             credentials: 'include',
             body: JSON.stringify(body),
           });
+          if (res.status === 423) {
+            // Owner has an active edit lock — warn the delegate, don't treat as fatal error
+            if (sequence === saveSequenceRef.current) {
+              setDelegateLocked(true);
+              setSaving(false);
+            }
+            return;
+          }
           if (!res.ok) {
             const data = await res.json() as { error?: string };
             throw new Error(data.error ?? 'Failed to save');
           }
+          setDelegateLocked(false);
 
           if (!existingId) {
             const created = await res.json() as { _id?: string };
@@ -1412,18 +1452,21 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
         </p>
       )}
 
+      {!loadingCharacter && isDelegated && delegateLocked && (
+        <p className="text-sm px-3 py-2 rounded bg-[var(--color-danger-subtle)] text-[color:var(--color-danger-fg)] border border-[var(--color-danger-muted)]">
+          The owner is currently editing this character. Your latest changes were not saved.
+        </p>
+      )}
+
       {!loadingCharacter && !isDelegated && delegatedTo && (
-        <p className="text-sm px-3 py-2 rounded bg-[var(--color-attention-subtle)] text-[color:var(--color-attention-fg)] border border-[var(--color-attention-muted)]">
-          This character is currently delegated. Fields are read-only until access is revoked.
+        <p className="text-sm px-3 py-2 rounded bg-[var(--color-accent-subtle)] text-[color:var(--color-accent-fg)] border border-[var(--color-accent-muted)]">
+          A delegate has access to this character. Your edits are locked for them while you are here.
         </p>
       )}
 
       {!loadingCharacter && (
       <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-4">
-        <div
-          className={!isDelegated && delegatedTo ? 'char-editor-readonly' : ''}
-          style={!isDelegated && delegatedTo ? { opacity: 0.65 } : undefined}
-        >
+        <div>
 
         {/* ── Identity ── */}
         {/* ── Identity ── */}

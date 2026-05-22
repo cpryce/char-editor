@@ -253,6 +253,7 @@ export interface ICharacter extends Document {
   delegatedTo?: Types.ObjectId | null;
   pendingInviteToken?: string | null;
   pendingInviteEmail?: string | null;
+  ownerEditingAt?: Date | null;
 }
 
 // ── Schema ───────────────────────────────────────────────────────────────────
@@ -364,6 +365,7 @@ characterSchema.add({
   delegatedTo:        { type: Schema.Types.ObjectId, ref: 'User', default: null },
   pendingInviteToken: { type: String, default: null },
   pendingInviteEmail: { type: String, default: null },
+  ownerEditingAt:     { type: Date, default: null },
 });
 
 export const Character = mongoose.model<ICharacter>('Character', characterSchema);
