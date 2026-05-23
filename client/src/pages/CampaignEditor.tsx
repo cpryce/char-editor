@@ -75,6 +75,7 @@ export function CampaignEditor({
   const [editingDescription, setEditingDescription] = useState(false);
   const [showPointBuyDropdown, setShowPointBuyDropdown] = useState(false);
   const [delegatePopoverCharId, setDelegatePopoverCharId] = useState<string | null>(null);
+  const [railOpen, setRailOpen] = useState(false);
   const delegateBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const selectAllRef = useRef<HTMLInputElement>(null);
   const charDropdownRef = useRef<HTMLDivElement>(null);
@@ -484,12 +485,11 @@ export function CampaignEditor({
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-[var(--color-canvas-subtle)]">
-                  {['Name', 'Race', 'Class', 'Level'].map((h) => (
-                    <th key={h} className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">
-                      {h}
-                    </th>
-                  ))}
-                  <th className="border-b border-[var(--color-border-default)]" />
+                  <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">Name</th>
+                  <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)] hidden sm:table-cell">Race</th>
+                  <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">Class</th>
+                  <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)] hidden min-[480px]:table-cell">Level</th>
+                  <th className="border-b border-[var(--color-border-default)] hidden md:table-cell" />
                 </tr>
               </thead>
               <tbody>
@@ -514,10 +514,10 @@ export function CampaignEditor({
                         )}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-[color:var(--color-fg-default)]">{c.race ?? '—'}</td>
+                    <td className="px-4 py-2 text-[color:var(--color-fg-default)] hidden sm:table-cell">{c.race ?? '—'}</td>
                     <td className="px-4 py-2 text-[color:var(--color-fg-default)]">{classLabel(c.classes)}</td>
-                    <td className="px-4 py-2 text-[color:var(--color-fg-default)]">{totalLevel(c.classes)}</td>
-                    <td className="px-4 py-2 text-right">
+                    <td className="px-4 py-2 text-[color:var(--color-fg-default)] hidden min-[480px]:table-cell">{totalLevel(c.classes)}</td>
+                    <td className="px-4 py-2 text-right hidden md:table-cell">
                       <div className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         {c.owner === userId && !c.delegatedTo && (
                           <>
@@ -582,7 +582,35 @@ export function CampaignEditor({
       </section>
 
         </main>{/* ── Right rail ── */}
-        <aside className="campaign-editor-rail">
+        <aside className={`campaign-editor-rail${railOpen ? ' campaign-editor-rail--open' : ''}`}>
+          {/* Sticky toggle tab – anchored to left edge of the sliding rail */}
+          <button
+            type="button"
+            onClick={() => setRailOpen((o) => !o)}
+            aria-label={railOpen ? 'Close campaign info panel' : 'Open campaign info panel'}
+            className="campaign-editor-sticky-toggle"
+          >
+            {railOpen ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" aria-hidden="true">
+                <path d="M10 5l5 7-5 7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" aria-hidden="true">
+                <path d="M14 5l-5 7 5 7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </button>
+          <div className="campaign-editor-rail-inner">
+          <button
+            type="button"
+            onClick={() => setRailOpen(false)}
+            aria-label="Close campaign info panel"
+            className="campaign-editor-rail-close self-end mb-3 w-7 h-7 rounded-md items-center justify-center border border-[var(--color-border-default)] hover:bg-[var(--color-canvas-subtle)] text-[color:var(--color-fg-muted)]"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14" aria-hidden="true">
+              <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+            </svg>
+          </button>
 
           {/* About */}
           <section className="campaign-rail-section">
@@ -706,7 +734,15 @@ export function CampaignEditor({
             <p className="campaign-rail-help-text">Overrides the global setting for characters created in this campaign.</p>
           </section>
 
+          </div>{/* campaign-editor-rail-inner */}
         </aside>
+        {railOpen && (
+          <div
+            className="campaign-editor-rail-backdrop"
+            onClick={() => setRailOpen(false)}
+            aria-hidden="true"
+          />
+        )}
       </div>
     </div>
   );
