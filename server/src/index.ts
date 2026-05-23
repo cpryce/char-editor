@@ -634,7 +634,10 @@ async function getCampaignDetail(campaignId: string, ownerId: mongoose.Types.Obj
     User.findById(ownerId, { name: 1, email: 1, avatar: 1 }).lean(),
   ]);
   const playerIds = [...new Set(
-    characters.map((c) => c.owner?.toString()).filter((id): id is string => Boolean(id)),
+    characters.map((c) => {
+      const raw = c as unknown as { delegatedTo?: { toString(): string } };
+      return (raw.delegatedTo?.toString() ?? c.owner?.toString());
+    }).filter((id): id is string => Boolean(id)),
   )];
   const playerUsers = playerIds.length > 0
     ? await User.find({ _id: { $in: playerIds } }, { name: 1, email: 1, avatar: 1 }).lean()

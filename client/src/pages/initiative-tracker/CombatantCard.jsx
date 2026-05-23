@@ -295,22 +295,31 @@ export function CombatantCard({ combatant, isActiveRound, isSelected, isDeferred
       </label>
 
       {/* Total */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', flexShrink: 0 }}>
+      <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', flexShrink: 0 }}>
         <span style={{ fontSize: '9px', color: 'var(--color-fg-subtle)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total</span>
-        <span style={{
-          width: '36px',
-          textAlign: 'center',
-          fontSize: '14px',
-          fontWeight: 700,
-          color: accentColor,
-          backgroundColor: accentBg,
-          borderRadius: '6px',
-          padding: '3px 2px',
-          border: `1px solid ${accentColor}33`,
-        }}>
-          {Math.max(1, combatant.initiative + combatant.modifier)}
-        </span>
-      </div>
+        <input
+          type="number"
+          value={combatant.initiative + combatant.modifier}
+          onChange={(e) => {
+            const total = parseInt(e.target.value, 10);
+            if (!isNaN(total)) {
+              onUpdate({ ...combatant, initiative: total - combatant.modifier });
+            }
+          }}
+          style={{
+            width: '36px',
+            textAlign: 'center',
+            fontSize: '14px',
+            fontWeight: 700,
+            color: accentColor,
+            backgroundColor: accentBg,
+            borderRadius: '6px',
+            padding: '3px 2px',
+            border: `1px solid ${accentColor}33`,
+          }}
+          onFocus={(e) => e.target.select()}
+        />
+      </label>
 
       {/* Status button */}
       <button
