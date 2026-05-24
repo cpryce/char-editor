@@ -63,6 +63,21 @@ function matMaxDex(maxDexBonus: string | null | undefined, mat?: string): number
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * Replace characters outside the WinAnsi (cp1252) range with safe ASCII
+ * equivalents so pdf-lib's Standard Helvetica font can encode them.
+ */
+function winAnsiSafe(text: string): string {
+  return text
+    .replace(/\u2212/g, '-')   // MINUS SIGN → hyphen-minus
+    .replace(/[\u2018\u2019]/g, "'")  // curly single quotes → apostrophe
+    .replace(/[\u201C\u201D]/g, '"')  // curly double quotes → straight quote
+    .replace(/\u2013/g, '-')   // en dash → hyphen
+    .replace(/\u2014/g, '-')   // em dash → hyphen
+    .replace(/\u2026/g, '...')  // ellipsis → three dots
+    .replace(/[^\x00-\xFF]/g, '?');  // anything else outside Latin-1 → ?
+}
+
 function signed(n: number): string {
   return n >= 0 ? `+${n}` : `${n}`;
 }
@@ -152,7 +167,8 @@ function safeSet(
   try {
     const field = form.getField(name);
     if (field instanceof PDFTextField) {
-      field.setText(value == null ? '' : String(value));
+      const str = value == null ? '' : winAnsiSafe(String(value));
+      field.setText(str);
     }
   } catch {
     // Field not found or wrong type — skip gracefully.
@@ -433,6 +449,108 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
     safeSet(form, `${prefix}.name`,    slot?.item    ?? '');
     safeSet(form, `${prefix}.acBonus`, slot?.acBonus != null ? String(slot.acBonus) : '');
     safeSetDropdown(form, `${prefix}.acType`, slot?.acType ?? '');
+  }
+
+  // ── Feats & Features ──────────────────────────────────────────────────────
+  // Fields: feat.0 … feat.45  (46 slots, 23 per column, left then right)
+  // Order: Class Feats → Racial Bonus Feats → all other feats
+  // Format: "SRC: Name - Short description"  (short description omitted if blank)
+  {
+    /**
+     * Derive a compact source abbreviation from the notes field (which stores
+     * the sourceLabel saved by the client) and the source category.
+     *
+     * Conventions:
+     *   "Character Level N"      → "C{N}"          (e.g. C3)
+     *   "Fighter Level N"        → "Ftr{N}"         (e.g. Ftr2)
+     *   "Wizard Level N"         → "Wiz{N}"         (e.g. Wiz5)
+     *   "Racial Bonus Feat (…)"  → "Rac"
+     *   "{Class} Level N"        → "{first3} {N}"   (e.g. Swa 1 for Swashbuckler)
+     *   Class Feat (auto)        → "Cls"
+     *   fallback by source       → "Rac" / "Ftr" / "Feat" / "Spc"
+     */
+    function abbrevSource(source: string, notes?: string): string {
+      if (notes) {
+        const charMatch = notes.match(/^Character Level (\d+)$/i);
+        if (charMatch) return `C${charMatch[1]}`;
+
+        const ftrMatch = notes.match(/^Fighter Level (\d+)$/i);
+        if (ftrMatch) return `Ftr${ftrMatch[1]}`;
+
+        const wizMatch = notes.match(/^Wizard Level (\d+)$/i);
+        if (wizMatch) return `Wiz${wizMatch[1]}`;
+
+        if (/Racial Bonus/i.test(notes)) return 'Rac';
+
+        // Generic "{ClassName} Level N" — used for custom classes (e.g. "Swashbuckler Level 1" → "Swa 1")
+        const classMatch = notes.match(/^(.+?) Level (\d+)$/);
+        if (classMatch) return `${classMatch[1].slice(0, 3)} ${classMatch[2]}`;
+      }
+
+      if (source === 'Class Feat')         return 'Cls';
+      if (source === 'Bonus Feat')         return 'Rac';
+      if (source === 'Fighter Bonus Feat') return 'Ftr';
+      if (source === 'Character Feat')     return 'Feat';
+      return 'Spc';
+    }
+
+    function formatFeat(f: { name: string; source: string; notes?: string; shortDescription?: string }): string {
+      const abbrev = abbrevSource(f.source, f.notes);
+      const desc   = f.shortDescription?.trim();
+      const raw = desc ? `${abbrev}: ${f.name} - ${desc}` : `${abbrev}: ${f.name}`;
+      return winAnsiSafe(raw);
+    }
+
+    const allFeats = (character.feats ?? []) as Array<{
+      name: string; source: string; notes?: string; shortDescription?: string;
+    }>;
+
+    // ── Class Feats: consolidate proficiency feats into 1-2 summary lines ──
+    // The character editor shows "Weapon and Armor Proficiency" as a single
+    // class-feature row. We mirror that by grouping weapon profs together and
+    // armor/shield profs together, instead of listing 7 individual entries.
+    const classFeatList = allFeats.filter((f) => f.source === 'Class Feat');
+    const consolidatedClassLines: string[] = (() => {
+      const weaponParts: string[] = [];
+      const armorParts: string[] = [];
+      const otherParts: string[] = [];
+
+      for (const f of classFeatList) {
+        const pre = f.name.match(/^(\w+)\s+Weapon Proficiency$/i);
+        const post = f.name.match(/^Weapon Proficiency\s*\((.+?)\)$/i);
+        const armor = f.name.match(/^Armor Proficiency\s*\((.+?)\)$/i);
+        const shield = f.name.match(/^(.+?)\s+Shield Proficiency$/i) || (f.name === 'Shield Proficiency' ? ['', ''] : null);
+
+        if (pre)          weaponParts.push(pre[1]);
+        else if (post)    weaponParts.push(post[1]);
+        else if (armor)   armorParts.push(armor[1]);
+        else if (shield || /shield proficiency/i.test(f.name)) {
+          armorParts.push(f.name.replace(/ Proficiency$/i, ''));
+        }
+        else              otherParts.push(f.name);
+      }
+
+      const lines: string[] = [];
+      if (weaponParts.length) lines.push(winAnsiSafe(`Cls: Weapon Prof - ${weaponParts.join(', ')}`));
+      if (armorParts.length)  lines.push(winAnsiSafe(`Cls: Armor Prof - ${armorParts.join(', ')}`));
+      for (const n of otherParts) lines.push(winAnsiSafe(`Cls: ${n}`));
+      return lines;
+    })();
+
+    const selectableFeats = allFeats.filter((f) => f.source !== 'Class Feat');
+    const racialFeats  = selectableFeats.filter((f) => f.source === 'Bonus Feat');
+    const otherFeats   = selectableFeats.filter((f) => f.source !== 'Bonus Feat');
+
+    // Order: consolidated class feats → racial bonus feats → everything else
+    const orderedStrings: string[] = [
+      ...consolidatedClassLines,
+      ...racialFeats.map(formatFeat),
+      ...otherFeats.map(formatFeat),
+    ];
+
+    for (let i = 0; i < 46; i++) {
+      safeSet(form, `feat.${i}`, orderedStrings[i] ?? '');
+    }
   }
 
   // ── Acrobat JavaScript calculations (Adobe Acrobat/Reader only) ──────────
