@@ -217,7 +217,12 @@ app.get('/api/characters/:id/export-pdf', async (req, res) => {
   const character = await Character.findOne({ _id: req.params.id, $or: [{ owner: u._id }, { delegatedTo: u._id }] });
   if (!character) { res.status(404).json({ error: 'Not found' }); return; }
   try {
-    const pdfBytes = await fillCharacterPdf(character);
+    const classNames = (character.classes as Array<{ name: string }> | undefined)?.map((c) => c.name) ?? [];
+    const customClasses = classNames.length > 0
+      ? await CustomClass.find({ name: { $in: classNames } }).lean()
+      : [];
+    const customClassFeatures = customClasses.map((cc) => ({ className: cc.name, features: cc.features }));
+    const pdfBytes = await fillCharacterPdf(character, customClassFeatures);
     const safeName = (character.name ?? 'character').replace(/[^a-z0-9_\- ]/gi, '_');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}_character_sheet.pdf"`);

@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PDFDocument, PDFTextField, PDFName, PDFBool, PDFDict, PDFRef, PDFString, StandardFonts } from 'pdf-lib';
 import type { ICharacter } from '../models/Character';
+import type { ICustomClassFeature } from '../models/CustomClass';
+import { BUILTIN_CLASS_FEATURES } from '../data/builtinClassFeatures';
 import { SIZE_CATEGORIES, applyMaxDexCap, computeAcTotals, RACES } from '../rules/coreMechanics';
 
 // ── Material helpers (inline — materials.ts lives in client only) ─────────────
@@ -177,7 +179,10 @@ function safeSet(
 
 // ── Main export function ──────────────────────────────────────────────────────
 
-export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Array> {
+export async function fillCharacterPdf(
+  character: ICharacter,
+  customClassFeatures: { className: string; features: ICustomClassFeature[] }[] = [],
+): Promise<Uint8Array> {
   const templatePath = path.join(__dirname, '../assets/blank.pdf');
   const pdfBytes = fs.readFileSync(templatePath);
   const pdfDoc = await PDFDocument.load(pdfBytes);
@@ -505,37 +510,66 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
       name: string; source: string; notes?: string; shortDescription?: string;
     }>;
 
-    // ── Class Feats: consolidate proficiency feats into 1-2 summary lines ──
-    // The character editor shows "Weapon and Armor Proficiency" as a single
-    // class-feature row. We mirror that by grouping weapon profs together and
-    // armor/shield profs together, instead of listing 7 individual entries.
-    const classFeatList = allFeats.filter((f) => f.source === 'Class Feat');
-    const consolidatedClassLines: string[] = (() => {
-      const weaponParts: string[] = [];
-      const armorParts: string[] = [];
-      const otherParts: string[] = [];
+    // ── Class Feats ──────────────────────────────────────────────────────────
+    // Abbreviate class name to 3–4 letters for the prefix (e.g. Rang, Rogu).
+    function classAbbrev(name: string): string {
+      const ABBREVS: Record<string, string> = {
+        Barbarian: 'Barb', Bard: 'Bard', Cleric: 'Clrc', Druid: 'Drud',
+        Fighter: 'Ftr',  Monk: 'Monk', Paladin: 'Pldn', Ranger: 'Rang',
+        Rogue: 'Rogu', Sorcerer: 'Sorc', Wizard: 'Wiz',
+      };
+      return ABBREVS[name] ?? name.slice(0, 4);
+    }
 
-      for (const f of classFeatList) {
-        const pre = f.name.match(/^(\w+)\s+Weapon Proficiency$/i);
-        const post = f.name.match(/^Weapon Proficiency\s*\((.+?)\)$/i);
-        const armor = f.name.match(/^Armor Proficiency\s*\((.+?)\)$/i);
-        const shield = f.name.match(/^(.+?)\s+Shield Proficiency$/i) || (f.name === 'Shield Proficiency' ? ['', ''] : null);
+    // Returns true for any weapon/armor/shield proficiency feature that should be omitted.
+    function isProficiencyFeature(name: string): boolean {
+      return /proficien/i.test(name);
+    }
 
-        if (pre?.[1])          weaponParts.push(pre[1]);
-        else if (post?.[1])    weaponParts.push(post[1]);
-        else if (armor?.[1])   armorParts.push(armor[1]);
-        else if (shield || /shield proficiency/i.test(f.name)) {
-          armorParts.push(f.name.replace(/ Proficiency$/i, ''));
+    type ClassFeatEntry = { name: string; source: string; notes?: string; shortDescription?: string; featLevel?: number; className?: string };
+
+    // Synthesize class feats from custom class features (features at or below character's class level)
+    const customClassFeatEntries: ClassFeatEntry[] = [];
+    const customClassNames = new Set(customClassFeatures.map((cc) => cc.className));
+    for (const { className, features } of customClassFeatures) {
+      const classEntry = (character.classes as Array<{ name: string; level: number }> | undefined)
+        ?.find((c) => c.name === className);
+      const classLevel = classEntry?.level ?? 0;
+      for (const f of features) {
+        if (f.level <= classLevel && f.name.trim() && !isProficiencyFeature(f.name)) {
+          const entry: ClassFeatEntry = { name: f.name, source: 'Class Feat', featLevel: f.level, className };
+          if (f.description) entry.shortDescription = f.description;
+          customClassFeatEntries.push(entry);
         }
-        else              otherParts.push(f.name);
       }
+    }
+    // Synthesize class feats from built-in classes (Ranger, Rogue, etc.)
+    for (const classEntry of (character.classes as Array<{ name: string; level: number }> | undefined) ?? []) {
+      if (customClassNames.has(classEntry.name)) continue; // handled above
+      const builtinFeatures = BUILTIN_CLASS_FEATURES[classEntry.name];
+      if (!builtinFeatures) continue;
+      for (const f of builtinFeatures) {
+        if (f.level <= classEntry.level && !isProficiencyFeature(f.name)) {
+          const entry: ClassFeatEntry = { name: f.name, source: 'Class Feat', featLevel: f.level, className: classEntry.name };
+          const sd = (f as { shortDescription?: string }).shortDescription;
+          if (sd) entry.shortDescription = sd;
+          customClassFeatEntries.push(entry);
+        }
+      }
+    }
 
-      const lines: string[] = [];
-      if (weaponParts.length) lines.push(winAnsiSafe(`Cls: Weapon Prof - ${weaponParts.join(', ')}`));
-      if (armorParts.length)  lines.push(winAnsiSafe(`Cls: Armor Prof - ${armorParts.join(', ')}`));
-      for (const n of otherParts) lines.push(winAnsiSafe(`Cls: ${n}`));
-      return lines;
-    })();
+    // Also include any existing character.feats with source 'Class Feat' (legacy/manual entries)
+    const legacyClassFeats = (allFeats.filter((f) => f.source === 'Class Feat') as ClassFeatEntry[])
+      .filter((f) => !isProficiencyFeature(f.name));
+
+    const classFeatList: ClassFeatEntry[] = [...legacyClassFeats, ...customClassFeatEntries];
+
+    const consolidatedClassLines: string[] = classFeatList.map((f) => {
+      const abbrev = f.className ? classAbbrev(f.className) : 'Cls';
+      const prefix = f.featLevel != null ? `${abbrev}${f.featLevel}` : abbrev;
+      const desc = f.shortDescription?.trim();
+      return winAnsiSafe(desc ? `${prefix}: ${f.name} - ${desc}` : `${prefix}: ${f.name}`);
+    });
 
     const selectableFeats = allFeats.filter((f) => f.source !== 'Class Feat');
     const racialFeats  = selectableFeats.filter((f) => f.source === 'Bonus Feat');
