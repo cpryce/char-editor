@@ -98,8 +98,6 @@ async function run() {
           height: H,
           font,
           borderWidth: 0,
-          // pdf-lib defaults to white background; explicitly make transparent
-          backgroundColor: undefined,
         });
         // Remove the automatically added /MK background so the field has no fill
         try {

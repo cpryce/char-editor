@@ -484,7 +484,7 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
 
         // Generic "{ClassName} Level N" — used for custom classes (e.g. "Swashbuckler Level 1" → "Swa 1")
         const classMatch = notes.match(/^(.+?) Level (\d+)$/);
-        if (classMatch) return `${classMatch[1].slice(0, 3)} ${classMatch[2]}`;
+        if (classMatch?.[1] && classMatch[2]) return `${classMatch[1].slice(0, 3)} ${classMatch[2]}`;
       }
 
       if (source === 'Class Feat')         return 'Cls';
@@ -521,9 +521,9 @@ export async function fillCharacterPdf(character: ICharacter): Promise<Uint8Arra
         const armor = f.name.match(/^Armor Proficiency\s*\((.+?)\)$/i);
         const shield = f.name.match(/^(.+?)\s+Shield Proficiency$/i) || (f.name === 'Shield Proficiency' ? ['', ''] : null);
 
-        if (pre)          weaponParts.push(pre[1]);
-        else if (post)    weaponParts.push(post[1]);
-        else if (armor)   armorParts.push(armor[1]);
+        if (pre?.[1])          weaponParts.push(pre[1]);
+        else if (post?.[1])    weaponParts.push(post[1]);
+        else if (armor?.[1])   armorParts.push(armor[1]);
         else if (shield || /shield proficiency/i.test(f.name)) {
           armorParts.push(f.name.replace(/ Proficiency$/i, ''));
         }
