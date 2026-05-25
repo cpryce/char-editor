@@ -926,7 +926,21 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
 
         const derivedFeats = deriveSelectableFeats(loaded.classes, loaded.race);
         const feats = mergeSelectableFeats(loadedSelectableFeats, derivedFeats);
-        const loadedDraft = { ...loaded, skills: adjustedSkills, feats };
+        const featNames = new Set(feats.map((f) => f.name));
+        const rawSpellcasting = (data.spellcasting ?? {}) as Record<string, unknown>;
+        const loadedDraft = {
+          ...loaded,
+          skills: adjustedSkills,
+          feats,
+          spellcasting: {
+            casterAbility: typeof rawSpellcasting.casterAbility === 'string' ? rawSpellcasting.casterAbility : '',
+            casterLevel: typeof rawSpellcasting.casterLevel === 'number' ? rawSpellcasting.casterLevel : 0,
+            effectiveCasterLevel: typeof rawSpellcasting.effectiveCasterLevel === 'number' ? rawSpellcasting.effectiveCasterLevel : 0,
+            spellFocus: typeof rawSpellcasting.spellFocus === 'boolean' ? rawSpellcasting.spellFocus : featNames.has('Spell Focus'),
+            spellPenetration: typeof rawSpellcasting.spellPenetration === 'boolean' ? rawSpellcasting.spellPenetration : featNames.has('Spell Penetration'),
+            combatCasting: typeof rawSpellcasting.combatCasting === 'boolean' ? rawSpellcasting.combatCasting : featNames.has('Combat Casting'),
+          },
+        };
         setDraft(loadedDraft);
         setAutoSaveCharacterId(characterId);
         setInitialDraftFingerprint(JSON.stringify(loadedDraft));
@@ -1503,6 +1517,8 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             customClasses={customClasses}
             onClassesChange={setClasses}
             onHitPointsChange={(next) => setField('hitPoints', next)}
+            spellcasting={draft.spellcasting}
+            onSpellcastingChange={(next) => setField('spellcasting', next)}
           />
         </Accordion>
 

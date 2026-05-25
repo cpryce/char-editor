@@ -98,6 +98,18 @@ const skillSchema = new Schema(
   { _id: false },
 );
 
+const spellcastingSchema = new Schema(
+  {
+    casterAbility:       { type: String, default: '' },
+    casterLevel:         { type: Number, default: 0 },
+    effectiveCasterLevel:{ type: Number, default: 0 },
+    spellFocus:          { type: Boolean, default: false },
+    spellPenetration:    { type: Boolean, default: false },
+    combatCasting:       { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
 const featSchema = new Schema(
   {
     name:   { type: String, required: true },
@@ -243,6 +255,16 @@ export interface ICharacter extends Document {
     twfAppliedFeats?: string[];
   };
 
+  // Spellcasting
+  spellcasting?: {
+    casterAbility: string;
+    casterLevel: number;
+    effectiveCasterLevel: number;
+    spellFocus: boolean;
+    spellPenetration: boolean;
+    combatCasting: boolean;
+  };
+
   // Skills, Feats, Equipment, Currency
   skills: { name: string; keyAbility: string; ranks: number; classSkill: boolean; miscBonus: number }[];
   feats:  { name: string; category: string; source?: string; sourceLabel?: string; shortDescription?: string; notes?: string }[];
@@ -346,6 +368,9 @@ const characterSchema = new Schema<ICharacter>(
       }],
       twfAppliedFeats: [{ type: String }],
     },
+
+    // Spellcasting
+    spellcasting: { type: spellcastingSchema, default: () => ({}) },
 
     // Skills, Feats, Equipment, Currency
     skills:    [skillSchema],
