@@ -13,6 +13,7 @@ const CampaignEditor = lazy(() => import('./pages/CampaignEditor').then((module)
 const CustomClassesPage = lazy(() => import('./pages/CustomClassesPage').then((module) => ({ default: module.CustomClassesPage })));
 const InvitePage = lazy(() => import('./pages/InvitePage').then((module) => ({ default: module.InvitePage })));
 const DiceRollerPage = lazy(() => import('./pages/DiceRollerPage').then((module) => ({ default: module.DiceRollerPage })));
+const TurnUndeadPage = lazy(() => import('./pages/TurnUndeadPage').then((module) => ({ default: module.TurnUndeadPage })));
 
 interface User {
   id: string;
@@ -21,7 +22,7 @@ interface User {
   avatar?: string;
 }
 
-type Section = 'characters' | 'custom-feats' | 'custom-classes' | 'initiative-tracker' | 'dice-roller' | 'name-generator' | 'campaigns';
+type Section = 'characters' | 'custom-feats' | 'custom-classes' | 'initiative-tracker' | 'dice-roller' | 'name-generator' | 'campaigns' | 'turn-undead';
 type View = 'list' | 'new' | 'edit';
 type Theme = 'light' | 'dark';
 
@@ -568,6 +569,7 @@ function App() {
     'initiative-tracker': 'Initiative Tracker',
     'dice-roller': 'Dice Roller',
     'name-generator': 'Name Generator',
+    'turn-undead': 'Turn Undead Calculator',
     'campaigns': 'Campaigns',
   };
   const navGroups: NavGroup[] = [
@@ -586,6 +588,7 @@ function App() {
         { id: 'initiative-tracker', label: 'Initiative Tracker' },
         { id: 'name-generator', label: 'Name Generator' },
         { id: 'dice-roller', label: 'Dice Roller' },
+        { id: 'turn-undead', label: 'Turn Undead Calculator' },
       ],
     },
     {
@@ -660,6 +663,9 @@ function App() {
             )}
             {section === 'dice-roller' && (
               <DiceRollerPage />
+            )}
+            {section === 'turn-undead' && (
+              <TurnUndeadPage />
             )}
             {section === 'name-generator' && (
               <NameGeneratorPage
