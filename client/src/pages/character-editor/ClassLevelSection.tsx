@@ -1,4 +1,4 @@
-import type { CharacterDraft } from '../../types/character';
+import type { CharacterDraft, Spellcasting } from '../../types/character';
 import type { CustomClass } from '../../types/customClass';
 import { createPortal } from 'react-dom';
 import { useState } from 'react';
@@ -244,6 +244,8 @@ export function ClassLevelSection({
   onClassesChange,
   onHitPointsChange,
   customClasses = [],
+  spellcasting,
+  onSpellcastingChange,
 }: {
   classes: CharacterDraft['classes'];
   isEdit: boolean;
@@ -253,58 +255,128 @@ export function ClassLevelSection({
   onClassesChange: (classes: CharacterDraft['classes']) => void;
   onHitPointsChange: (next: CharacterDraft['hitPoints']) => void;
   customClasses?: CustomClass[];
+  spellcasting: Spellcasting;
+  onSpellcastingChange: (next: Spellcasting) => void;
 }) {
+  function updateSpellcasting<K extends keyof Spellcasting>(key: K, value: Spellcasting[K]) {
+    onSpellcastingChange({ ...spellcasting, [key]: value });
+  }
+
   return (
-    <>
-      <ClassesSection
-        classes={classes}
-        onChange={onClassesChange}
-        isCreate={!isEdit}
-        inputStyle={inputStyle}
-        customClasses={customClasses}
-      />
-      {isEdit ? (
-        <div className="grid grid-cols-3 gap-4 max-w-xl">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      {/* ── Column 1: Class & Hit Points ── */}
+      <div className="flex flex-col gap-4">
+        <ClassesSection
+          classes={classes}
+          onChange={onClassesChange}
+          isCreate={!isEdit}
+          inputStyle={inputStyle}
+          customClasses={customClasses}
+        />
+        {isEdit ? (
+          <div className="grid grid-cols-3 gap-4 max-w-xl">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Hit Points</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={String(hitPoints.max)}
+                onChange={(e) => {
+                  const digitsOnly = e.target.value.replace(/\D+/g, '');
+                  const max = digitsOnly === '' ? 0 : Number(digitsOnly);
+                  onHitPointsChange({
+                    ...hitPoints,
+                    max,
+                    current: max,
+                  });
+                }}
+                style={{ ...inputStyle, width: 96 }}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Nonlethal</span>
+              <NumberInput
+                value={hitPoints.nonlethal}
+                min={0}
+                onChange={(v) => onHitPointsChange({ ...hitPoints, nonlethal: Math.max(0, Math.trunc(v)) })}
+              />
+            </label>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-4 max-w-xl">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Hit Points</span>
+              <input
+                type="text"
+                value={calculatedCreateHitPoints}
+                readOnly
+                style={{ ...inputStyle, width: 96, color: 'var(--color-fg-muted)', cursor: 'default' }}
+              />
+            </label>
+          </div>
+        )}
+      </div>
+
+      {/* ── Column 2: Spellcasting ── */}
+      <div className="flex flex-col gap-4">
+        <p className="subsection-header">Spellcasting</p>
+        <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Hit Points</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={String(hitPoints.max)}
-              onChange={(e) => {
-                const digitsOnly = e.target.value.replace(/\D+/g, '');
-                const max = digitsOnly === '' ? 0 : Number(digitsOnly);
-                onHitPointsChange({
-                  ...hitPoints,
-                  max,
-                  current: max,
-                });
-              }}
-              style={{ ...inputStyle, width: 96 }}
-            />
+            <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Caster Ability</span>
+            <select
+              aria-label="Caster Ability"
+              value={spellcasting.casterAbility}
+              onChange={(e) => updateSpellcasting('casterAbility', e.target.value)}
+              style={{ ...inputStyle, minWidth: 140 }}
+            >
+              <option value="">— None —</option>
+              <option value="intelligence">Intelligence</option>
+              <option value="wisdom">Wisdom</option>
+              <option value="charisma">Charisma</option>
+            </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Nonlethal</span>
+            <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>CL</span>
             <NumberInput
-              value={hitPoints.nonlethal}
+              value={spellcasting.casterLevel}
               min={0}
-              onChange={(v) => onHitPointsChange({ ...hitPoints, nonlethal: Math.max(0, Math.trunc(v)) })}
+              aria-label="Caster Level"
+              onChange={(v) => updateSpellcasting('casterLevel', v)}
             />
           </label>
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-4 max-w-xl">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Hit Points</span>
-            <input
-              type="text"
-              value={calculatedCreateHitPoints}
-              readOnly
-              style={{ ...inputStyle, width: 96, color: 'var(--color-fg-muted)', cursor: 'default' }}
+            <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>EL</span>
+            <NumberInput
+              value={spellcasting.effectiveCasterLevel}
+              min={0}
+              aria-label="Effective Caster Level"
+              onChange={(v) => updateSpellcasting('effectiveCasterLevel', v)}
             />
           </label>
         </div>
-      )}
-    </>
+        <div className="flex flex-col gap-2">
+          {(
+            [
+              { key: 'spellFocus', label: 'Spell Focus' },
+              { key: 'spellPenetration', label: 'Spell Penetration' },
+              { key: 'combatCasting', label: 'Combat Casting' },
+            ] as Array<{ key: keyof Pick<Spellcasting, 'spellFocus' | 'spellPenetration' | 'combatCasting'>; label: string }>
+          ).map(({ key, label }) => (
+            <label
+              key={key}
+              className="flex items-center gap-2 text-sm"
+              style={{ color: 'var(--color-fg-default)', cursor: 'pointer' }}
+            >
+              <input
+                type="checkbox"
+                checked={spellcasting[key]}
+                onChange={(e) => updateSpellcasting(key, e.target.checked)}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

@@ -815,6 +815,14 @@ export function newCharacterDraft(): CharacterDraft {
       bonus: 0,
     })),
     feats: [],
+    spellcasting: {
+      casterAbility: '',
+      casterLevel: 0,
+      effectiveCasterLevel: 0,
+      spellFocus: false,
+      spellPenetration: false,
+      combatCasting: false,
+    },
   };
 }
 

@@ -150,6 +150,23 @@ export interface Inventory {
   twfAppliedFeats?: string[];
 }
 
+// ── Spellcasting ─────────────────────────────────────────────────────────────
+
+export interface Spellcasting {
+  /** Primary ability score used for spellcasting (e.g. 'intelligence', 'wisdom', 'charisma'). */
+  casterAbility: string;
+  /** Caster level modifier (CL). */
+  casterLevel: number;
+  /** Effective caster level modifier (EL). */
+  effectiveCasterLevel: number;
+  /** Whether the character has/uses the Spell Focus feat for spellcasting. */
+  spellFocus: boolean;
+  /** Whether the character has/uses the Spell Penetration feat. */
+  spellPenetration: boolean;
+  /** Whether the character has/uses the Combat Casting feat. */
+  combatCasting: boolean;
+}
+
 // ── Full character form state ─────────────────────────────────────────────────
 
 export interface CharacterDraft {
@@ -202,4 +219,5 @@ export interface CharacterDraft {
 
   skills: Skill[];
   feats: FeatSlot[];
+  spellcasting: Spellcasting;
 }
