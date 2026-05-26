@@ -38,6 +38,7 @@ import type { FeatCatalogEntry } from '../components/FeatAutocomplete';
 import type { CustomFeat } from '../types/customFeat';
 import type { CustomClass } from '../types/customClass';
 import type { CustomClassLookup } from '../utils/characterHelpers';
+import type { SpellProgression } from '../types/spellProgression';
 import { IdentitySection } from './character-editor/IdentitySection';
 import { BackgroundSection } from './character-editor/BackgroundSection';
 import { ClassLevelSection } from './character-editor/ClassLevelSection';
@@ -526,6 +527,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
   });
   const [customFeats, setCustomFeats] = useState<CustomFeat[]>([]);
   const [customClasses, setCustomClasses] = useState<CustomClass[]>([]);
+  const [spellProgressions, setSpellProgressions] = useState<SpellProgression[]>([]);
   // Custom classes embedded in the character response (may belong to a different user, e.g. the
   // owner's classes when the delegate is viewing, or classes the delegate added that the owner
   // doesn't have). Merged into customClassMap so BAB/saves are always computed correctly.
@@ -937,8 +939,9 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             casterLevel: typeof rawSpellcasting.casterLevel === 'number' ? rawSpellcasting.casterLevel : 0,
             effectiveCasterLevel: typeof rawSpellcasting.effectiveCasterLevel === 'number' ? rawSpellcasting.effectiveCasterLevel : 0,
             spellFocus: typeof rawSpellcasting.spellFocus === 'boolean' ? rawSpellcasting.spellFocus : featNames.has('Spell Focus'),
+            greaterSpellFocus: typeof rawSpellcasting.greaterSpellFocus === 'boolean' ? rawSpellcasting.greaterSpellFocus : featNames.has('Greater Spell Focus'),
             spellPenetration: typeof rawSpellcasting.spellPenetration === 'boolean' ? rawSpellcasting.spellPenetration : featNames.has('Spell Penetration'),
-            combatCasting: typeof rawSpellcasting.combatCasting === 'boolean' ? rawSpellcasting.combatCasting : featNames.has('Combat Casting'),
+            greaterSpellPenetration: typeof rawSpellcasting.greaterSpellPenetration === 'boolean' ? rawSpellcasting.greaterSpellPenetration : featNames.has('Greater Spell Penetration'),
           },
         };
         setDraft(loadedDraft);
@@ -1135,6 +1138,10 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
     fetch('/api/custom-classes', { credentials: 'include' })
       .then((r) => r.ok ? r.json() as Promise<CustomClass[]> : Promise.resolve([]))
       .then(setCustomClasses)
+      .catch(() => { /* non-critical */ });
+    fetch('/api/spell-progressions', { credentials: 'include' })
+      .then((r) => r.ok ? r.json() as Promise<SpellProgression[]> : Promise.resolve([]))
+      .then(setSpellProgressions)
       .catch(() => { /* non-critical */ });
   }, []);
 
@@ -1517,8 +1524,10 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             customClasses={customClasses}
             onClassesChange={setClasses}
             onHitPointsChange={(next) => setField('hitPoints', next)}
+            abilityScores={draft.abilityScores}
             spellcasting={draft.spellcasting}
             onSpellcastingChange={(next) => setField('spellcasting', next)}
+            spellProgressions={spellProgressions}
           />
         </Accordion>
 
@@ -1568,6 +1577,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
               const hadDodge = draft.feats.some((f) => f.name.trim().toLowerCase() === 'dodge');
               const hasDodge = feats.some((f) => f.name.trim().toLowerCase() === 'dodge');
               const dodgeAdded = !hadDodge && hasDodge;
+              const featNameSet = new Set(feats.map((f) => f.name));
               setDraft((d) => {
                 const nextDraft = { ...d, feats };
                 if (dodgeAdded && (d.combat.armorClass.dodge ?? 0) === 0) {
@@ -1576,6 +1586,15 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
                     armorClass: { ...d.combat.armorClass, dodge: 1 },
                   };
                 }
+                const spellFocus = featNameSet.has('Spell Focus');
+                const spellPenetration = featNameSet.has('Spell Penetration');
+                nextDraft.spellcasting = {
+                  ...d.spellcasting,
+                  spellFocus,
+                  greaterSpellFocus: spellFocus && featNameSet.has('Greater Spell Focus'),
+                  spellPenetration,
+                  greaterSpellPenetration: spellPenetration && featNameSet.has('Greater Spell Penetration'),
+                };
                 return nextDraft;
               });
             }}

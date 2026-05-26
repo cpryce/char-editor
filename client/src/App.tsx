@@ -14,6 +14,7 @@ const CustomClassesPage = lazy(() => import('./pages/CustomClassesPage').then((m
 const InvitePage = lazy(() => import('./pages/InvitePage').then((module) => ({ default: module.InvitePage })));
 const DiceRollerPage = lazy(() => import('./pages/DiceRollerPage').then((module) => ({ default: module.DiceRollerPage })));
 const TurnUndeadPage = lazy(() => import('./pages/TurnUndeadPage').then((module) => ({ default: module.TurnUndeadPage })));
+const SpellProgressionPage = lazy(() => import('./pages/SpellProgressionPage'));
 
 interface User {
   id: string;
@@ -22,7 +23,7 @@ interface User {
   avatar?: string;
 }
 
-type Section = 'characters' | 'custom-feats' | 'custom-classes' | 'initiative-tracker' | 'dice-roller' | 'name-generator' | 'campaigns' | 'turn-undead';
+type Section = 'characters' | 'custom-feats' | 'custom-classes' | 'spell-progressions' | 'initiative-tracker' | 'dice-roller' | 'name-generator' | 'campaigns' | 'turn-undead';
 type View = 'list' | 'new' | 'edit';
 type Theme = 'light' | 'dark';
 
@@ -566,6 +567,7 @@ function App() {
     'characters': 'Characters',
     'custom-feats': 'Custom Feats',
     'custom-classes': 'Custom Classes',
+    'spell-progressions': 'Spell Progressions',
     'initiative-tracker': 'Initiative Tracker',
     'dice-roller': 'Dice Roller',
     'name-generator': 'Name Generator',
@@ -579,6 +581,7 @@ function App() {
         { id: 'characters', label: 'Characters' },
         { id: 'custom-classes', label: 'Custom Classes' },
         { id: 'custom-feats', label: 'Custom Feats' },
+        { id: 'spell-progressions', label: 'Spell Progressions' },
         { id: 'custom-skills', label: 'Custom Skills', placeholder: true },
       ],
     },
@@ -657,6 +660,9 @@ function App() {
             )}
             {section === 'custom-classes' && (
               <CustomClassesPage />
+            )}
+            {section === 'spell-progressions' && (
+              <SpellProgressionPage />
             )}
             {section === 'initiative-tracker' && (
               <InitiativeTrackerPage initialSessionId={initiativeSessionId ?? undefined} />

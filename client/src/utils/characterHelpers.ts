@@ -817,11 +817,12 @@ export function newCharacterDraft(): CharacterDraft {
     feats: [],
     spellcasting: {
       casterAbility: '',
-      casterLevel: 0,
       effectiveCasterLevel: 0,
       spellFocus: false,
+      greaterSpellFocus: false,
       spellPenetration: false,
-      combatCasting: false,
+      greaterSpellPenetration: false,
+      domainSlots: false,
     },
   };
 }

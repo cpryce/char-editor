@@ -1,18 +1,21 @@
-import type { CharacterDraft, Spellcasting } from '../../types/character';
+import type { CharacterDraft, Spellcasting, AbilityScore } from '../../types/character';
+import { abilityModifier, totalScore } from '../../utils/characterHelpers';
 import type { CustomClass } from '../../types/customClass';
+import type { SpellProgression } from '../../types/spellProgression';
 import { createPortal } from 'react-dom';
 import { useState } from 'react';
 import { CLASSES, HIT_DIE_BY_CLASS } from '../../types/character';
 import { totalCharacterLevel } from '../../utils/characterHelpers';
 
 function NumberInput({
-  value, onChange, min = 0, 'aria-label': ariaLabel,
-}: { value: number; onChange: (v: number) => void; min?: number; 'aria-label'?: string }) {
+  value, onChange, min = 0, placeholder, 'aria-label': ariaLabel,
+}: { value: number; onChange: (v: number) => void; min?: number; placeholder?: string; 'aria-label'?: string }) {
   return (
     <input
       type="number"
-      value={value}
+      value={value || ''}
       min={min}
+      placeholder={placeholder}
       aria-label={ariaLabel}
       onChange={(e) => onChange(Number(e.target.value))}
       style={{
@@ -246,6 +249,8 @@ export function ClassLevelSection({
   customClasses = [],
   spellcasting,
   onSpellcastingChange,
+  abilityScores,
+  spellProgressions = [],
 }: {
   classes: CharacterDraft['classes'];
   isEdit: boolean;
@@ -257,10 +262,58 @@ export function ClassLevelSection({
   customClasses?: CustomClass[];
   spellcasting: Spellcasting;
   onSpellcastingChange: (next: Spellcasting) => void;
+  abilityScores: CharacterDraft['abilityScores'];
+  spellProgressions?: SpellProgression[];
 }) {
   function updateSpellcasting<K extends keyof Spellcasting>(key: K, value: Spellcasting[K]) {
     onSpellcastingChange({ ...spellcasting, [key]: value });
   }
+
+  /** Ability modifier for spellcasting: use temp score override if set, otherwise fall back to total score. */
+  function spellAbilityMod(): number {
+    if (!spellcasting.casterAbility) return 0;
+    const score: AbilityScore | undefined =
+      abilityScores[spellcasting.casterAbility as keyof typeof abilityScores];
+    if (!score) return 0;
+    return abilityModifier(score.temp ?? totalScore(score));
+  }
+
+  /** Bonus spells per day at spell level L (3.5e formula). Level 0 gets no bonus spells. */
+  function bonusSpells(spellLevel: number): number | null {
+    if (spellLevel === 0) return null;
+    const mod = spellAbilityMod();
+    if (mod < spellLevel) return 0;
+    return Math.floor((mod - spellLevel) / 4) + 1;
+  }
+
+  const abilityMod = spellAbilityMod();
+  const SPELL_LEVELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+  // ── Spell Progression lookup ──────────────────────────────────────────────
+  // Use the highest-leveled class to identify which progression table to use.
+  const primaryClass: { name: string; level: number } | null = classes.reduce<{ name: string; level: number } | null>(
+    (best, c) => {
+      if (!c.name) return best;
+      const lvl = (c.levels ?? []).reduce((a, b) => a + b, 0);
+      if (!best || lvl > best.level) return { name: c.name, level: lvl };
+      return best;
+    },
+    null,
+  );
+  const primaryClassName: string | null = primaryClass?.name ?? null;
+  const primaryClassLevel: number = primaryClass?.level ?? 0;
+
+  const activeProgression: SpellProgression | null = primaryClassName
+    ? (spellProgressions.find(
+        (p) => p.className.toLowerCase() === primaryClassName.toLowerCase(),
+      ) ?? null)
+    : null;
+
+  // EL defaults to primary class level when not set manually.
+  const resolvedEL = spellcasting.effectiveCasterLevel > 0 ? spellcasting.effectiveCasterLevel : primaryClassLevel;
+  const progressionRow: number[] | null = activeProgression && resolvedEL > 0
+    ? (activeProgression.levels[Math.min(resolvedEL, 20) - 1] ?? null)
+    : null;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -336,46 +389,185 @@ export function ClassLevelSection({
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>CL</span>
-            <NumberInput
-              value={spellcasting.casterLevel}
-              min={0}
-              aria-label="Caster Level"
-              onChange={(v) => updateSpellcasting('casterLevel', v)}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
             <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>EL</span>
             <NumberInput
               value={spellcasting.effectiveCasterLevel}
               min={0}
               aria-label="Effective Caster Level"
+              placeholder={primaryClassLevel > 0 ? String(primaryClassLevel) : undefined}
               onChange={(v) => updateSpellcasting('effectiveCasterLevel', v)}
             />
           </label>
         </div>
-        <div className="flex flex-col gap-2">
-          {(
-            [
-              { key: 'spellFocus', label: 'Spell Focus' },
-              { key: 'spellPenetration', label: 'Spell Penetration' },
-              { key: 'combatCasting', label: 'Combat Casting' },
-            ] as Array<{ key: keyof Pick<Spellcasting, 'spellFocus' | 'spellPenetration' | 'combatCasting'>; label: string }>
-          ).map(({ key, label }) => (
+        <div className="flex gap-6">
+          {/* ── Checkboxes ── */}
+          <div className="flex flex-col gap-1">
+            {/* Spell Focus group */}
             <label
-              key={key}
               className="flex items-center gap-2 text-sm"
               style={{ color: 'var(--color-fg-default)', cursor: 'pointer' }}
             >
               <input
                 type="checkbox"
-                checked={spellcasting[key]}
-                onChange={(e) => updateSpellcasting(key, e.target.checked)}
+                checked={spellcasting.spellFocus}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  onSpellcastingChange({
+                    ...spellcasting,
+                    spellFocus: checked,
+                    greaterSpellFocus: checked ? spellcasting.greaterSpellFocus : false,
+                  });
+                }}
               />
-              {label}
+              Spell Focus
             </label>
-          ))}
+            <label
+              className="flex items-center gap-2 text-sm"
+              style={{
+                color: spellcasting.spellFocus ? 'var(--color-fg-default)' : 'var(--color-fg-subtle)',
+                cursor: spellcasting.spellFocus ? 'pointer' : 'not-allowed',
+                paddingLeft: 16,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={spellcasting.greaterSpellFocus}
+                disabled={!spellcasting.spellFocus}
+                onChange={(e) => updateSpellcasting('greaterSpellFocus', e.target.checked)}
+              />
+              Greater Spell Focus
+            </label>
+
+            {/* Spell Penetration group */}
+            <label
+              className="flex items-center gap-2 text-sm"
+              style={{ color: 'var(--color-fg-default)', cursor: 'pointer', marginTop: 4 }}
+            >
+              <input
+                type="checkbox"
+                checked={spellcasting.spellPenetration}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  onSpellcastingChange({
+                    ...spellcasting,
+                    spellPenetration: checked,
+                    greaterSpellPenetration: checked ? spellcasting.greaterSpellPenetration : false,
+                  });
+                }}
+              />
+              Spell Penetration
+            </label>
+            <label
+              className="flex items-center gap-2 text-sm"
+              style={{
+                color: spellcasting.spellPenetration ? 'var(--color-fg-default)' : 'var(--color-fg-subtle)',
+                cursor: spellcasting.spellPenetration ? 'pointer' : 'not-allowed',
+                paddingLeft: 16,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={spellcasting.greaterSpellPenetration}
+                disabled={!spellcasting.spellPenetration}
+                onChange={(e) => updateSpellcasting('greaterSpellPenetration', e.target.checked)}
+              />
+              Greater Spell Penetration
+            </label>
+
+            {/* Domain Spells */}
+            <label
+              className="flex items-center gap-2 text-sm"
+              style={{ color: 'var(--color-fg-default)', cursor: 'pointer', marginTop: 4 }}
+            >
+              <input
+                type="checkbox"
+                checked={spellcasting.domainSlots}
+                onChange={(e) => updateSpellcasting('domainSlots', e.target.checked)}
+              />
+              Domain Spells (+1/level)
+            </label>
+          </div>
+
+          {/* ── Effects Summary ── */}
+          <div
+            className="flex flex-col gap-2 text-xs"
+            style={{
+              color: 'var(--color-fg-muted)',
+              borderLeft: '2px solid var(--color-border-default)',
+              paddingLeft: 12,
+              alignSelf: 'flex-start',
+            }}
+          >
+              {spellcasting.spellFocus && (
+                <div>
+                  <span style={{ fontWeight: 600, color: 'var(--color-fg-default)' }}>Spell Focus</span>
+                  <br />
+                  +1 DC on spells of chosen school
+                  {spellcasting.greaterSpellFocus && (
+                    <><br /><span style={{ fontWeight: 600, color: 'var(--color-fg-default)' }}>Greater:</span> +1 DC (total +2)</>
+                  )}
+                </div>
+              )}
+              <div>
+                <span style={{ fontWeight: 600, color: 'var(--color-fg-default)' }}>Spell Resistance</span>
+                <br />
+                Caster level check to overcome SR:
+                <br />
+                d20 + {resolvedEL + (spellcasting.spellPenetration ? 2 : 0) + (spellcasting.greaterSpellPenetration ? 2 : 0)} vs SR
+              </div>
+            </div>
         </div>
+
+        {/* ── Spell Table ── */}
+        {spellcasting.casterAbility && (
+          <div>
+            <table style={{ borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  {['Lvl', 'Spell DC', 'Spells/Day', 'Bonus Spells'].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: '4px 10px',
+                        textAlign: 'center',
+                        borderBottom: '1px solid var(--color-border-default)',
+                        color: 'var(--color-fg-muted)',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {SPELL_LEVELS.map((lvl) => {
+                  const dc = 10 + lvl + abilityMod;
+                  const bonus = bonusSpells(lvl);
+                  return (
+                    <tr key={lvl}>
+                      <td style={{ padding: '3px 10px', textAlign: 'center', color: 'var(--color-fg-default)' }}>{lvl}</td>
+                      <td style={{ padding: '3px 10px', textAlign: 'center', color: 'var(--color-fg-default)' }}>{dc}</td>
+                      <td style={{ padding: '3px 10px', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
+                        {progressionRow
+                          ? progressionRow[lvl] === -1
+                            ? '—'
+                            : spellcasting.domainSlots
+                              ? `${progressionRow[lvl]} +1`
+                              : String(progressionRow[lvl])
+                          : '—'}
+                      </td>
+                      <td style={{ padding: '3px 10px', textAlign: 'center', color: 'var(--color-fg-default)' }}>
+                        {bonus === null ? '—' : bonus}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

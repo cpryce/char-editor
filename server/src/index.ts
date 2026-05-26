@@ -16,6 +16,8 @@ import { CustomFeat } from './models/CustomFeat';
 import { CustomClass } from './models/CustomClass';
 import { EncounterSession } from './models/EncounterSession';
 import { Campaign } from './models/Campaign';
+import { SpellProgression } from './models/SpellProgression';
+import { SRD_SPELL_PROGRESSIONS } from './data/spellProgressionSeed';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -530,6 +532,88 @@ app.delete('/api/custom-classes/:id', async (req, res) => {
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const cls = await CustomClass.findOneAndDelete({ _id: req.params.id, owner: u._id });
   if (!cls) { res.status(404).json({ error: 'Not found' }); return; }
+  res.status(204).end();
+});
+
+// ── Spell Progressions ─────────────────────────────────
+
+async function ensureDefaultSpellProgressions(userId: mongoose.Types.ObjectId) {
+  const existing = await SpellProgression.find({ owner: userId }).lean();
+  if (existing.length > 0) return;
+  const docs = SRD_SPELL_PROGRESSIONS.map((p) => ({
+    owner: userId,
+    className: p.className,
+    casterAbility: p.casterAbility,
+    isDefault: true,
+    levels: p.levels,
+  }));
+  await SpellProgression.insertMany(docs, { ordered: false });
+}
+
+app.get('/api/spell-progressions', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  await ensureDefaultSpellProgressions(u._id);
+  const progressions = await SpellProgression.find({ owner: u._id }).sort({ className: 1 }).lean();
+  res.json(progressions);
+});
+
+app.post('/api/spell-progressions', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  try {
+    const prog = await SpellProgression.create({ ...req.body, owner: u._id, isDefault: false });
+    res.status(201).json(prog);
+  } catch (err: unknown) {
+    if (err instanceof mongoose.Error.ValidationError) {
+      res.status(400).json({ error: err.message });
+    } else if ((err as { code?: number }).code === 11000) {
+      res.status(409).json({ error: 'A spell progression for this class already exists.' });
+    } else {
+      throw err;
+    }
+  }
+});
+
+app.get('/api/spell-progressions/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const prog = await SpellProgression.findOne({ _id: req.params.id, owner: u._id }).lean();
+  if (!prog) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json(prog);
+});
+
+app.put('/api/spell-progressions/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  try {
+    const { isDefault: _ignored, owner: _owner, ...body } = req.body;
+    const prog = await SpellProgression.findOneAndUpdate(
+      { _id: req.params.id, owner: u._id },
+      { $set: body },
+      { returnDocument: 'after', runValidators: true },
+    );
+    if (!prog) { res.status(404).json({ error: 'Not found' }); return; }
+    res.json(prog);
+  } catch (err: unknown) {
+    if (err instanceof mongoose.Error.ValidationError) {
+      res.status(400).json({ error: err.message });
+    } else if ((err as { code?: number }).code === 11000) {
+      res.status(409).json({ error: 'A spell progression for this class already exists.' });
+    } else {
+      throw err;
+    }
+  }
+});
+
+app.delete('/api/spell-progressions/:id', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  // Disallow deleting SRD defaults
+  const prog = await SpellProgression.findOne({ _id: req.params.id, owner: u._id });
+  if (!prog) { res.status(404).json({ error: 'Not found' }); return; }
+  if (prog.isDefault) { res.status(403).json({ error: 'Cannot delete an SRD default progression.' }); return; }
+  await prog.deleteOne();
   res.status(204).end();
 });
 

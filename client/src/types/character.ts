@@ -155,16 +155,18 @@ export interface Inventory {
 export interface Spellcasting {
   /** Primary ability score used for spellcasting (e.g. 'intelligence', 'wisdom', 'charisma'). */
   casterAbility: string;
-  /** Caster level modifier (CL). */
-  casterLevel: number;
-  /** Effective caster level modifier (EL). */
+  /** Effective caster level override (EL). Defaults to primary class level when 0. */
   effectiveCasterLevel: number;
-  /** Whether the character has/uses the Spell Focus feat for spellcasting. */
+  /** Whether the character has/uses the Spell Focus feat. */
   spellFocus: boolean;
+  /** Whether the character has/uses the Greater Spell Focus feat (requires Spell Focus). */
+  greaterSpellFocus: boolean;
   /** Whether the character has/uses the Spell Penetration feat. */
   spellPenetration: boolean;
-  /** Whether the character has/uses the Combat Casting feat. */
-  combatCasting: boolean;
+  /** Whether the character has/uses the Greater Spell Penetration feat (requires Spell Penetration). */
+  greaterSpellPenetration: boolean;
+  /** Whether the class grants a bonus domain spell slot per spell level (e.g. Cleric). */
+  domainSlots: boolean;
 }
 
 // ── Full character form state ─────────────────────────────────────────────────
