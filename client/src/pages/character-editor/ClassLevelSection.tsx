@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { useState } from 'react';
 import { CLASSES, HIT_DIE_BY_CLASS } from '../../types/character';
 import { totalCharacterLevel } from '../../utils/characterHelpers';
+import { formatSpellsPerDay } from './spellSlots';
 
 function NumberInput({
   value, onChange, min = 0, placeholder, 'aria-label': ariaLabel,
@@ -553,9 +554,7 @@ export function ClassLevelSection({
                         {progressionRow
                           ? progressionRow[lvl] === -1
                             ? '—'
-                            : spellcasting.domainSlots
-                              ? `${progressionRow[lvl]} +1`
-                              : String(progressionRow[lvl])
+                            : formatSpellsPerDay(progressionRow[lvl], lvl, spellcasting.domainSlots)
                           : '—'}
                       </td>
                       <td style={{ padding: '3px 10px', textAlign: 'center', color: 'var(--color-fg-default)' }}>
