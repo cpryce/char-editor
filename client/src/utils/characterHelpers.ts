@@ -86,6 +86,22 @@ export const BASE_SPEED_BY_SIZE: Readonly<Partial<Record<Size, number>>> = {
   Colossal: 60,
 };
 
+export const AC_SIZE_MODIFIERS: Readonly<Record<Size, number>> = {
+  Fine: 8,
+  Diminutive: 4,
+  Tiny: 2,
+  Small: 1,
+  Medium: 0,
+  Large: -1,
+  Huge: -2,
+  Gargantuan: -4,
+  Colossal: -8,
+};
+
+export function defaultAcSizeModifier(size: Size): number {
+  return AC_SIZE_MODIFIERS[size] ?? 0;
+}
+
 export const CLASS_SKILL_POINTS_PER_LEVEL: Readonly<Record<ClassName, number>> = {
   Barbarian: 4,
   Bard: 6,
@@ -774,7 +790,15 @@ export function newCharacterDraft(): CharacterDraft {
     combat: {
       initiative: { miscBonus: 0 },
       speed: { base: 30, armorAdjust: 0, fly: 0, swim: 0 },
-      armorClass: { armor: 0, shield: 0, dodge: 0, natural: 0, deflection: 0, misc: 0 },
+      armorClass: {
+        armor: 0,
+        shield: 0,
+        size: defaultAcSizeModifier(RACIAL_SIZES.Human),
+        dodge: 0,
+        natural: 0,
+        deflection: 0,
+        misc: 0,
+      },
       saves: {
         fortitude: { base: 0, magic: 0, misc: 0, temp: 0 },
         reflex: { base: 0, magic: 0, misc: 0, temp: 0 },

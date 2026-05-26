@@ -182,6 +182,7 @@ async function seed() {
       armorClass: {
         armor:      4,  // chain shirt
         shield:     1,  // light wooden shield
+        size:       0,
         natural:    0,
         deflection: 0,
         misc:       0,

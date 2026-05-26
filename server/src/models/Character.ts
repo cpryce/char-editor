@@ -206,7 +206,7 @@ export interface ICharacter extends Document {
   combat: {
     initiative:  { miscBonus: number };
     speed:       { base: number; armorAdjust: number; fly: number; swim: number };
-    armorClass:  { armor: number; shield: number; dodge: number; natural: number; deflection: number; misc: number };
+    armorClass:  { armor: number; shield: number; size: number; dodge: number; natural: number; deflection: number; misc: number };
     saves: {
       fortitude: { base: number; magic: number; misc: number; temp: number };
       reflex:    { base: number; magic: number; misc: number; temp: number };
@@ -340,6 +340,7 @@ const characterSchema = new Schema<ICharacter>(
       armorClass: {
         armor:       { type: Number, default: 0 },
         shield:      { type: Number, default: 0 },
+        size:        { type: Number, default: 0 },
         dodge:       { type: Number, default: 0 },
         natural:     { type: Number, default: 0 },
         deflection:  { type: Number, default: 0 },
