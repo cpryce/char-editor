@@ -294,7 +294,7 @@ export function ClassLevelSection({
   const primaryClass: { name: string; level: number } | null = classes.reduce<{ name: string; level: number } | null>(
     (best, c) => {
       if (!c.name) return best;
-      const lvl = (c.levels ?? []).reduce((a, b) => a + b, 0);
+      const lvl = c.level ?? 0;
       if (!best || lvl > best.level) return { name: c.name, level: lvl };
       return best;
     },
