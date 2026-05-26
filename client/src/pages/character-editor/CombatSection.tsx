@@ -12,6 +12,7 @@ export type CombatDerivedStats = {
   wisMod: number;
   strMod: number;
   sizeMod: number;
+  acSizeMod: number;
   acArmor: number;
   acShield: number;
   acDodge: number;
@@ -59,6 +60,7 @@ export function CombatSection({
     wisMod,
     strMod,
     sizeMod,
+    acSizeMod,
     acArmor,
     acShield,
     acNatural,
@@ -180,6 +182,7 @@ export function CombatSection({
             {modInput('Armor', acArmor, (v) => updateNumeric('armorClass.armor', v))}
             {modInput('Shield', acShield, (v) => updateNumeric('armorClass.shield', v))}
             {modInput('Dex', acDexMod)}
+            {modInput('Size', acSizeMod, (v) => updateNumeric('armorClass.size', v))}
             {modInput('Dodge', combat.armorClass.dodge, (v) => updateNumeric('armorClass.dodge', v))}
             {modInput('Deflection', acDeflection)}
             {modInput('Natural', acNatural)}

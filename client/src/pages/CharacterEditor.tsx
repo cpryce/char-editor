@@ -26,6 +26,7 @@ import {
   computeAcTotals,
   BASE_SPEED_BY_SIZE,
   BASE_SPEED_BY_RACE,
+  defaultAcSizeModifier,
   PATHFINDER_FLEXIBLE_RACES,
   isPathfinderSystem,
   getRacialAdjFor,
@@ -152,13 +153,21 @@ function applyRaceToDraft(
     bonus: computeSkillBonus(skill, abilityScores),
   }));
   const feats = mergeSelectableFeats(draft.feats, deriveSelectableFeats(draft.classes, race));
+  const size = RACIAL_SIZES[race];
 
   return {
     ...draft,
     race,
     racialAbilityChoice: choice ?? null,
-    size: RACIAL_SIZES[race],
-    baseSpeed: String(BASE_SPEED_BY_RACE[race] ?? BASE_SPEED_BY_SIZE[RACIAL_SIZES[race]] ?? 30),
+    size,
+    baseSpeed: String(BASE_SPEED_BY_RACE[race] ?? BASE_SPEED_BY_SIZE[size] ?? 30),
+    combat: {
+      ...draft.combat,
+      armorClass: {
+        ...draft.combat.armorClass,
+        size: defaultAcSizeModifier(size),
+      },
+    },
     abilityScores,
     skills,
     feats,
@@ -230,18 +239,6 @@ function Accordion({
 
 // ── Ability Scores section ────────────────────────────────────────────────────
 
-const SIZE_MODIFIERS: Record<CharacterDraft['size'], number> = {
-  Fine: 8,
-  Diminutive: 4,
-  Tiny: 2,
-  Small: 1,
-  Medium: 0,
-  Large: -1,
-  Huge: -2,
-  Gargantuan: -4,
-  Colossal: -8,
-};
-
 function signed(value: number) {
   return value >= 0 ? `+${value}` : `${value}`;
 }
@@ -294,7 +291,10 @@ function deriveCombatStats({
   const conMod = abilityMods.constitution;
   const wisMod = abilityMods.wisdom;
   const strMod = abilityMods.strength;
-  const sizeMod = SIZE_MODIFIERS[size] ?? 0;
+  const sizeMod = defaultAcSizeModifier(size);
+  const acSizeMod = typeof combat.armorClass.size === 'number' && Number.isFinite(combat.armorClass.size)
+    ? combat.armorClass.size
+    : sizeMod;
   const acArmor = safeCombatNumber(combat.armorClass.armor);
   const acShield = safeCombatNumber(combat.armorClass.shield);
   const acNatural = safeCombatNumber(combat.armorClass.natural);
@@ -351,7 +351,7 @@ function deriveCombatStats({
 
   const { total: totalAC, touch: touchAC, flatFooted: flatFootedAC } = computeAcTotals({
     armor: acArmor, shield: acShield, acDexMod,
-    sizeMod, dodge: acDodge, natural: acNatural, deflection: acDeflection, misc: acMisc + featAcMod,
+    sizeMod: acSizeMod, dodge: acDodge, natural: acNatural, deflection: acDeflection, misc: acMisc + featAcMod,
   });
   const initiativeTotal = dexMod + initMisc;
   const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc) + featFortMod;
@@ -367,6 +367,7 @@ function deriveCombatStats({
     wisMod,
     strMod,
     sizeMod,
+    acSizeMod,
     acArmor,
     acShield,
     acDexMod,
@@ -755,13 +756,20 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
           };
         });
 
+        const loadedSize = (data.size as CharacterDraft['size']) ?? base.size;
         const rawCombat = (data.combat as CharacterDraft['combat'] | undefined) ?? base.combat;
         const normalizedCombat: CharacterDraft['combat'] = {
           ...base.combat,
           ...rawCombat,
           initiative: { ...base.combat.initiative, ...(rawCombat.initiative ?? {}) },
           speed: { ...base.combat.speed, ...(rawCombat.speed ?? {}) },
-          armorClass: { ...base.combat.armorClass, ...(rawCombat.armorClass ?? {}) },
+          armorClass: {
+            ...base.combat.armorClass,
+            ...(rawCombat.armorClass ?? {}),
+            size: typeof rawCombat.armorClass?.size === 'number' && Number.isFinite(rawCombat.armorClass.size)
+              ? rawCombat.armorClass.size
+              : defaultAcSizeModifier(loadedSize),
+          },
           saves: {
             fortitude: { ...base.combat.saves.fortitude, ...(rawCombat.saves?.fortitude ?? {}) },
             reflex: { ...base.combat.saves.reflex, ...(rawCombat.saves?.reflex ?? {}) },
@@ -858,8 +866,8 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
           race: (data.race as CharacterDraft['race']) ?? base.race,
           racialAbilityChoice: typeof data.racialAbilityChoice === 'string' ? data.racialAbilityChoice : null,
           alignment: (data.alignment as CharacterDraft['alignment']) ?? base.alignment,
-          size: (data.size as CharacterDraft['size']) ?? base.size,
-          baseSpeed: typeof data.baseSpeed === 'string' ? data.baseSpeed : typeof data.baseSpeed === 'number' ? String(data.baseSpeed) : String(BASE_SPEED_BY_SIZE[(data.size as CharacterDraft['size']) ?? base.size] ?? 30),
+          size: loadedSize,
+          baseSpeed: typeof data.baseSpeed === 'string' ? data.baseSpeed : typeof data.baseSpeed === 'number' ? String(data.baseSpeed) : String(BASE_SPEED_BY_SIZE[loadedSize] ?? 30),
           deity: typeof data.deity === 'string' ? data.deity : '',
           age: typeof data.age === 'number' ? String(data.age) : '',
           height: typeof data.height === 'string' ? data.height : '',
@@ -1080,7 +1088,24 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
       }));
       const derivedFeats = deriveSelectableFeats(d.classes, race);
       const feats = mergeSelectableFeats(d.feats, derivedFeats);
-      return { ...d, race, racialAbilityChoice: newChoice, size: RACIAL_SIZES[race], baseSpeed: String(BASE_SPEED_BY_RACE[race] ?? BASE_SPEED_BY_SIZE[RACIAL_SIZES[race]] ?? 30), abilityScores: newScores, skills, feats };
+      const nextSize = RACIAL_SIZES[race];
+      return {
+        ...d,
+        race,
+        racialAbilityChoice: newChoice,
+        size: nextSize,
+        baseSpeed: String(BASE_SPEED_BY_RACE[race] ?? BASE_SPEED_BY_SIZE[nextSize] ?? 30),
+        combat: {
+          ...d.combat,
+          armorClass: {
+            ...d.combat.armorClass,
+            size: defaultAcSizeModifier(nextSize),
+          },
+        },
+        abilityScores: newScores,
+        skills,
+        feats,
+      };
     });
   }, [customClassMap, pointBuySystem]);
 

@@ -216,10 +216,11 @@ export async function fillCharacterPdf(
   const wisEffMod = effectiveTempMod(s.wisdom)         ?? wisMod;
   const chaEffMod = effectiveTempMod(s.charisma)      ?? chaMod;
 
-  const sizeMod = SIZE_CATEGORIES[character.size as keyof typeof SIZE_CATEGORIES]?.acAttackMod ?? 0;
+  const defaultSizeMod = SIZE_CATEGORIES[character.size as keyof typeof SIZE_CATEGORIES]?.acAttackMod ?? 0;
 
   const classes = character.classes;
   const ac = character.combat.armorClass;
+  const acSizeMod = Number.isFinite(ac.size) ? ac.size : defaultSizeMod;
   const saves = character.combat.saves;
 
   // ── Fill fields ───────────────────────────────────────────────────────────
@@ -326,7 +327,7 @@ export async function fillCharacterPdf(
   safeSet(form, 'combat.armorClass.armor',       ac.armor);
   safeSet(form, 'combat.armorClass.shield',      ac.shield);
   safeSet(form, 'combat.armorClass.dexterityMod', signed(acDexEffMod));
-  safeSet(form, 'combat.armorClass.size',        sizeMod || '');
+  safeSet(form, 'combat.armorClass.size',        acSizeMod || '');
   safeSet(form, 'combat.armorClass.dodge',       ac.dodge       || '');
   safeSet(form, 'combat.armorClass.natural',     ac.natural     || '');
   safeSet(form, 'combat.armorClass.deflection',  ac.deflection  || '');
@@ -335,7 +336,7 @@ export async function fillCharacterPdf(
   // Armor class — derived totals
   const { total: acTotal, touch: acTouch, flatFooted: acFlatFooted } = computeAcTotals({
     armor: ac.armor, shield: ac.shield, acDexMod: acDexEffMod,
-    sizeMod, dodge: ac.dodge, natural: ac.natural, deflection: ac.deflection, misc: ac.misc,
+    sizeMod: acSizeMod, dodge: ac.dodge, natural: ac.natural, deflection: ac.deflection, misc: ac.misc,
   });
   safeSet(form, 'combat.armorClass.total',      acTotal);
   safeSet(form, 'combat.armorClass.touch',      acTouch);

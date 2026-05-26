@@ -207,7 +207,7 @@ export interface CharacterDraft {
   combat: {
     initiative: { miscBonus: number };
     speed: { base: number; armorAdjust: number; fly: number; swim: number };
-    armorClass: { armor: number; shield: number; dodge: number; natural: number; deflection: number; misc: number };
+    armorClass: { armor: number; shield: number; size: number; dodge: number; natural: number; deflection: number; misc: number };
     saves: {
       fortitude: { base: number; magic: number; misc: number; temp: number };
       reflex: { base: number; magic: number; misc: number; temp: number };
