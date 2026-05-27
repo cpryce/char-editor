@@ -944,6 +944,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
           feats,
           spellcasting: {
             casterAbility: typeof rawSpellcasting.casterAbility === 'string' ? rawSpellcasting.casterAbility : '',
+            casterLevel: typeof rawSpellcasting.casterLevel === 'number' ? rawSpellcasting.casterLevel : 0,
             effectiveCasterLevel: typeof rawSpellcasting.effectiveCasterLevel === 'number' ? rawSpellcasting.effectiveCasterLevel : 0,
             spellFocus: typeof rawSpellcasting.spellFocus === 'boolean' ? rawSpellcasting.spellFocus : featNames.has('Spell Focus'),
             greaterSpellFocus: typeof rawSpellcasting.greaterSpellFocus === 'boolean' ? rawSpellcasting.greaterSpellFocus : featNames.has('Greater Spell Focus'),

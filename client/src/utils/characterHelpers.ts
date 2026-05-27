@@ -841,6 +841,7 @@ export function newCharacterDraft(): CharacterDraft {
     feats: [],
     spellcasting: {
       casterAbility: '',
+      casterLevel: 0,
       effectiveCasterLevel: 0,
       spellFocus: false,
       greaterSpellFocus: false,

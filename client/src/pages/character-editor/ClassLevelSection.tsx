@@ -291,29 +291,32 @@ export function ClassLevelSection({
   const SPELL_LEVELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
   // ── Spell Progression lookup ──────────────────────────────────────────────
-  // Use the highest-leveled class to identify which progression table to use.
-  const primaryClass: { name: string; level: number } | null = classes.reduce<{ name: string; level: number } | null>(
+  // Among classes that have a matching spell progression, use the one with the
+  // highest level. This handles multiclass characters correctly: e.g. a Fighter
+  // 10 / Wizard 5 will use the Wizard progression at level 5, not Fighter.
+  const { activeProgression, primaryClassLevel } = classes.reduce<{
+    activeProgression: SpellProgression | null;
+    primaryClassLevel: number;
+  }>(
     (best, c) => {
       if (!c.name) return best;
       const lvl = c.level ?? 0;
-      if (!best || lvl > best.level) return { name: c.name, level: lvl };
-      return best;
+      if (lvl <= best.primaryClassLevel) return best;
+      const prog = spellProgressions.find(
+        (p) => p.className.toLowerCase() === c.name.toLowerCase(),
+      ) ?? null;
+      if (!prog) return best;
+      return { activeProgression: prog, primaryClassLevel: lvl };
     },
-    null,
+    { activeProgression: null, primaryClassLevel: 0 },
   );
-  const primaryClassName: string | null = primaryClass?.name ?? null;
-  const primaryClassLevel: number = primaryClass?.level ?? 0;
 
-  const activeProgression: SpellProgression | null = primaryClassName
-    ? (spellProgressions.find(
-        (p) => p.className.toLowerCase() === primaryClassName.toLowerCase(),
-      ) ?? null)
-    : null;
-
-  // EL defaults to primary class level when not set manually.
+  // CL defaults to highest spellcasting class level; EL also defaults the same.
+  // CL drives the spells-per-day table; EL drives spell resistance checks.
+  const resolvedCL = spellcasting.casterLevel > 0 ? spellcasting.casterLevel : primaryClassLevel;
   const resolvedEL = spellcasting.effectiveCasterLevel > 0 ? spellcasting.effectiveCasterLevel : primaryClassLevel;
-  const progressionRow: number[] | null = activeProgression && resolvedEL > 0
-    ? (activeProgression.levels[Math.min(resolvedEL, 20) - 1] ?? null)
+  const progressionRow: number[] | null = activeProgression && resolvedCL > 0
+    ? (activeProgression.levels[Math.min(resolvedCL, 20) - 1] ?? null)
     : null;
 
   return (
@@ -388,6 +391,16 @@ export function ClassLevelSection({
               <option value="wisdom">Wisdom</option>
               <option value="charisma">Charisma</option>
             </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>CL</span>
+            <NumberInput
+              value={spellcasting.casterLevel}
+              min={0}
+              aria-label="Caster Level"
+              placeholder={primaryClassLevel > 0 ? String(primaryClassLevel) : undefined}
+              onChange={(v) => updateSpellcasting('casterLevel', v)}
+            />
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>EL</span>

@@ -101,6 +101,7 @@ const skillSchema = new Schema(
 const spellcastingSchema = new Schema(
   {
     casterAbility:       { type: String, default: '' },
+    casterLevel:         { type: Number, default: 0 },
     effectiveCasterLevel:{ type: Number, default: 0 },
     spellFocus:              { type: Boolean, default: false },
     greaterSpellFocus:       { type: Boolean, default: false },
@@ -259,6 +260,7 @@ export interface ICharacter extends Document {
   // Spellcasting
   spellcasting?: {
     casterAbility: string;
+    casterLevel: number;
     effectiveCasterLevel: number;
     spellFocus: boolean;
     spellPenetration: boolean;

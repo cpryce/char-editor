@@ -155,7 +155,9 @@ export interface Inventory {
 export interface Spellcasting {
   /** Primary ability score used for spellcasting (e.g. 'intelligence', 'wisdom', 'charisma'). */
   casterAbility: string;
-  /** Effective caster level override (EL). Defaults to primary class level when 0. */
+  /** Caster level (CL) override. Used for spells-per-day table. Defaults to highest spellcasting class level when 0. */
+  casterLevel: number;
+  /** Effective caster level override (EL). Used for spell resistance checks. Defaults to highest spellcasting class level when 0. */
   effectiveCasterLevel: number;
   /** Whether the character has/uses the Spell Focus feat. */
   spellFocus: boolean;

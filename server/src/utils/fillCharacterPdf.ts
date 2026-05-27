@@ -588,6 +588,19 @@ export async function fillCharacterPdf(
     }
   }
 
+  // ── Spellcasting ─────────────────────────────────────────────────────────
+  {
+    const sc = character.spellcasting;
+    // Resolve CL and EL: fall back to the highest spellcasting class level when
+    // the stored value is 0 (meaning "use default").
+    const highestSpellcastingLevel = (character.classes as Array<{ name: string; level: number }> | undefined)
+      ?.reduce((max, c) => Math.max(max, c.level ?? 0), 0) ?? 0;
+    const cl = (sc?.casterLevel && sc.casterLevel > 0) ? sc.casterLevel : highestSpellcastingLevel;
+    const el = (sc?.effectiveCasterLevel && sc.effectiveCasterLevel > 0) ? sc.effectiveCasterLevel : highestSpellcastingLevel;
+    safeSet(form, 'spellcasting.casterLevel',         cl || '');
+    safeSet(form, 'spellcasting.effectiveCasterLevel', el || '');
+  }
+
   // ── Acrobat JavaScript calculations (Adobe Acrobat/Reader only) ──────────
   // Attaches a Calculate (AA.C) JS action to each derived field and sets the
   // AcroForm CO (Calculation Order) so Acrobat evaluates dependencies in order.
