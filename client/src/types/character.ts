@@ -171,6 +171,15 @@ export interface Spellcasting {
   domainSlots: boolean;
 }
 
+// ── Turn / Rebuke Undead ──────────────────────────────────────────────────────
+
+export interface TurnUndead {
+  clericLevel: number;
+  turnsPerDay: number;
+  turnCheck: number;
+  turnDamage: number;
+}
+
 // ── Full character form state ─────────────────────────────────────────────────
 
 export interface CharacterDraft {
@@ -224,4 +233,5 @@ export interface CharacterDraft {
   skills: Skill[];
   feats: FeatSlot[];
   spellcasting: Spellcasting;
+  turnUndead: TurnUndead;
 }

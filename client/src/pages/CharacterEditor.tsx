@@ -952,6 +952,15 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             greaterSpellPenetration: typeof rawSpellcasting.greaterSpellPenetration === 'boolean' ? rawSpellcasting.greaterSpellPenetration : featNames.has('Greater Spell Penetration'),
             domainSlots: typeof rawSpellcasting.domainSlots === 'boolean' ? rawSpellcasting.domainSlots : false,
           },
+          turnUndead: (() => {
+            const raw = (data.turnUndead ?? {}) as Record<string, unknown>;
+            return {
+              clericLevel: typeof raw.clericLevel === 'number' ? raw.clericLevel : 0,
+              turnsPerDay: typeof raw.turnsPerDay === 'number' ? raw.turnsPerDay : 0,
+              turnCheck: typeof raw.turnCheck === 'number' ? raw.turnCheck : 0,
+              turnDamage: typeof raw.turnDamage === 'number' ? raw.turnDamage : 0,
+            };
+          })(),
         };
         setDraft(loadedDraft);
         setAutoSaveCharacterId(characterId);
@@ -1554,6 +1563,8 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             spellcasting={draft.spellcasting}
             onSpellcastingChange={(next) => setField('spellcasting', next)}
             spellProgressions={spellProgressions}
+            turnUndead={draft.turnUndead}
+            onTurnUndeadChange={(next) => setField('turnUndead', next)}
           />
         </Accordion>
 

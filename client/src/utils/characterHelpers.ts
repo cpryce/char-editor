@@ -849,6 +849,12 @@ export function newCharacterDraft(): CharacterDraft {
       greaterSpellPenetration: false,
       domainSlots: false,
     },
+    turnUndead: {
+      clericLevel: 0,
+      turnsPerDay: 0,
+      turnCheck: 0,
+      turnDamage: 0,
+    },
   };
 }
 

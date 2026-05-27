@@ -68,6 +68,16 @@ function SelectableFeatsSection({
   const takenNames = new Set(feats.map((f) => f.name).filter(Boolean));
   const selectedFeatNames = takenNames;
 
+  // Racial bonus feats first, then preserve original order
+  const sortedIndices = feats
+    .map((f, i) => ({ f, i }))
+    .sort((a, b) => {
+      const aRacial = a.f.sourceLabel.startsWith('Racial') ? 0 : 1;
+      const bRacial = b.f.sourceLabel.startsWith('Racial') ? 0 : 1;
+      return aRacial - bRacial;
+    })
+    .map(({ i }) => i);
+
   function updateName(i: number, name: string, shortDescription?: string) {
     onChange(feats.map((f, idx) =>
       idx === i ? { ...f, name, shortDescription: shortDescription ?? '' } : f,
@@ -112,10 +122,12 @@ function SelectableFeatsSection({
                 </td>
               </tr>
             )}
-            {feats.map((feat, i) => (
+            {sortedIndices.map((i, displayIdx) => {
+              const feat = feats[i];
+              return (
               <tr
                 key={i}
-                className={`border-b border-[var(--color-border-muted)] ${i % 2 === 0 ? 'bg-[var(--color-canvas-default)]' : 'bg-[var(--color-canvas-subtle)]'}`}
+                className={`border-b border-[var(--color-border-muted)] ${displayIdx % 2 === 0 ? 'bg-[var(--color-canvas-default)]' : 'bg-[var(--color-canvas-subtle)]'}`}
               >
                 <td className="px-3 py-1">
                   <FeatAutocomplete
@@ -157,7 +169,8 @@ function SelectableFeatsSection({
                   )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

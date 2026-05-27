@@ -1,4 +1,4 @@
-import type { CharacterDraft, Spellcasting, AbilityScore } from '../../types/character';
+import type { CharacterDraft, Spellcasting, TurnUndead, AbilityScore } from '../../types/character';
 import { abilityModifier, totalScore } from '../../utils/characterHelpers';
 import type { CustomClass } from '../../types/customClass';
 import type { SpellProgression } from '../../types/spellProgression';
@@ -27,6 +27,35 @@ function NumberInput({
         padding: '4px 8px',
         fontSize: 14,
         width: 72,
+      }}
+    />
+  );
+}
+
+function BonusInput({
+  value, onChange, 'aria-label': ariaLabel,
+}: { value: number; onChange: (v: number) => void; 'aria-label'?: string }) {
+  const display = value > 0 ? `+${value}` : value === 0 ? '+0' : String(value);
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={display}
+      aria-label={ariaLabel}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/^\+/, '');
+        const n = parseInt(raw, 10);
+        if (!isNaN(n)) onChange(n);
+        else if (raw === '' || raw === '-') onChange(0);
+      }}
+      style={{
+        background: 'var(--color-canvas-default)',
+        border: '1px solid var(--color-border-default)',
+        borderRadius: 6,
+        color: 'var(--color-fg-default)',
+        padding: '4px 8px',
+        fontSize: 14,
+        width: 88,
       }}
     />
   );
@@ -169,6 +198,7 @@ function ClassesSection({
 
   return (
     <div className="flex flex-col gap-2">
+      <p className="subsection-header">Character Level: {totalCharacterLevel(classes)}</p>
       {classes.map((c, i) => (
         <div key={i} className="flex items-center gap-2">
           {i === 0 ? (
@@ -232,9 +262,6 @@ function ClassesSection({
       >
         + Add Class
       </button>
-      <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
-        Character Level: {totalCharacterLevel(classes)}
-      </p>
     </div>
   );
 }
@@ -252,6 +279,8 @@ export function ClassLevelSection({
   onSpellcastingChange,
   abilityScores,
   spellProgressions = [],
+  turnUndead,
+  onTurnUndeadChange,
 }: {
   classes: CharacterDraft['classes'];
   isEdit: boolean;
@@ -265,6 +294,8 @@ export function ClassLevelSection({
   onSpellcastingChange: (next: Spellcasting) => void;
   abilityScores: CharacterDraft['abilityScores'];
   spellProgressions?: SpellProgression[];
+  turnUndead: TurnUndead;
+  onTurnUndeadChange: (next: TurnUndead) => void;
 }) {
   function updateSpellcasting<K extends keyof Spellcasting>(key: K, value: Spellcasting[K]) {
     onSpellcastingChange({ ...spellcasting, [key]: value });
@@ -331,47 +362,75 @@ export function ClassLevelSection({
           customClasses={customClasses}
         />
         {isEdit ? (
-          <div className="grid grid-cols-3 gap-4 max-w-xl">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Hit Points</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={String(hitPoints.max)}
-                onChange={(e) => {
-                  const digitsOnly = e.target.value.replace(/\D+/g, '');
-                  const max = digitsOnly === '' ? 0 : Number(digitsOnly);
-                  onHitPointsChange({
-                    ...hitPoints,
-                    max,
-                    current: max,
-                  });
-                }}
-                style={{ ...inputStyle, width: 96 }}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Nonlethal</span>
-              <NumberInput
-                value={hitPoints.nonlethal}
-                min={0}
-                onChange={(v) => onHitPointsChange({ ...hitPoints, nonlethal: Math.max(0, Math.trunc(v)) })}
-              />
-            </label>
-          </div>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium" style={{ color: 'var(--color-fg-muted)' }}>Hit Points</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={String(hitPoints.max)}
+              onChange={(e) => {
+                const digitsOnly = e.target.value.replace(/\D+/g, '');
+                const max = digitsOnly === '' ? 0 : Number(digitsOnly);
+                onHitPointsChange({
+                  ...hitPoints,
+                  max,
+                  current: max,
+                });
+              }}
+              style={{ ...inputStyle, width: 96 }}
+            />
+          </label>
         ) : (
-          <div className="grid grid-cols-3 gap-4 max-w-xl">
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium" style={{ color: 'var(--color-fg-muted)' }}>Hit Points</span>
+            <input
+              type="text"
+              value={calculatedCreateHitPoints}
+              readOnly
+              style={{ ...inputStyle, width: 96, color: 'var(--color-fg-muted)', cursor: 'default' }}
+            />
+          </label>
+        )}
+        {/* ── Turn / Rebuke Undead ── */}
+        <div className="flex flex-col gap-2">
+          <p className="subsection-header">Turn or Rebuke Undead</p>
+          <div className="flex flex-wrap items-end gap-3">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Hit Points</span>
-              <input
-                type="text"
-                value={calculatedCreateHitPoints}
-                readOnly
-                style={{ ...inputStyle, width: 96, color: 'var(--color-fg-muted)', cursor: 'default' }}
+              <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Cleric Level</span>
+              <NumberInput
+                value={turnUndead.clericLevel}
+                min={0}
+                aria-label="Cleric Level"
+                onChange={(v) => onTurnUndeadChange({ ...turnUndead, clericLevel: v })}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Turn/Day</span>
+              <NumberInput
+                value={turnUndead.turnsPerDay}
+                min={0}
+                aria-label="Turns per Day"
+                onChange={(v) => onTurnUndeadChange({ ...turnUndead, turnsPerDay: v })}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Turn Check (d20)</span>
+              <BonusInput
+                value={turnUndead.turnCheck}
+                aria-label="Turn Check"
+                onChange={(v) => onTurnUndeadChange({ ...turnUndead, turnCheck: v })}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Turn Damage (2d6)</span>
+              <BonusInput
+                value={turnUndead.turnDamage}
+                aria-label="Turn Damage"
+                onChange={(v) => onTurnUndeadChange({ ...turnUndead, turnDamage: v })}
               />
             </label>
           </div>
-        )}
+        </div>
       </div>
 
       {/* ── Column 2: Spellcasting ── */}
