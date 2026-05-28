@@ -12,8 +12,12 @@ export interface ISpellProgression extends Document {
   className: string;
   casterAbility: 'Intelligence' | 'Wisdom' | 'Charisma';
   /** true = auto-seeded SRD default; user can edit but not delete SRD rows */
-  isDefault: boolean;
-  levels: number[][];
+  isDefault: boolean;  /** Highest spell level available (0–9, default 9). */
+  maxSpellLevel?: number;
+  /** Whether this class has a limited spells-known list (e.g. Bard, Sorcerer). */
+  hasLimitedSpellsKnown?: boolean;  levels: number[][];
+  /** Optional spells-known table (same shape as levels). Present for spontaneous casters like Bard/Sorcerer. */
+  spellsKnown?: number[][];
   updatedAt: Date;
   createdAt: Date;
 }
@@ -23,8 +27,11 @@ const spellProgressionSchema = new Schema<ISpellProgression>(
     owner:         { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     className:     { type: String, required: true, trim: true, maxlength: 120 },
     casterAbility: { type: String, required: true, enum: ['Intelligence', 'Wisdom', 'Charisma'] },
-    isDefault:     { type: Boolean, default: false },
-    levels:        { type: [[Number]], required: true },
+    isDefault:              { type: Boolean, default: false },
+    maxSpellLevel:          { type: Number, required: false },
+    hasLimitedSpellsKnown:  { type: Boolean, required: false },
+    levels:                 { type: [[Number]], required: true },
+    spellsKnown:            { type: [[Number]], required: false },
   },
   { timestamps: true },
 );

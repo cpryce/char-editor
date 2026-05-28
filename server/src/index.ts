@@ -538,16 +538,23 @@ app.delete('/api/custom-classes/:id', async (req, res) => {
 // ── Spell Progressions ─────────────────────────────────
 
 async function ensureDefaultSpellProgressions(userId: mongoose.Types.ObjectId) {
-  const existing = await SpellProgression.find({ owner: userId }).lean();
-  if (existing.length > 0) return;
-  const docs = SRD_SPELL_PROGRESSIONS.map((p) => ({
-    owner: userId,
-    className: p.className,
-    casterAbility: p.casterAbility,
-    isDefault: true,
-    levels: p.levels,
-  }));
-  await SpellProgression.insertMany(docs, { ordered: false });
+  for (const p of SRD_SPELL_PROGRESSIONS) {
+    await SpellProgression.findOneAndUpdate(
+      { owner: userId, className: p.className },
+      {
+        $set: {
+          casterAbility: p.casterAbility,
+          isDefault: true,
+          levels: p.levels,
+          ...(p.maxSpellLevel !== undefined ? { maxSpellLevel: p.maxSpellLevel } : {}),
+          ...(p.hasLimitedSpellsKnown !== undefined ? { hasLimitedSpellsKnown: p.hasLimitedSpellsKnown } : {}),
+          ...(p.spellsKnown !== undefined ? { spellsKnown: p.spellsKnown } : {}),
+        },
+        $setOnInsert: { owner: userId, className: p.className },
+      },
+      { upsert: true },
+    );
+  }
 }
 
 app.get('/api/spell-progressions', async (req, res) => {

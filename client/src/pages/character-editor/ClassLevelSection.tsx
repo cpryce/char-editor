@@ -350,6 +350,11 @@ export function ClassLevelSection({
     ? (activeProgression.levels[Math.min(resolvedCL, 20) - 1] ?? null)
     : null;
 
+  const showSpellsKnown = !!(activeProgression?.hasLimitedSpellsKnown && activeProgression.spellsKnown);
+  const spellsKnownRow: number[] | null = showSpellsKnown && resolvedCL > 0
+    ? (activeProgression!.spellsKnown![Math.min(resolvedCL, 20) - 1] ?? null)
+    : null;
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
       {/* ── Column 1: Class & Hit Points ── */}
@@ -597,7 +602,7 @@ export function ClassLevelSection({
             <table style={{ borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr>
-                  {['Lvl', 'Spell DC', 'Spells/Day', 'Bonus Spells'].map((h) => (
+                  {['Lvl', 'Spell DC', 'Spells/Day', ...(showSpellsKnown ? ['Spells Known'] : []), 'Bonus Spells'].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -629,6 +634,15 @@ export function ClassLevelSection({
                             : formatSpellsPerDay(progressionRow[lvl], lvl, spellcasting.domainSlots)
                           : '—'}
                       </td>
+                      {showSpellsKnown && (
+                        <td style={{ padding: '3px 10px', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
+                          {spellsKnownRow
+                            ? spellsKnownRow[lvl] === -1
+                              ? '—'
+                              : String(spellsKnownRow[lvl])
+                            : '—'}
+                        </td>
+                      )}
                       <td style={{ padding: '3px 10px', textAlign: 'center', color: 'var(--color-fg-default)' }}>
                         {bonus === null ? '—' : bonus}
                       </td>

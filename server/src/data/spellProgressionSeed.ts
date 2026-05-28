@@ -15,7 +15,13 @@
 export interface SrdSpellProgression {
   className: string;
   casterAbility: 'Intelligence' | 'Wisdom' | 'Charisma';
+  /** Highest spell level available (0-9, default 9). */
+  maxSpellLevel?: number;
+  /** Whether this class has a limited spells-known list (e.g. Bard). */
+  hasLimitedSpellsKnown?: boolean;
   levels: number[][];
+  /** Optional spells-known table. Same shape as levels. Present for spontaneous casters. */
+  spellsKnown?: number[][];
 }
 
 // prettier-ignore
@@ -53,6 +59,7 @@ export const SRD_SPELL_PROGRESSIONS: SrdSpellProgression[] = [
   {
     className: 'Sorcerer',
     casterAbility: 'Charisma',
+    hasLimitedSpellsKnown: true,
     levels: [
       // 0  1   2   3   4   5   6   7   8   9
       [ 5,  3, -1, -1, -1, -1, -1, -1, -1, -1], // 1
@@ -75,6 +82,30 @@ export const SRD_SPELL_PROGRESSIONS: SrdSpellProgression[] = [
       [ 6,  6,  6,  6,  6,  6,  6,  6,  5,  3], // 18
       [ 6,  6,  6,  6,  6,  6,  6,  6,  6,  4], // 19
       [ 6,  6,  6,  6,  6,  6,  6,  6,  6,  6], // 20
+    ],
+    // Source: d20 SRD v3.5, Table: Sorcerer Spells Known
+    spellsKnown: [
+      // 0   1   2   3   4   5   6   7   8   9
+      [ 4,   2, -1, -1, -1, -1, -1, -1, -1, -1], // 1
+      [ 5,   2, -1, -1, -1, -1, -1, -1, -1, -1], // 2
+      [ 5,   3, -1, -1, -1, -1, -1, -1, -1, -1], // 3
+      [ 6,   3,  1, -1, -1, -1, -1, -1, -1, -1], // 4
+      [ 6,   4,  2, -1, -1, -1, -1, -1, -1, -1], // 5
+      [ 7,   4,  2,  1, -1, -1, -1, -1, -1, -1], // 6
+      [ 7,   5,  3,  2, -1, -1, -1, -1, -1, -1], // 7
+      [ 8,   5,  3,  2,  1, -1, -1, -1, -1, -1], // 8
+      [ 8,   5,  4,  3,  2, -1, -1, -1, -1, -1], // 9
+      [ 9,   5,  4,  3,  2,  1, -1, -1, -1, -1], // 10
+      [ 9,   5,  5,  4,  3,  2, -1, -1, -1, -1], // 11
+      [ 9,   5,  5,  4,  3,  2,  1, -1, -1, -1], // 12
+      [ 9,   5,  5,  4,  4,  3,  2, -1, -1, -1], // 13
+      [ 9,   5,  5,  4,  4,  3,  2,  1, -1, -1], // 14
+      [ 9,   5,  5,  4,  4,  4,  3,  2, -1, -1], // 15
+      [ 9,   5,  5,  4,  4,  4,  3,  2,  1, -1], // 16
+      [ 9,   5,  5,  4,  4,  4,  3,  3,  2, -1], // 17
+      [ 9,   5,  5,  4,  4,  4,  3,  3,  2,  1], // 18
+      [ 9,   5,  5,  4,  4,  4,  3,  3,  3,  2], // 19
+      [ 9,   5,  5,  4,  4,  4,  3,  3,  3,  3], // 20
     ],
   },
 
@@ -140,6 +171,8 @@ export const SRD_SPELL_PROGRESSIONS: SrdSpellProgression[] = [
   {
     className: 'Bard',
     casterAbility: 'Charisma',
+    maxSpellLevel: 6,
+    hasLimitedSpellsKnown: true,
     levels: [
       // 0   1   2   3   4   5   6   7   8   9
       [ 2,  -1, -1, -1, -1, -1, -1, -1, -1, -1], // 1
@@ -163,6 +196,30 @@ export const SRD_SPELL_PROGRESSIONS: SrdSpellProgression[] = [
       [ 4,   4,  4,  4,  4,  4,  3, -1, -1, -1], // 19
       [ 4,   4,  4,  4,  4,  4,  4, -1, -1, -1], // 20
     ],
+    // Source: d20 SRD v3.5, Table: The Bard — Spells Known columns
+    spellsKnown: [
+      // 0   1   2   3   4   5   6   7   8   9
+      [ 4,  -1, -1, -1, -1, -1, -1, -1, -1, -1], // 1
+      [ 5,   2, -1, -1, -1, -1, -1, -1, -1, -1], // 2
+      [ 6,   3, -1, -1, -1, -1, -1, -1, -1, -1], // 3
+      [ 6,   3,  2, -1, -1, -1, -1, -1, -1, -1], // 4
+      [ 6,   4,  3, -1, -1, -1, -1, -1, -1, -1], // 5
+      [ 6,   4,  3, -1, -1, -1, -1, -1, -1, -1], // 6
+      [ 6,   4,  4,  2, -1, -1, -1, -1, -1, -1], // 7
+      [ 6,   4,  4,  3, -1, -1, -1, -1, -1, -1], // 8
+      [ 6,   4,  4,  3, -1, -1, -1, -1, -1, -1], // 9
+      [ 6,   4,  4,  4,  2, -1, -1, -1, -1, -1], // 10
+      [ 6,   4,  4,  4,  3, -1, -1, -1, -1, -1], // 11
+      [ 6,   4,  4,  4,  3, -1, -1, -1, -1, -1], // 12
+      [ 6,   4,  4,  4,  4,  2, -1, -1, -1, -1], // 13
+      [ 6,   4,  4,  4,  4,  3, -1, -1, -1, -1], // 14
+      [ 6,   4,  4,  4,  4,  3, -1, -1, -1, -1], // 15
+      [ 6,   5,  4,  4,  4,  4,  2, -1, -1, -1], // 16
+      [ 6,   5,  5,  4,  4,  4,  3, -1, -1, -1], // 17
+      [ 6,   5,  5,  5,  4,  4,  3, -1, -1, -1], // 18
+      [ 6,   5,  5,  5,  5,  4,  4, -1, -1, -1], // 19
+      [ 6,   5,  5,  5,  5,  5,  4, -1, -1, -1], // 20
+    ],
   },
 
   // ── Paladin (Wisdom, half caster, max 4th-level spells, starts at level 4)
@@ -170,6 +227,8 @@ export const SRD_SPELL_PROGRESSIONS: SrdSpellProgression[] = [
   {
     className: 'Paladin',
     casterAbility: 'Wisdom',
+    maxSpellLevel: 4,
+    hasLimitedSpellsKnown: true,
     levels: [
       // 0   1   2   3   4   5   6   7   8   9
       [-1,  -1, -1, -1, -1, -1, -1, -1, -1, -1], // 1
@@ -200,6 +259,8 @@ export const SRD_SPELL_PROGRESSIONS: SrdSpellProgression[] = [
   {
     className: 'Ranger',
     casterAbility: 'Wisdom',
+    maxSpellLevel: 4,
+    hasLimitedSpellsKnown: true,
     levels: [
       // 0   1   2   3   4   5   6   7   8   9
       [-1,  -1, -1, -1, -1, -1, -1, -1, -1, -1], // 1
