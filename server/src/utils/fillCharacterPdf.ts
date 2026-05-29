@@ -601,6 +601,28 @@ export async function fillCharacterPdf(
     safeSet(form, 'spellcasting.effectiveCasterLevel', el || '');
   }
 
+  // ── Turn / Rebuke Undead ─────────────────────────────────────────────────
+  {
+    const tu = character.turnUndead;
+    // Mirror the defaults computed in ClassLevelSection:
+    //   clericLevel  = stored ?? resolvedCL (same cl as spellcasting above)
+    //   turnsPerDay  = stored ?? 3 + chaEffMod
+    //   turnCheck    = stored ?? chaEffMod
+    //   turnDamage   = stored ?? effectiveClericLevel + chaEffMod
+    const sc = character.spellcasting;
+    const highestClassLevel = (character.classes as Array<{ name: string; level: number }> | undefined)
+      ?.reduce((max, c) => Math.max(max, c.level ?? 0), 0) ?? 0;
+    const resolvedCL = (sc?.casterLevel && sc.casterLevel > 0) ? sc.casterLevel : highestClassLevel;
+    const effectiveClericLevel = tu?.clericLevel ?? resolvedCL;
+    const turnsPerDay = tu?.turnsPerDay ?? (3 + chaEffMod);
+    const turnCheck   = tu?.turnCheck   ?? chaEffMod;
+    const turnDamage  = tu?.turnDamage  ?? (effectiveClericLevel + chaEffMod);
+    safeSet(form, 'turnUndead.clericLevel',  effectiveClericLevel || '');
+    safeSet(form, 'turnUndead.turnsPerDay',  turnsPerDay);
+    safeSet(form, 'turnUndead.turnCheck',    signed(turnCheck));
+    safeSet(form, 'turnUndead.turnDamage',   signed(turnDamage));
+  }
+
   // ── Acrobat JavaScript calculations (Adobe Acrobat/Reader only) ──────────
   // Attaches a Calculate (AA.C) JS action to each derived field and sets the
   // AcroForm CO (Calculation Order) so Acrobat evaluates dependencies in order.
@@ -725,7 +747,12 @@ export async function fillCharacterPdf(
       .set(PDFName.of('CO'), pdfDoc.context.obj(calcOrder as any));
   }
 
-  form.updateFieldAppearances(font);
+  try {
+    form.updateFieldAppearances(font);
+  } catch {
+    // pdf-lib cannot generate appearance streams for rich text fields — skip.
+    // NeedAppearances:true below tells conforming readers to regenerate on open.
+  }
 
   // Tell conforming readers to regenerate field appearances on open.
   // This ensures dropdown selected values are visible without relying on
@@ -759,5 +786,5 @@ export async function fillCharacterPdf(
   // Also set Info dict /Title for viewers that read it instead of XMP
   pdfDoc.setTitle(character.name);
 
-  return pdfDoc.save();
+  return pdfDoc.save({ updateFieldAppearances: false });
 }

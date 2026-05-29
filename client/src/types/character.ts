@@ -174,10 +174,14 @@ export interface Spellcasting {
 // ── Turn / Rebuke Undead ──────────────────────────────────────────────────────
 
 export interface TurnUndead {
-  clericLevel: number;
-  turnsPerDay: number;
-  turnCheck: number;
-  turnDamage: number;
+  /** null = auto-computed from caster level */
+  clericLevel: number | null;
+  /** null = auto-computed as 3 + Charisma modifier */
+  turnsPerDay: number | null;
+  /** null = auto-computed as Charisma modifier */
+  turnCheck: number | null;
+  /** null = auto-computed as cleric level + Charisma modifier */
+  turnDamage: number | null;
 }
 
 // ── Full character form state ─────────────────────────────────────────────────

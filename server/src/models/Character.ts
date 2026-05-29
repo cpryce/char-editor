@@ -112,6 +112,16 @@ const spellcastingSchema = new Schema(
   { _id: false },
 );
 
+const turnUndeadSchema = new Schema(
+  {
+    clericLevel: { type: Number, default: null },
+    turnsPerDay: { type: Number, default: null },
+    turnCheck:   { type: Number, default: null },
+    turnDamage:  { type: Number, default: null },
+  },
+  { _id: false },
+);
+
 const featSchema = new Schema(
   {
     name:   { type: String, required: true },
@@ -257,6 +267,14 @@ export interface ICharacter extends Document {
     twfAppliedFeats?: string[];
   };
 
+  // Turn / Rebuke Undead
+  turnUndead?: {
+    clericLevel: number | null;
+    turnsPerDay: number | null;
+    turnCheck:   number | null;
+    turnDamage:  number | null;
+  };
+
   // Spellcasting
   spellcasting?: {
     casterAbility: string;
@@ -371,6 +389,9 @@ const characterSchema = new Schema<ICharacter>(
       }],
       twfAppliedFeats: [{ type: String }],
     },
+
+    // Turn / Rebuke Undead
+    turnUndead: { type: turnUndeadSchema, default: () => ({}) },
 
     // Spellcasting
     spellcasting: { type: spellcastingSchema, default: () => ({}) },

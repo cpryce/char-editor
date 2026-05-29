@@ -850,10 +850,10 @@ export function newCharacterDraft(): CharacterDraft {
       domainSlots: false,
     },
     turnUndead: {
-      clericLevel: 0,
-      turnsPerDay: 0,
-      turnCheck: 0,
-      turnDamage: 0,
+      clericLevel: null,
+      turnsPerDay: null,
+      turnCheck: null,
+      turnDamage: null,
     },
   };
 }

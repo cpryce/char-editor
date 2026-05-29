@@ -355,6 +355,14 @@ export function ClassLevelSection({
     ? (activeProgression!.spellsKnown![Math.min(resolvedCL, 20) - 1] ?? null)
     : null;
 
+  // ── Turn Undead defaults ──────────────────────────────────────────────────
+  const chaMod = abilityModifier(abilityScores.charisma.temp ?? totalScore(abilityScores.charisma));
+  const defaultClericLevel = resolvedCL;
+  const effectiveClericLevel = turnUndead.clericLevel ?? defaultClericLevel;
+  const defaultTurnsPerDay = 3 + chaMod;
+  const defaultTurnCheck = chaMod;
+  const defaultTurnDamage = effectiveClericLevel + chaMod;
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
       {/* ── Column 1: Class & Hit Points ── */}
@@ -403,7 +411,7 @@ export function ClassLevelSection({
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Cleric Level</span>
               <NumberInput
-                value={turnUndead.clericLevel}
+                value={turnUndead.clericLevel ?? defaultClericLevel}
                 min={0}
                 aria-label="Cleric Level"
                 onChange={(v) => onTurnUndeadChange({ ...turnUndead, clericLevel: v })}
@@ -412,7 +420,7 @@ export function ClassLevelSection({
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Turn/Day</span>
               <NumberInput
-                value={turnUndead.turnsPerDay}
+                value={turnUndead.turnsPerDay ?? defaultTurnsPerDay}
                 min={0}
                 aria-label="Turns per Day"
                 onChange={(v) => onTurnUndeadChange({ ...turnUndead, turnsPerDay: v })}
@@ -421,7 +429,7 @@ export function ClassLevelSection({
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Turn Check (d20)</span>
               <BonusInput
-                value={turnUndead.turnCheck}
+                value={turnUndead.turnCheck ?? defaultTurnCheck}
                 aria-label="Turn Check"
                 onChange={(v) => onTurnUndeadChange({ ...turnUndead, turnCheck: v })}
               />
@@ -429,7 +437,7 @@ export function ClassLevelSection({
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>Turn Damage (2d6)</span>
               <BonusInput
-                value={turnUndead.turnDamage}
+                value={turnUndead.turnDamage ?? defaultTurnDamage}
                 aria-label="Turn Damage"
                 onChange={(v) => onTurnUndeadChange({ ...turnUndead, turnDamage: v })}
               />

@@ -88,7 +88,7 @@ export function TurnUndeadPage() {
   void timesPerDay;
 
   return (
-    <div className="turn-undead-page">
+    <div className="turn-undead-page p-6">
       <div className="turn-undead-page-header">
         <h1 className="turn-undead-page-title">Turn Undead Calculator</h1>
       </div>

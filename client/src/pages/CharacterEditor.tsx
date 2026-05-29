@@ -955,10 +955,10 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
           turnUndead: (() => {
             const raw = (data.turnUndead ?? {}) as Record<string, unknown>;
             return {
-              clericLevel: typeof raw.clericLevel === 'number' ? raw.clericLevel : 0,
-              turnsPerDay: typeof raw.turnsPerDay === 'number' ? raw.turnsPerDay : 0,
-              turnCheck: typeof raw.turnCheck === 'number' ? raw.turnCheck : 0,
-              turnDamage: typeof raw.turnDamage === 'number' ? raw.turnDamage : 0,
+              clericLevel: typeof raw.clericLevel === 'number' ? raw.clericLevel : null,
+              turnsPerDay: typeof raw.turnsPerDay === 'number' ? raw.turnsPerDay : null,
+              turnCheck: typeof raw.turnCheck === 'number' ? raw.turnCheck : null,
+              turnDamage: typeof raw.turnDamage === 'number' ? raw.turnDamage : null,
             };
           })(),
         };
