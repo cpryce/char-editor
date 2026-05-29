@@ -62,14 +62,19 @@
 }
 
 .turn-undead-form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   gap: 12px 16px;
+}
+
+.turn-undead-field--btn {
+  justify-content: flex-end;
 }
 
 @media (max-width: 479px) {
   .turn-undead-form-grid {
-    grid-template-columns: 1fr;
+    flex-direction: column;
   }
 }
 
@@ -86,7 +91,7 @@
 }
 
 .turn-undead-input {
-  width: 100%;
+  width: 120px;
   padding: 6px 10px;
   border: 1px solid var(--color-border-default);
   border-radius: 6px;

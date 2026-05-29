@@ -114,7 +114,7 @@ export function TurnUndeadPage() {
 
               <div className="turn-undead-field">
                 <label htmlFor="cha-bonus" className="turn-undead-label">
-                  Charisma Bonus
+                  Cha Bonus
                 </label>
                 <input
                   id="cha-bonus"
@@ -129,7 +129,7 @@ export function TurnUndeadPage() {
 
               <div className="turn-undead-field">
                 <label htmlFor="d20-roll" className="turn-undead-label">
-                  d20 Roll
+                  Turn Check (d20)
                 </label>
                 <input
                   id="d20-roll"
@@ -145,7 +145,7 @@ export function TurnUndeadPage() {
 
               <div className="turn-undead-field">
                 <label htmlFor="twod6-roll" className="turn-undead-label">
-                  2d6 Roll
+                  Turn Damage (2d6)
                 </label>
                 <input
                   id="twod6-roll"
@@ -158,13 +158,16 @@ export function TurnUndeadPage() {
                   onChange={(e) => setTwod6Roll(e.target.value)}
                 />
               </div>
+
+              <div className="turn-undead-field turn-undead-field--btn">
+                <span className="turn-undead-label" aria-hidden="true">&nbsp;</span>
+                <button type="submit" className="turn-undead-btn">
+                  Calculate
+                </button>
+              </div>
             </div>
 
             {error && <p className="turn-undead-error">{error}</p>}
-
-            <button type="submit" className="turn-undead-btn">
-              Calculate
-            </button>
           </form>
 
           {result && (
