@@ -91,7 +91,7 @@ export function NameGeneratorPage({ onCreateCharacter }: { onCreateCharacter?: (
               id="ng-race"
               value={race}
               onChange={(e) => setRace(e.target.value as Race)}
-              className="h-8 px-3 text-sm min-w-[140px] rounded-md border border-[var(--color-border-default)] bg-white text-slate-900"
+              className="h-8 px-3 text-sm min-w-[140px] rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
             >
               {RACES.map((r) => (
                 <option key={r} value={r}>{r}</option>
@@ -111,7 +111,7 @@ export function NameGeneratorPage({ onCreateCharacter }: { onCreateCharacter?: (
               id="ng-gender"
               value={gender}
               onChange={(e) => setGender(e.target.value as Gender)}
-              className="h-8 px-3 text-sm min-w-[140px] rounded-md border border-[var(--color-border-default)] bg-white text-slate-900"
+              className="h-8 px-3 text-sm min-w-[140px] rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
             >
               {GENDERS.map((g) => (
                 <option key={g} value={g}>{g}</option>
@@ -162,7 +162,7 @@ export function NameGeneratorPage({ onCreateCharacter }: { onCreateCharacter?: (
               id="ng-class"
               value={selectedClass ?? ''}
               onChange={(e) => setSelectedClass((e.target.value as ClassName) || undefined)}
-              className="h-8 px-3 text-sm min-w-[140px] rounded-md border border-[var(--color-border-default)] bg-white text-slate-900"
+              className="h-8 px-3 text-sm min-w-[140px] rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
             >
               <option value="">None</option>
               {CLASSES.map((c) => (
