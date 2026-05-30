@@ -87,6 +87,8 @@ const skillSchema = new Schema(
     armorCheckPenalty: { type: Boolean, default: false },
     ranks:             { type: Number, default: 0, min: 0 },
     classSkill:        { type: Boolean, default: false },
+    /** Explicit user override for classSkill. Absent/null = defer to class-derived value. */
+    classSkillOverride: { type: Boolean, default: null },
     miscBonus:         { type: Number, default: 0 },
     /**
      * Pre-computed total modifier for the skill check:
@@ -286,7 +288,7 @@ export interface ICharacter extends Document {
   };
 
   // Skills, Feats, Equipment, Currency
-  skills: { name: string; keyAbility: string; ranks: number; classSkill: boolean; miscBonus: number }[];
+  skills: { name: string; keyAbility: string; ranks: number; classSkill: boolean; classSkillOverride?: boolean | null; miscBonus: number }[];
   feats:  { name: string; category: string; source?: string; sourceLabel?: string; shortDescription?: string; notes?: string }[];
   equipment: { name: string; type?: string; weight: number; equipped: boolean; notes?: string }[];
   currency: { pp: number; gp: number; sp: number; cp: number };

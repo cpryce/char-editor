@@ -52,6 +52,15 @@ export function SkillsSection({
     onChange(updated);
   }
 
+  function updateClassSkillOverride(i: number, newValue: boolean) {
+    const updated = skills.map((sk, idx) => {
+      if (idx !== i) return sk;
+      const next = { ...sk, classSkill: newValue, classSkillOverride: newValue };
+      return { ...next, bonus: computeSkillBonus(next, abilityScores) };
+    });
+    onChange(updated);
+  }
+
   function resetRanks() {
     const updated = skills.map((sk) => {
       const next = { ...sk, ranks: 0 };
@@ -142,10 +151,11 @@ export function SkillsSection({
                 <td className="px-3 py-1 text-center skills-td-muted">
                   <input
                     type="checkbox"
-                    aria-label={`${sk.name} is class skill`}
+                    aria-label={`${sk.name} is class skill${sk.classSkillOverride != null ? ' (overridden)' : ''}`}
                     checked={sk.classSkill}
-                    readOnly
-                    className="skills-checkbox"
+                    onChange={(e) => updateClassSkillOverride(i, e.target.checked)}
+                    className={['skills-checkbox', sk.classSkillOverride != null ? 'skills-checkbox--overridden' : ''].join(' ').trim()}
+                    title={sk.classSkillOverride != null ? 'Class skill overridden' : undefined}
                   />
                 </td>
                 <td className="px-3 py-1 text-right font-semibold skills-td-default">

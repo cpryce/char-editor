@@ -722,7 +722,8 @@ export function applyClassAndRacialSkillRules(
   const racialBonuses = RACIAL_SKILL_BONUSES[race] ?? {};
 
   return skills.map((skill) => {
-    const classSkill = classSkillNames.has(skill.name);
+    const computedClassSkill = classSkillNames.has(skill.name);
+    const classSkill = skill.classSkillOverride != null ? skill.classSkillOverride : computedClassSkill;
     return {
       ...skill,
       classSkill,

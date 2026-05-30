@@ -752,6 +752,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             armorCheckPenalty: typeof found.armorCheckPenalty === 'boolean' ? found.armorCheckPenalty : skill.armorCheckPenalty,
             ranks: typeof found.ranks === 'number' ? found.ranks : skill.ranks,
             classSkill: typeof found.classSkill === 'boolean' ? found.classSkill : skill.classSkill,
+            classSkillOverride: typeof found.classSkillOverride === 'boolean' ? found.classSkillOverride : null,
             miscBonus: typeof found.miscBonus === 'number' ? found.miscBonus : skill.miscBonus,
           };
         });

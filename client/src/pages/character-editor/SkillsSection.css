@@ -59,6 +59,14 @@
   accent-color: black;
   width: 14px;
   height: 14px;
+  cursor: pointer;
+}
+
+.skills-checkbox--overridden {
+  accent-color: var(--color-attention-fg, #9a6700);
+  outline: 1px solid var(--color-attention-fg, #9a6700);
+  outline-offset: 1px;
+  border-radius: 2px;
 }
 
 .skills-number-input {

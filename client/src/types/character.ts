@@ -48,6 +48,8 @@ export interface Skill {
   armorCheckPenalty: boolean;
   ranks: number;
   classSkill: boolean;
+  /** Explicit user override for classSkill. null = defer to class-derived value. */
+  classSkillOverride?: boolean | null;
   miscBonus: number;
   bonus: number;
 }

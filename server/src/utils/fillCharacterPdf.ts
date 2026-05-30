@@ -604,23 +604,23 @@ export async function fillCharacterPdf(
   // ── Turn / Rebuke Undead ─────────────────────────────────────────────────
   {
     const tu = character.turnUndead;
-    // Mirror the defaults computed in ClassLevelSection:
-    //   clericLevel  = stored ?? resolvedCL (same cl as spellcasting above)
-    //   turnsPerDay  = stored ?? 3 + chaEffMod
-    //   turnCheck    = stored ?? chaEffMod
-    //   turnDamage   = stored ?? effectiveClericLevel + chaEffMod
-    const sc = character.spellcasting;
-    const highestClassLevel = (character.classes as Array<{ name: string; level: number }> | undefined)
-      ?.reduce((max, c) => Math.max(max, c.level ?? 0), 0) ?? 0;
-    const resolvedCL = (sc?.casterLevel && sc.casterLevel > 0) ? sc.casterLevel : highestClassLevel;
-    const effectiveClericLevel = tu?.clericLevel ?? resolvedCL;
-    const turnsPerDay = tu?.turnsPerDay ?? (3 + chaEffMod);
-    const turnCheck   = tu?.turnCheck   ?? chaEffMod;
-    const turnDamage  = tu?.turnDamage  ?? (effectiveClericLevel + chaEffMod);
-    safeSet(form, 'turnUndead.clericLevel',  effectiveClericLevel || '');
-    safeSet(form, 'turnUndead.turnsPerDay',  turnsPerDay);
-    safeSet(form, 'turnUndead.turnCheck',    signed(turnCheck));
-    safeSet(form, 'turnUndead.turnDamage',   signed(turnDamage));
+    // Only fill turn/rebuke undead fields when the user has explicitly set a
+    // clericLevel. When clericLevel is null the feature is considered unused
+    // and all four fields are left blank.
+    if (tu?.clericLevel != null) {
+      const turnsPerDay = tu.turnsPerDay ?? (3 + chaEffMod);
+      const turnCheck   = tu.turnCheck   ?? chaEffMod;
+      const turnDamage  = tu.turnDamage  ?? (tu.clericLevel + chaEffMod);
+      safeSet(form, 'turnUndead.clericLevel',  tu.clericLevel || '');
+      safeSet(form, 'turnUndead.turnsPerDay',  turnsPerDay);
+      safeSet(form, 'turnUndead.turnCheck',    signed(turnCheck));
+      safeSet(form, 'turnUndead.turnDamage',   signed(turnDamage));
+    } else {
+      safeSet(form, 'turnUndead.clericLevel',  '');
+      safeSet(form, 'turnUndead.turnsPerDay',  '');
+      safeSet(form, 'turnUndead.turnCheck',    '');
+      safeSet(form, 'turnUndead.turnDamage',   '');
+    }
   }
 
   // ── Acrobat JavaScript calculations (Adobe Acrobat/Reader only) ──────────
