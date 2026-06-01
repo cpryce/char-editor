@@ -8,8 +8,6 @@ interface CampaignSummary {
   encounterIds: string[];
   playerCount: number;
   updatedAt: string;
-  accessLevel?: 'owner' | 'view' | 'delegate';
-  dmName?: string | null;
 }
 
 export function CampaignsPage({ onEditCampaign }: { onEditCampaign: (id: string) => void }) {
@@ -103,9 +101,7 @@ export function CampaignsPage({ onEditCampaign }: { onEditCampaign: (id: string)
 
       {!loading && campaigns.length > 0 && (
         <ul className="flex flex-col gap-2">
-          {campaigns.map((c) => {
-            const isOwner = !c.accessLevel || c.accessLevel === 'owner';
-            return (
+          {campaigns.map((c) => (
             <li
               key={c._id}
               className="flex items-center rounded-lg"
@@ -116,29 +112,9 @@ export function CampaignsPage({ onEditCampaign }: { onEditCampaign: (id: string)
                 className="flex-1 text-left px-4 py-3"
                 onClick={() => onEditCampaign(c._id)}
               >
-                <span className="inline-flex items-center gap-2 font-medium text-sm" style={{ color: 'var(--color-fg-default)' }}>
+                <span className="font-medium text-sm block" style={{ color: 'var(--color-fg-default)' }}>
                   {c.name}
-                  {!isOwner && (
-                    <span
-                      className="text-xs px-1.5 py-0.5 rounded font-normal"
-                      style={{
-                        background: c.accessLevel === 'delegate'
-                          ? 'var(--color-accent-subtle)'
-                          : 'var(--color-neutral-subtle)',
-                        color: c.accessLevel === 'delegate'
-                          ? 'var(--color-accent-fg)'
-                          : 'var(--color-fg-muted)',
-                      }}
-                    >
-                      {c.accessLevel === 'delegate' ? 'Shared · Edit' : 'Shared · View'}
-                    </span>
-                  )}
                 </span>
-                {c.dmName && (
-                  <span className="text-xs block mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>
-                    DM: {c.dmName}
-                  </span>
-                )}
                 {c.description && (
                   <span
                     className="text-xs block mt-0.5"
@@ -161,21 +137,18 @@ export function CampaignsPage({ onEditCampaign }: { onEditCampaign: (id: string)
                   {c.encounterIds.length} encounter{c.encounterIds.length !== 1 ? 's' : ''}
                 </span>
               </button>
-              {isOwner && (
-                <button
-                  type="button"
-                  onClick={() => handleDelete(c._id, c.name)}
-                  aria-label={`Delete ${c.name}`}
-                  className="px-3 py-3 text-lg leading-none"
-                  style={{ color: 'var(--color-fg-subtle)', background: 'none', border: 'none', cursor: 'pointer' }}
-                  title="Delete campaign"
-                >
-                  ×
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => handleDelete(c._id, c.name)}
+                aria-label={`Delete ${c.name}`}
+                className="px-3 py-3 text-lg leading-none"
+                style={{ color: 'var(--color-fg-subtle)', background: 'none', border: 'none', cursor: 'pointer' }}
+                title="Delete campaign"
+              >
+                ×
+              </button>
             </li>
-            );
-          })}
+          ))}
         </ul>
       )}
     </div>

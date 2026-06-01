@@ -15,7 +15,7 @@ import { Character } from './models/Character';
 import { CustomFeat } from './models/CustomFeat';
 import { CustomClass } from './models/CustomClass';
 import { EncounterSession } from './models/EncounterSession';
-import { Campaign, type CampaignAccessLevel, type ICampaign } from './models/Campaign';
+import { Campaign } from './models/Campaign';
 import { SpellProgression } from './models/SpellProgression';
 import { SRD_SPELL_PROGRESSIONS } from './data/spellProgressionSeed';
 
@@ -201,15 +201,8 @@ app.post('/api/characters', async (req, res) => {
   }
   const u = req.user as { _id: mongoose.Types.ObjectId };
   try {
-    const { campaignId, ...charBody } = req.body as { campaignId?: string; [key: string]: unknown };
     const owner = await User.findById(u._id);
-    const character = await Character.create({ ...charBody, owner: u._id, player: owner?.name ?? '' });
-    if (campaignId) {
-      const campAccess = await getCampaignAccess(campaignId, u._id);
-      if (campAccess) {
-        await Campaign.updateOne({ _id: campaignId }, { $addToSet: { characterIds: character._id } });
-      }
-    }
+    const character = await Character.create({ ...req.body, owner: u._id, player: owner?.name ?? '' });
     res.status(201).json(character);
   } catch (err: unknown) {
     if (err instanceof mongoose.Error.ValidationError) {
@@ -667,10 +660,7 @@ app.post('/api/encounters', async (req, res) => {
     campaignId: campaignId || null,
   });
   if (campaignId) {
-    const campAccess = await getCampaignAccess(campaignId, u._id);
-    if (campAccess) {
-      await Campaign.updateOne({ _id: campaignId }, { $addToSet: { encounterIds: encounter._id } });
-    }
+    await Campaign.updateOne({ _id: campaignId, owner: u._id }, { $addToSet: { encounterIds: encounter._id } });
   }
   let campaignName: string | null = null;
   if (campaignId) {
@@ -724,162 +714,78 @@ app.delete('/api/encounters/:id', async (req, res) => {
 
 // ── Campaign routes ─────────────────────────────────────────────
 
-/**
- * Returns the caller's access level for a campaign, or null if they have none.
- * 'owner' > 'delegate' > 'view'
- */
-async function getCampaignAccess(
-  campaignId: string,
-  userId: mongoose.Types.ObjectId,
-): Promise<{ campaign: ICampaign; access: 'owner' | CampaignAccessLevel } | null> {
-  const campaign = await Campaign.findById(campaignId);
+/** Returns a campaign with populated character + encounter summaries. */
+async function getCampaignDetail(campaignId: string, ownerId: mongoose.Types.ObjectId) {
+  const campaign = await Campaign.findOne({ _id: campaignId, owner: ownerId }).lean();
   if (!campaign) return null;
-  if (campaign.owner.toString() === userId.toString()) return { campaign, access: 'owner' };
-  const invite = campaign.invites.find(
-    (inv) => inv.userId?.toString() === userId.toString(),
-  );
-  if (invite) return { campaign, access: invite.access };
-  return null;
-}
-
-/** Maps a character document to the summary shape returned in campaign detail. */
-function mapCharSummary(c: {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-  race?: string;
-  classes?: Array<{ name: string; level: number; hitDieType: number; hpRolled: number[] }>;
-  owner?: mongoose.Types.ObjectId | null;
-  delegatedTo?: mongoose.Types.ObjectId | null;
-  pendingInviteEmail?: string | null;
-  abilityScores?: { dexterity?: { base?: number; racial?: number; enhancement?: number; misc?: number; tempMod?: number; levelUp?: number; temp?: number | null } };
-  combat?: { initiative?: { miscBonus?: number } };
-}) {
-  const dex = c.abilityScores?.dexterity;
-  const dexTotal = dex
-    ? (dex.temp ?? ((dex.base ?? 10) + (dex.racial ?? 0) + (dex.enhancement ?? 0) + (dex.misc ?? 0) + (dex.tempMod ?? 0) + (dex.levelUp ?? 0)))
-    : 10;
-  const initiativeModifier = Math.floor((dexTotal - 10) / 2) + Number(c.combat?.initiative?.miscBonus ?? 0);
-  return {
-    _id: c._id.toString(),
-    name: c.name,
-    race: c.race,
-    classes: c.classes,
-    owner: c.owner?.toString() ?? null,
-    delegatedTo: c.delegatedTo?.toString() ?? null,
-    pendingInviteEmail: c.pendingInviteEmail ?? null,
-    initiativeModifier,
-  };
-}
-
-/**
- * Returns a campaign detail object visible to the given user (owner or accepted invite member).
- * Owners additionally receive the full invites list.
- */
-async function getCampaignDetail(
-  campaignId: string,
-  userId: mongoose.Types.ObjectId,
-) {
-  const result = await getCampaignAccess(campaignId, userId);
-  if (!result) return null;
-  const { campaign, access } = result;
-  const campObj = campaign;
-
   const [characters, encounters, ownerUser] = await Promise.all([
     Character.find(
-      { _id: { $in: campObj.characterIds } },
+      { _id: { $in: campaign.characterIds } },
       { name: 1, race: 1, classes: 1, owner: 1, delegatedTo: 1, pendingInviteEmail: 1, 'abilityScores.dexterity': 1, 'combat.initiative': 1 },
     ).lean(),
     EncounterSession.find(
-      { _id: { $in: campObj.encounterIds } },
+      { _id: { $in: campaign.encounterIds } },
       { name: 1 },
     ).lean(),
-    User.findById(campObj.owner, { name: 1, email: 1, avatar: 1 }).lean(),
+    User.findById(ownerId, { name: 1, email: 1, avatar: 1 }).lean(),
   ]);
-
-  // Players sidebar: all accepted invite members (union of char owners/delegates + explicit invitees)
-  const acceptedInviteUserIds = campObj.invites
-    .filter((inv) => inv.userId != null)
-    .map((inv) => inv.userId!.toString());
-  const charPlayerIds = characters.map((c) => {
-    const raw = c as unknown as { delegatedTo?: { toString(): string } | null };
-    return raw.delegatedTo?.toString() ?? c.owner?.toString();
-  }).filter((id): id is string => Boolean(id));
-  const allPlayerIds = [...new Set([...charPlayerIds, ...acceptedInviteUserIds])];
-  const playerUsers = allPlayerIds.length > 0
-    ? await User.find({ _id: { $in: allPlayerIds } }, { name: 1, email: 1, avatar: 1 }).lean()
+  const playerIds = [...new Set(
+    characters.map((c) => {
+      const raw = c as unknown as { delegatedTo?: { toString(): string } };
+      return (raw.delegatedTo?.toString() ?? c.owner?.toString());
+    }).filter((id): id is string => Boolean(id)),
+  )];
+  const playerUsers = playerIds.length > 0
+    ? await User.find({ _id: { $in: playerIds } }, { name: 1, email: 1, avatar: 1 }).lean()
     : [];
-
-  const base = {
-    ...campObj.toObject(),
-    accessLevel: access,
+  return {
+    ...campaign,
     owner: ownerUser
       ? { _id: ownerUser._id.toString(), name: ownerUser.name, email: ownerUser.email, avatar: ownerUser.avatar }
       : null,
-    characters: characters.map((c) => mapCharSummary(c as Parameters<typeof mapCharSummary>[0])),
+    characters: characters.map((c) => {
+      const raw = c as unknown as {
+        delegatedTo?: { toString(): string };
+        pendingInviteEmail?: string;
+        abilityScores?: { dexterity?: { base?: number; racial?: number; enhancement?: number; misc?: number; tempMod?: number; levelUp?: number; temp?: number } };
+        combat?: { initiative?: { miscBonus?: number } };
+      };
+      const dex = raw.abilityScores?.dexterity;
+      const dexTotal = dex
+        ? (dex.temp ?? ((dex.base ?? 10) + (dex.racial ?? 0) + (dex.enhancement ?? 0) + (dex.misc ?? 0) + (dex.tempMod ?? 0) + (dex.levelUp ?? 0)))
+        : 10;
+      const initiativeModifier = Math.floor((dexTotal - 10) / 2) + Number(raw.combat?.initiative?.miscBonus ?? 0);
+      return {
+        _id: c._id.toString(),
+        name: c.name,
+        race: c.race,
+        classes: c.classes,
+        owner: c.owner?.toString() ?? null,
+        delegatedTo: raw.delegatedTo?.toString() ?? null,
+        pendingInviteEmail: raw.pendingInviteEmail ?? null,
+        initiativeModifier,
+      };
+    }),
     encounters: encounters.map((e) => ({ _id: e._id.toString(), id: e._id.toString(), name: e.name })),
     players: playerUsers.map((u) => ({ _id: u._id.toString(), name: u.name, email: u.email, avatar: u.avatar })),
   };
-
-  // Only expose invite management data to the campaign owner
-  if (access === 'owner') {
-    // Enrich invites with resolved user details for accepted entries
-    const acceptedUserMap = new Map(playerUsers.map((u) => [u._id.toString(), u]));
-    return {
-      ...base,
-      invites: campObj.invites.map((inv) => {
-        const user = inv.userId ? acceptedUserMap.get(inv.userId.toString()) : null;
-        return {
-          _id: inv._id.toString(),
-          email: inv.email,
-          access: inv.access,
-          isPending: inv.token != null,
-          token: inv.token ?? null,
-          user: user ? { _id: user._id.toString(), name: user.name, email: user.email, avatar: user.avatar } : null,
-        };
-      }),
-    };
-  }
-
-  return { ...base, invites: undefined };
 }
 
 app.get('/api/campaigns', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-
-  // Fetch campaigns owned by user OR campaigns with an accepted invite for this user
-  const campaigns = await Campaign.find(
-    { $or: [{ owner: u._id }, { 'invites.userId': u._id }] },
-    { name: 1, description: 1, characterIds: 1, encounterIds: 1, updatedAt: 1, owner: 1, invites: 1 },
-  ).sort({ updatedAt: -1 }).lean();
-
+  const campaigns = await Campaign.find({ owner: u._id }, { name: 1, description: 1, characterIds: 1, encounterIds: 1, updatedAt: 1 }).sort({ updatedAt: -1 }).lean();
   const allCharIds = campaigns.flatMap((c) => c.characterIds);
   const charOwners = allCharIds.length > 0
     ? await Character.find({ _id: { $in: allCharIds } }, { owner: 1 }).lean()
     : [];
   const charOwnerMap = new Map(charOwners.map((c) => [c._id.toString(), c.owner?.toString() ?? null]));
-
-  // Resolve DM user info for shared campaigns
-  const dmIds = [...new Set(campaigns.map((c) => c.owner.toString()))];
-  const dmUsers = dmIds.length > 0
-    ? await User.find({ _id: { $in: dmIds } }, { name: 1, email: 1 }).lean()
-    : [];
-  const dmMap = new Map(dmUsers.map((u) => [u._id.toString(), u]));
-
-  res.json(campaigns.map((c) => {
-    const isOwner = c.owner.toString() === u._id.toString();
-    const invite = isOwner ? null : c.invites.find((inv) => inv.userId?.toString() === u._id.toString());
-    const dm = dmMap.get(c.owner.toString());
-    return {
-      ...c,
-      invites: undefined, // never expose raw invites array in list
-      accessLevel: isOwner ? 'owner' : invite?.access ?? 'view',
-      dmName: isOwner ? null : (dm?.name || dm?.email || null),
-      playerCount: new Set(
-        c.characterIds.map((id) => charOwnerMap.get(id.toString())).filter(Boolean),
-      ).size,
-    };
-  }));
+  res.json(campaigns.map((c) => ({
+    ...c,
+    playerCount: new Set(
+      c.characterIds.map((id) => charOwnerMap.get(id.toString())).filter(Boolean),
+    ).size,
+  })));
 });
 
 app.post('/api/campaigns', async (req, res) => {
@@ -908,7 +814,7 @@ app.put('/api/campaigns/:id', async (req, res) => {
   if (description !== undefined) update.description = description;
   if (pointBuySystem !== undefined) update.pointBuySystem = pointBuySystem;
   const campaign = await Campaign.findOneAndUpdate(
-    { _id: req.params.id, owner: u._id }, // owner only
+    { _id: req.params.id, owner: u._id },
     { $set: update },
     { returnDocument: 'after', runValidators: true },
   ).lean();
@@ -921,139 +827,18 @@ app.delete('/api/campaigns/:id', async (req, res) => {
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const campaign = await Campaign.findOneAndDelete({ _id: req.params.id, owner: u._id });
   if (!campaign) { res.status(404).json({ error: 'Not found' }); return; }
-  // Clear the back-reference on any encounters that belonged to this campaign
-  if (campaign.encounterIds.length > 0) {
-    await EncounterSession.updateMany(
-      { _id: { $in: campaign.encounterIds } },
-      { $set: { campaignId: null } },
-    );
-  }
   res.status(204).end();
 });
-
-// ── Campaign invite routes ────────────────────────────────────────────────────
-
-// Public: resolve a campaign invite token (no auth required — handle 401 on accept)
-app.get('/api/campaign-invite/:token', async (req, res) => {
-  const campaign = await Campaign.findOne({ 'invites.token': req.params.token })
-    .populate<{ owner: { name?: string; email: string } }>('owner', 'name email')
-    .lean();
-  if (!campaign) { res.status(404).json({ error: 'Invite not found or already accepted' }); return; }
-  const invite = campaign.invites.find((inv) => inv.token === req.params.token);
-  if (!invite) { res.status(404).json({ error: 'Invite not found or already accepted' }); return; }
-  const owner = campaign.owner as unknown as { name?: string; email: string };
-  res.json({
-    campaignId: campaign._id,
-    campaignName: campaign.name,
-    dmName: owner.name || owner.email,
-    access: invite.access,
-  });
-});
-
-// Accept a campaign invite
-app.post('/api/campaign-invite/:token/accept', async (req, res) => {
-  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
-  const u = req.user as { _id: mongoose.Types.ObjectId };
-  const campaign = await Campaign.findOne({ 'invites.token': req.params.token });
-  if (!campaign) { res.status(404).json({ error: 'Invite not found or already accepted' }); return; }
-  if (campaign.owner.toString() === u._id.toString()) {
-    res.status(400).json({ error: 'You cannot accept an invite to your own campaign' }); return;
-  }
-  const invite = campaign.invites.find((inv) => inv.token === req.params.token);
-  if (!invite) { res.status(404).json({ error: 'Invite not found or already accepted' }); return; }
-  // Check not already a member
-  const alreadyMember = campaign.invites.some((inv) => inv.userId?.toString() === u._id.toString());
-  if (alreadyMember) { res.status(409).json({ error: 'You are already a member of this campaign' }); return; }
-  invite.token = null;
-  invite.userId = u._id;
-  await campaign.save();
-  res.json({ campaignId: campaign._id });
-});
-
-// DM: create a new campaign invite
-app.post('/api/campaigns/:id/invites', async (req, res) => {
-  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
-  const u = req.user as { _id: mongoose.Types.ObjectId };
-  const { email, access } = req.body as { email?: string; access?: string };
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    res.status(400).json({ error: 'Invalid email address' }); return;
-  }
-  if (access !== 'view' && access !== 'delegate') {
-    res.status(400).json({ error: 'access must be "view" or "delegate"' }); return;
-  }
-  const campaign = await Campaign.findOne({ _id: req.params.id, owner: u._id });
-  if (!campaign) { res.status(404).json({ error: 'Not found' }); return; }
-  // Prevent duplicate pending invite to same email
-  const existing = campaign.invites.find((inv) => inv.email === email && inv.token != null);
-  if (existing) { res.status(409).json({ error: 'A pending invite already exists for this email' }); return; }
-  const token = crypto.randomBytes(32).toString('hex');
-  campaign.invites.push({ _id: new mongoose.Types.ObjectId(), email, token, userId: null, access: access as CampaignAccessLevel });
-  await campaign.save();
-  res.json({ token });
-});
-
-// DM: change a member's access level
-app.patch('/api/campaigns/:id/invites/:inviteId', async (req, res) => {
-  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
-  const u = req.user as { _id: mongoose.Types.ObjectId };
-  const { access } = req.body as { access?: string };
-  if (access !== 'view' && access !== 'delegate') {
-    res.status(400).json({ error: 'access must be "view" or "delegate"' }); return;
-  }
-  const campaign = await Campaign.findOne({ _id: req.params.id, owner: u._id });
-  if (!campaign) { res.status(404).json({ error: 'Not found' }); return; }
-  const invite = campaign.invites.id(req.params.inviteId);
-  if (!invite) { res.status(404).json({ error: 'Invite not found' }); return; }
-  invite.access = access as CampaignAccessLevel;
-  await campaign.save();
-  const detail = await getCampaignDetail(req.params.id, u._id);
-  res.json(detail);
-});
-
-// DM: revoke an invite (pending or accepted)
-app.delete('/api/campaigns/:id/invites/:inviteId', async (req, res) => {
-  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
-  const u = req.user as { _id: mongoose.Types.ObjectId };
-  const campaign = await Campaign.findOne({ _id: req.params.id, owner: u._id });
-  if (!campaign) { res.status(404).json({ error: 'Not found' }); return; }
-  const before = campaign.invites.length;
-  const revokedInvite = campaign.invites.find((inv) => inv._id.toString() === req.params.inviteId);
-  campaign.invites = campaign.invites.filter((inv) => inv._id.toString() !== req.params.inviteId) as typeof campaign.invites;
-  if (campaign.invites.length === before) { res.status(404).json({ error: 'Invite not found' }); return; }
-
-  // Remove characters owned by the revoked user from the campaign
-  if (revokedInvite?.userId) {
-    const revokedUserId = revokedInvite.userId.toString();
-    const ownedChars = await Character.find(
-      { _id: { $in: campaign.characterIds }, owner: revokedInvite.userId },
-      '_id',
-    ).lean();
-    const ownedIds = new Set(ownedChars.map((c) => c._id.toString()));
-    campaign.characterIds = campaign.characterIds.filter(
-      (id) => !ownedIds.has(id.toString()),
-    ) as typeof campaign.characterIds;
-  }
-
-  await campaign.save();
-  const detail = await getCampaignDetail(req.params.id, u._id);
-  res.json(detail);
-});
-
-// ── Campaign character/encounter management ───────────────────────────────────
 
 app.post('/api/campaigns/:id/characters', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const { characterId } = req.body as { characterId?: string };
   if (!characterId) { res.status(400).json({ error: 'characterId is required.' }); return; }
-  // Caller must be a campaign member (owner or any access level)
-  const access = await getCampaignAccess(req.params.id, u._id);
-  if (!access) { res.status(404).json({ error: 'Not found' }); return; }
-  // Caller must own or have delegate access to the character being added
   const char = await Character.findOne({ _id: characterId, $or: [{ owner: u._id }, { delegatedTo: u._id }] });
   if (!char) { res.status(404).json({ error: 'Character not found.' }); return; }
   await Campaign.updateOne(
-    { _id: req.params.id },
+    { _id: req.params.id, owner: u._id },
     { $addToSet: { characterIds: char._id } },
   );
   const detail = await getCampaignDetail(req.params.id, u._id);
@@ -1061,46 +846,11 @@ app.post('/api/campaigns/:id/characters', async (req, res) => {
   res.json(detail);
 });
 
-// Read-only full character data for stat block — accessible to any campaign member
-app.get('/api/campaigns/:id/characters/:charId', async (req, res) => {
-  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
-  const u = req.user as { _id: mongoose.Types.ObjectId };
-  const access = await getCampaignAccess(req.params.id, u._id);
-  if (!access) { res.status(404).json({ error: 'Not found' }); return; }
-  const { campaign } = access;
-  if (!campaign.characterIds.some((id) => id.toString() === req.params.charId)) {
-    res.status(404).json({ error: 'Not found' }); return;
-  }
-  const character = await Character.findById(req.params.charId).lean();
-  if (!character) { res.status(404).json({ error: 'Not found' }); return; }
-  const classNames = ((character.classes ?? []) as Array<{ name: string }>).map((c) => c.name).filter(Boolean);
-  const ownerId = character.owner instanceof mongoose.Types.ObjectId
-    ? character.owner
-    : new mongoose.Types.ObjectId(String(character.owner));
-  const characterCustomClasses = classNames.length > 0
-    ? await CustomClass.find({ name: { $in: classNames }, owner: ownerId })
-    : [];
-  res.json({ ...character, characterCustomClasses });
-});
-
 app.delete('/api/campaigns/:id/characters/:charId', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  const campaignAccess = await getCampaignAccess(req.params.id, u._id);
-  if (!campaignAccess) { res.status(404).json({ error: 'Not found' }); return; }
-  const { access } = campaignAccess;
-
-  if (access === 'view') {
-    // View-only members may only remove characters they own or have delegation over
-    const char = await Character.findOne({
-      _id: req.params.charId,
-      $or: [{ owner: u._id }, { delegatedTo: u._id }],
-    });
-    if (!char) { res.status(403).json({ error: 'Forbidden' }); return; }
-  }
-  // owner and delegate may remove any character
   await Campaign.updateOne(
-    { _id: req.params.id },
+    { _id: req.params.id, owner: u._id },
     { $pull: { characterIds: new mongoose.Types.ObjectId(req.params.charId) } },
   );
   const detail = await getCampaignDetail(req.params.id, u._id);
@@ -1113,13 +863,10 @@ app.post('/api/campaigns/:id/encounters', async (req, res) => {
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const { encounterId } = req.body as { encounterId?: string };
   if (!encounterId) { res.status(400).json({ error: 'encounterId is required.' }); return; }
-  // Allow any campaign member to associate one of their own encounters
-  const access = await getCampaignAccess(req.params.id, u._id);
-  if (!access) { res.status(404).json({ error: 'Not found' }); return; }
   const enc = await EncounterSession.findOne({ _id: encounterId, userId: u._id });
   if (!enc) { res.status(404).json({ error: 'Encounter not found.' }); return; }
   await Campaign.updateOne(
-    { _id: req.params.id },
+    { _id: req.params.id, owner: u._id },
     { $addToSet: { encounterIds: enc._id } },
   );
   const detail = await getCampaignDetail(req.params.id, u._id);
@@ -1130,11 +877,8 @@ app.post('/api/campaigns/:id/encounters', async (req, res) => {
 app.delete('/api/campaigns/:id/encounters/:encId', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  // Only owner can remove encounters from the campaign list
-  const campaign = await Campaign.findOne({ _id: req.params.id, owner: u._id });
-  if (!campaign) { res.status(404).json({ error: 'Not found' }); return; }
   await Campaign.updateOne(
-    { _id: req.params.id },
+    { _id: req.params.id, owner: u._id },
     { $pull: { encounterIds: new mongoose.Types.ObjectId(req.params.encId) } },
   );
   const detail = await getCampaignDetail(req.params.id, u._id);

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import './CampaignEditor.css';
 import { NewCharacterForm } from '../components/NewCharacterForm';
 import { DelegatePopover } from '../components/DelegatePopover';
-import { CharacterStatBlockModal } from '../components/CharacterStatBlockModal';
 import { type PointBuySystem } from '../utils/characterHelpers';
 
 const DEFAULT_ABILITY_SCORE = { base: 10, racial: 0, enhancement: 0, misc: 0, temp: null, tempMod: null, levelUp: 0 };
@@ -25,25 +24,15 @@ interface UserSummary {
   avatar?: string;
 }
 
-interface CampaignInvite {
-  _id: string;
-  email: string;
-  access: 'view' | 'delegate';
-  isPending: boolean;
-  token?: string | null;
-  user: { _id: string; name?: string; email: string; avatar?: string } | null;
-}
-
 interface CampaignDetail {
   _id: string;
   name: string;
+  description: string;
   createdAt: string;
   owner: UserSummary | null;
   characters: CharSummary[];
   players: UserSummary[];
   pointBuySystem?: string;
-  accessLevel?: 'owner' | 'view' | 'delegate';
-  invites?: CampaignInvite[];
 }
 
 const POINT_BUY_LABELS: Record<PointBuySystem, string> = {
@@ -55,21 +44,8 @@ const POINT_BUY_LABELS: Record<PointBuySystem, string> = {
   pathfinder25: 'Epic Fantasy (25-point)',
 };
 
-function timeAgo(iso: string): string {
-  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (secs < 60) return `${secs} second${secs !== 1 ? 's' : ''} ago`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins} minute${mins !== 1 ? 's' : ''} ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs} hour${hrs !== 1 ? 's' : ''} ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days} day${days !== 1 ? 's' : ''} ago`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 5) return `${weeks} week${weeks !== 1 ? 's' : ''} ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months} month${months !== 1 ? 's' : ''} ago`;
-  const years = Math.floor(days / 365);
-  return `${years} year${years !== 1 ? 's' : ''} ago`;
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 export function CampaignEditor({
@@ -89,38 +65,29 @@ export function CampaignEditor({
 }) {
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [allChars, setAllChars] = useState<CharSummary[]>([]);
   const [showCharDropdown, setShowCharDropdown] = useState(false);
   const [charDropdownTab, setCharDropdownTab] = useState<'import' | 'new'>('import');
   const [charPickerSelection, setCharPickerSelection] = useState<Set<string>>(new Set());
   const [showEncounterDropdown, setShowEncounterDropdown] = useState(false);
   const [encounterNewName, setEncounterNewName] = useState('');
+  const [editingDescription, setEditingDescription] = useState(false);
   const [showPointBuyDropdown, setShowPointBuyDropdown] = useState(false);
   const [delegatePopoverCharId, setDelegatePopoverCharId] = useState<string | null>(null);
   const [railOpen, setRailOpen] = useState(false);
-  const [statBlockCharId, setStatBlockCharId] = useState<string | null>(null);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteAccess, setInviteAccess] = useState<'view' | 'delegate'>('view');
-  const [inviteLoading, setInviteLoading] = useState(false);
-  const [inviteError, setInviteError] = useState<string | null>(null);
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [revokingInviteId, setRevokingInviteId] = useState<string | null>(null);
-  const [patchingInviteId, setPatchingInviteId] = useState<string | null>(null);
-  const [openInviteDropdownId, setOpenInviteDropdownId] = useState<string | null>(null);
-  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const delegateBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const selectAllRef = useRef<HTMLInputElement>(null);
   const charDropdownRef = useRef<HTMLDivElement>(null);
   const encounterDropdownRef = useRef<HTMLDivElement>(null);
   const pointBuyDropdownRef = useRef<HTMLDivElement>(null);
-  const inviteListRef = useRef<HTMLUListElement>(null);
 
   const load = useCallback(() => {    fetch(`/api/campaigns/${campaignId}`, { credentials: 'include' })
       .then((r) => r.json())
       .then((data: CampaignDetail) => {
         setCampaign(data);
         setName(data.name);
+        setDescription(data.description ?? '');
         onPointBuySystemChange?.(data.pointBuySystem as PointBuySystem ?? null);
       });
   }, [campaignId, onPointBuySystemChange]);
@@ -139,73 +106,17 @@ export function CampaignEditor({
     });
   }
 
-  async function sendInvite(e: React.FormEvent) {
-    e.preventDefault();
-    if (!inviteEmail.trim()) return;
-    setInviteLoading(true);
-    setInviteError(null);
-    setInviteLink(null);
-    setCopied(false);
-    try {
-      const res = await fetch(`/api/campaigns/${campaignId}/invites`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail.trim(), access: inviteAccess }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setInviteError((data as { error?: string }).error ?? 'Failed to create invite'); return; }
-      const token = (data as { token: string }).token;
-      setInviteLink(`${window.location.origin}/campaign-invite/${token}`);
-      setInviteEmail('');
-      load();
-    } catch {
-      setInviteError('Failed to create invite');
-    } finally {
-      setInviteLoading(false);
-    }
-  }
-
-  async function copyInviteLink() {
-    if (!inviteLink) return;
-    await navigator.clipboard.writeText(inviteLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  function copyInviteToken(inviteId: string, token: string) {
-    const link = `${window.location.origin}/campaign-invite/${token}`;
-    navigator.clipboard.writeText(link).catch(() => {});
-    setCopiedInviteId(inviteId);
-    setTimeout(() => setCopiedInviteId(null), 2000);
-  }
-
-  async function changeInviteAccess(inviteId: string, newAccess: 'view' | 'delegate') {
-    setPatchingInviteId(inviteId);
-    try {
-      const res = await fetch(`/api/campaigns/${campaignId}/invites/${inviteId}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access: newAccess }),
-      });
-      if (res.ok) setCampaign(await res.json());
-    } finally {
-      setPatchingInviteId(null);
-    }
-  }
-
-  async function revokeInvite(inviteId: string) {
-    setRevokingInviteId(inviteId);
-    try {
-      const res = await fetch(`/api/campaigns/${campaignId}/invites/${inviteId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (res.ok) setCampaign(await res.json());
-    } finally {
-      setRevokingInviteId(null);
-    }
+  function saveDescription() {
+    setEditingDescription(false);
+    if (description === (campaign?.description ?? '')) return;
+    fetch(`/api/campaigns/${campaignId}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description }),
+    }).then((r) => r.json()).then((updated) => {
+      setCampaign((prev) => prev ? { ...prev, description: updated.description ?? '' } : prev);
+    });
   }
 
   function savePointBuySystem(system: PointBuySystem | null) {
@@ -253,17 +164,6 @@ export function CampaignEditor({
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [showPointBuyDropdown]);
 
-  useEffect(() => {
-    if (!openInviteDropdownId) return;
-    function handleMouseDown(e: MouseEvent) {
-      if (inviteListRef.current && !inviteListRef.current.contains(e.target as Node)) {
-        setOpenInviteDropdownId(null);
-      }
-    }
-    document.addEventListener('mousedown', handleMouseDown);
-    return () => document.removeEventListener('mousedown', handleMouseDown);
-  }, [openInviteDropdownId]);
-
   async function openCharDropdown() {
     if (showCharDropdown) { setShowCharDropdown(false); return; }
     const res = await fetch('/api/characters', { credentials: 'include' });
@@ -285,7 +185,7 @@ export function CampaignEditor({
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: encounterNewName.trim(), campaignId }),
+      body: JSON.stringify({ name: encounterNewName.trim() }),
     });
     const session = await createRes.json();
     if (!createRes.ok) return;
@@ -347,7 +247,6 @@ export function CampaignEditor({
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        campaignId,
         name: charName || `New ${className}`,
         gender: 'Male',
         race: 'Human',
@@ -365,15 +264,21 @@ export function CampaignEditor({
       }),
     });
     if (!charRes.ok) return;
-    load();
+    const newChar = await charRes.json();
+    const addRes = await fetch(`/api/campaigns/${campaignId}/characters`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ characterId: newChar._id }),
+    });
+    if (!addRes.ok) return;
+    setCampaign(await addRes.json());
     setShowCharDropdown(false);
   }
 
   if (!campaign) {
     return <p className="p-6 text-sm" style={{ color: 'var(--color-fg-muted)' }}>Loading…</p>;
   }
-
-  const roleAccess = campaign.accessLevel ?? 'owner';
 
   const assignedCharIds = new Set(campaign.characters.map((c) => c._id));
   const availableChars  = allChars.filter((c) => !assignedCharIds.has(c._id));
@@ -412,10 +317,9 @@ export function CampaignEditor({
         <input
           type="text"
           value={name}
-          onChange={roleAccess === 'owner' ? (e) => setName(e.target.value) : undefined}
-          onBlur={roleAccess === 'owner' ? saveName : undefined}
-          readOnly={roleAccess !== 'owner'}
-          className={`campaign-editor-name-input${roleAccess !== 'owner' ? ' opacity-70 cursor-default' : ''}`}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={saveName}
+          className="campaign-editor-name-input"
           aria-label="Campaign name"
         />
       </div>
@@ -582,7 +486,6 @@ export function CampaignEditor({
               <thead>
                 <tr className="bg-[var(--color-canvas-subtle)]">
                   <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">Name</th>
-                  <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)] hidden md:table-cell">Player</th>
                   <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)] hidden sm:table-cell">Race</th>
                   <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">Class</th>
                   <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)] hidden min-[480px]:table-cell">Level</th>
@@ -590,18 +493,11 @@ export function CampaignEditor({
                 </tr>
               </thead>
               <tbody>
-                {(() => {
-                  const userMap = new Map<string, string>();
-                  if (campaign.owner) userMap.set(campaign.owner._id, campaign.owner.name || campaign.owner.email);
-                  campaign.players?.forEach((p) => userMap.set(p._id, p.name || p.email));
-                  return campaign.characters.map((c) => {
-                  const canEdit = c.owner === userId || (roleAccess !== 'view' && c.delegatedTo === userId);
-                  const canRemove = roleAccess !== 'view' || c.owner === userId || c.delegatedTo === userId;
-                  return (
+                {campaign.characters.map((c) => (
                   <tr
                     key={c._id}
-                    className="border-b border-[var(--color-border-muted)] last:border-b-0 bg-[var(--color-canvas-default)] cursor-pointer hover:bg-[var(--color-canvas-subtle)]"
-                    onClick={() => { if (canEdit) { onEditCharacter(c._id); } else { setStatBlockCharId(c._id); } }}
+                    className="border-b border-[var(--color-border-muted)] last:border-b-0 cursor-pointer hover:bg-[var(--color-canvas-subtle)] bg-[var(--color-canvas-default)]"
+                    onClick={() => onEditCharacter(c._id)}
                   >
                     <td className="px-4 py-2 font-medium text-[color:var(--color-fg-default)]">
                       <span className="inline-flex items-center gap-2">
@@ -618,7 +514,6 @@ export function CampaignEditor({
                         )}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-[color:var(--color-fg-muted)] hidden md:table-cell">{c.owner ? (userMap.get(c.owner) ?? '—') : '—'}</td>
                     <td className="px-4 py-2 text-[color:var(--color-fg-default)] hidden sm:table-cell">{c.race ?? '—'}</td>
                     <td className="px-4 py-2 text-[color:var(--color-fg-default)]">{classLabel(c.classes)}</td>
                     <td className="px-4 py-2 text-[color:var(--color-fg-default)] hidden min-[480px]:table-cell">{totalLevel(c.classes)}</td>
@@ -665,25 +560,21 @@ export function CampaignEditor({
                             )}
                           </>
                         )}
-                        {canRemove && (
-                          <button
-                            type="button"
-                            className="campaign-editor-remove-btn inline-flex items-center justify-center w-6 h-6"
-                            onClick={(e) => { e.stopPropagation(); removeCharacter(c._id); }}
-                            aria-label={`Remove ${c.name}`}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                              <path d="M4 2H1V4H15V2H12V0H4V2Z"/>
-                              <path fillRule="evenodd" clipRule="evenodd" d="M3 6H13V16H3V6ZM7 9H9V13H7V9Z"/>
-                            </svg>
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          className="campaign-editor-remove-btn inline-flex items-center justify-center w-6 h-6"
+                          onClick={(e) => { e.stopPropagation(); removeCharacter(c._id); }}
+                          aria-label={`Remove ${c.name}`}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M4 2H1V4H15V2H12V0H4V2Z"/>
+                            <path fillRule="evenodd" clipRule="evenodd" d="M3 6H13V16H3V6ZM7 9H9V13H7V9Z"/>
+                          </svg>
+                        </button>
                       </div>
                     </td>
                   </tr>
-                  );
-                  });
-                })()}
+                ))}
               </tbody>
             </table>
           </div>
@@ -721,211 +612,76 @@ export function CampaignEditor({
             </svg>
           </button>
 
-          {/* Owner */}
+          {/* About */}
           <section className="campaign-rail-section">
-            <h3 className="subsection-header">Owner</h3>
-            {campaign.owner && (
-              <div className="campaign-rail-player">
-                {campaign.owner.avatar ? (
-                  <img
-                    src={campaign.owner.avatar}
-                    alt={campaign.owner.name || campaign.owner.email}
-                    className="campaign-rail-avatar"
-                  />
-                ) : (
-                  <div className="campaign-rail-avatar campaign-rail-avatar--initials">
-                    {(campaign.owner.name || campaign.owner.email).charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <span className="campaign-rail-player-name">{campaign.owner.name || campaign.owner.email}</span>
-              </div>
+            <div className="campaign-rail-section-header">
+              <h3 className="subsection-header">About</h3>
+              {campaign.description && !editingDescription && (
+                <button
+                  type="button"
+                  className="campaign-rail-edit-btn"
+                  onClick={() => setEditingDescription(true)}
+                  aria-label="Edit description"
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm1.414 1.06a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354l-1.086-1.086ZM11.189 6.25 9.75 4.81l-6.286 6.287a.25.25 0 0 0-.064.108l-.558 1.953 1.953-.558a.25.25 0 0 0 .108-.064L11.19 6.25Z"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+            {!campaign.description || editingDescription ? (
+              <>
+                <p className="campaign-rail-field-label">Description</p>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  onBlur={saveDescription}
+                  placeholder="Add a description…"
+                  className="campaign-editor-description"
+                  rows={4}
+                  autoFocus={editingDescription}
+                />
+              </>
+            ) : (
+              <>
+                <p className="campaign-rail-field-label">Description</p>
+                <p className="campaign-rail-description" onClick={() => setEditingDescription(true)}>
+                  {campaign.description}
+                </p>
+              </>
             )}
-            <p className="campaign-rail-meta-line">Created {timeAgo(campaign.createdAt)}</p>
+            <div className="campaign-rail-meta">
+              <div>Created {formatDate(campaign.createdAt)}</div>
+              {campaign.owner && (
+                <div>by {campaign.owner.name || campaign.owner.email}</div>
+              )}
+            </div>
           </section>
 
           {/* Players */}
           <section className="campaign-rail-section">
             <h3 className="subsection-header">Players</h3>
-
-            {roleAccess === 'owner' ? (
-              // ── DM view: invite management ──
-              <>
-                {(!campaign.invites || campaign.invites.length === 0) ? (
-                  <p className="campaign-editor-empty">No players invited yet.</p>
-                ) : (
-                  <ul className="invite-list mb-3" ref={inviteListRef}>
-                    {campaign.invites.map((inv) => {
-                      const displayName = inv.user?.name || inv.user?.email || inv.email;
-                      const initial = displayName.charAt(0).toUpperCase();
-                      const badgeKey = inv.isPending ? 'pending' : inv.access;
-                      const badgeLabel = inv.isPending ? 'P' : inv.access === 'view' ? 'V' : 'D';
-                      const isOpen = openInviteDropdownId === inv._id;
-                      return (
-                        <li key={inv._id} className="invite-row-wrap">
-                          <div className="invite-row">
-                            <div className="invite-avatar-wrap">
-                              {inv.user?.avatar ? (
-                                <img src={inv.user.avatar} alt={displayName} className="campaign-rail-avatar" />
-                              ) : (
-                                <div className="campaign-rail-avatar campaign-rail-avatar--initials" aria-hidden="true">
-                                  {initial}
-                                </div>
-                              )}
-                              <span
-                                className={`invite-badge invite-badge--${badgeKey}`}
-                                title={inv.isPending ? 'Pending' : inv.access === 'view' ? 'View-only' : 'Delegate'}
-                              >
-                                {badgeLabel}
-                              </span>
-                            </div>
-                            <span className="invite-row__name">{displayName}</span>
-                            <button
-                              type="button"
-                              className="invite-caret-btn"
-                              onClick={() => setOpenInviteDropdownId(isOpen ? null : inv._id)}
-                              aria-label={`Manage ${displayName}`}
-                              aria-expanded={isOpen}
-                            >
-                              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true"
-                                className={['nav-dropdown-chevron', isOpen ? 'nav-dropdown-chevron--open' : ''].join(' ')}
-                              >
-                                <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            </button>
-                          </div>
-                          {isOpen && (
-                            <div className="invite-dropdown">
-                              <div className="invite-dropdown__header">
-                                <p className="invite-dropdown__email">{inv.email}</p>
-                                <p className="invite-dropdown__status-line">{inv.isPending ? 'Pending invitation' : 'Active'}</p>
-                              </div>
-                              <div className="invite-dropdown__toggle-row">
-                                <button
-                                  type="button"
-                                  role="switch"
-                                  aria-checked={inv.access === 'delegate'}
-                                  aria-label="Access level"
-                                  disabled={patchingInviteId === inv._id}
-                                  onClick={() => changeInviteAccess(inv._id, inv.access === 'view' ? 'delegate' : 'view')}
-                                  className="invite-access-toggle-btn"
-                                >
-                                  <span
-                                    aria-hidden="true"
-                                    className={`invite-access-knob${inv.access === 'delegate' ? ' invite-access-knob--right' : ' invite-access-knob--left'}`}
-                                  />
-                                  <span aria-hidden="true" className="invite-access-labels">
-                                    <span className={`invite-access-label${inv.access === 'view' ? ' invite-access-label--active' : ' invite-access-label--inactive'}`}>View</span>
-                                    <span className={`invite-access-label${inv.access === 'delegate' ? ' invite-access-label--active' : ' invite-access-label--inactive'}`}>Edit</span>
-                                  </span>
-                                </button>
-                              </div>
-                              {inv.token && (
-                                <>
-                                  <hr className="invite-dropdown__divider" />
-                                  <button
-                                    type="button"
-                                    className="invite-dropdown__copy-btn"
-                                    onClick={() => copyInviteToken(inv._id, inv.token!)}
-                                  >
-                                    {copiedInviteId === inv._id ? 'Copied!' : 'Copy Link'}
-                                  </button>
-                                </>
-                              )}
-                              <hr className="invite-dropdown__divider" />
-                              <button
-                                type="button"
-                                className="invite-dropdown__revoke-btn"
-                                onClick={() => { revokeInvite(inv._id); setOpenInviteDropdownId(null); }}
-                                disabled={revokingInviteId === inv._id}
-                              >
-                                {revokingInviteId === inv._id ? 'Revoking…' : 'Revoke Access'}
-                              </button>
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-
-                {/* Invite form */}
-                <form onSubmit={sendInvite} className="flex flex-col gap-2 mt-1">
-                  <p className="campaign-rail-field-label">Invite player by email</p>
-                  <input
-                    type="email"
-                    value={inviteEmail}
-                    onChange={(e) => { setInviteEmail(e.target.value); setInviteError(null); setInviteLink(null); setCopied(false); }}
-                    placeholder="player@example.com"
-                    className="char-new-name-input"
-                    aria-label="Player email address"
-                    disabled={inviteLoading}
-                  />
-                  <select
-                    value={inviteAccess}
-                    onChange={(e) => setInviteAccess(e.target.value as 'view' | 'delegate')}
-                    className="char-new-name-input"
-                    aria-label="Access level"
-                    disabled={inviteLoading}
-                  >
-                    <option value="view">View Only</option>
-                    <option value="delegate">Edit (Delegate)</option>
-                  </select>
-                  {inviteError && (
-                    <p className="text-xs" style={{ color: 'var(--color-danger-fg)' }}>{inviteError}</p>
-                  )}
-                  {inviteLink ? (
-                    <>
-                      <input
-                        type="text"
-                        readOnly
-                        value={inviteLink}
-                        className="char-new-name-input"
-                        aria-label="Invite link"
-                        onFocus={(e) => e.target.select()}
-                      />
-                      <button
-                        type="button"
-                        className="campaign-picker-add-btn"
-                        onClick={copyInviteLink}
-                      >
-                        {copied ? 'Copied!' : 'Copy Link'}
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="submit"
-                      className="campaign-picker-add-btn"
-                      disabled={inviteLoading || !inviteEmail.trim()}
-                    >
-                      {inviteLoading ? 'Creating…' : 'Create Invite'}
-                    </button>
-                  )}
-                </form>
-              </>
+            {campaign.players.length === 0 ? (
+              <p className="campaign-editor-empty">No players yet.</p>
             ) : (
-              // ── Player view: read-only member list ──
-              campaign.players.length === 0 ? (
-                <p className="campaign-editor-empty">No players yet.</p>
-              ) : (
-                <div className="campaign-rail-players">
-                  {campaign.players.map((player) => (
-                    <div key={player._id} className="campaign-rail-player">
-                      {player.avatar ? (
-                        <img
-                          src={player.avatar}
-                          alt={player.name || player.email}
-                          className="campaign-rail-avatar"
-                        />
-                      ) : (
-                        <div className="campaign-rail-avatar campaign-rail-avatar--initials">
-                          {(player.name || player.email).charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <span className="campaign-rail-player-name">{player.name || player.email}</span>
-                    </div>
-                  ))}
-                </div>
-              )
+              <div className="campaign-rail-players">
+                {campaign.players.map((player) => (
+                  <div key={player._id} className="campaign-rail-player">
+                    {player.avatar ? (
+                      <img
+                        src={player.avatar}
+                        alt={player.name || player.email}
+                        className="campaign-rail-avatar"
+                      />
+                    ) : (
+                      <div className="campaign-rail-avatar campaign-rail-avatar--initials">
+                        {(player.name || player.email).charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="campaign-rail-player-name">{player.name || player.email}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </section>
 
@@ -937,10 +693,9 @@ export function CampaignEditor({
               <button
                 type="button"
                 className="point-buy-trigger"
-                onClick={roleAccess === 'owner' ? () => setShowPointBuyDropdown((v) => !v) : undefined}
+                onClick={() => setShowPointBuyDropdown((v) => !v)}
                 aria-haspopup="listbox"
                 aria-expanded={showPointBuyDropdown}
-                disabled={roleAccess !== 'owner'}
               >
                 <span>{campaign.pointBuySystem ? POINT_BUY_LABELS[campaign.pointBuySystem as PointBuySystem] : '— Use global setting —'}</span>
                 <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -989,13 +744,6 @@ export function CampaignEditor({
           />
         )}
       </div>
-      {statBlockCharId && (
-        <CharacterStatBlockModal
-          charId={statBlockCharId}
-          campaignId={campaignId}
-          onClose={() => setStatBlockCharId(null)}
-        />
-      )}
     </div>
   );
 }

@@ -32,7 +32,7 @@ import {
   getRacialAdjFor,
 } from '../utils/characterHelpers';
 import { FEAT_BY_NAME } from '../data/feats';
-import { MATERIALS, applyMaxDexDelta } from '../data/materials';
+import { MATERIALS, applyMaxDexDelta, applyAcpDelta } from '../data/materials';
 import type { MaterialKey } from '../data/materials';
 import { getWeaponAttackClass } from '../data/weapons';
 import type { FeatCatalogEntry } from '../components/FeatAutocomplete';
@@ -255,7 +255,7 @@ function parseMaxDexBonus(value: string | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function deriveAbilityTotals(scores: CharacterDraft['abilityScores']): Record<AbilityKey, number> {
+function deriveAbilityTotals(scores: CharacterDraft['abilityScores']): Record<AbilityKey, number> {
   return {
     strength: totalScore(scores.strength),
     dexterity: totalScore(scores.dexterity),
@@ -266,7 +266,7 @@ export function deriveAbilityTotals(scores: CharacterDraft['abilityScores']): Re
   };
 }
 
-export function deriveCombatStats({
+function deriveCombatStats({
   combat,
   inventory,
   feats,
@@ -598,6 +598,18 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
   const intelligenceMod = abilityMods.intelligence;
   const availableSkillPoints = totalSkillPointsAvailable(draft.classes, intelligenceMod, draft.race, customClassMap);
   const spentPoints = spentSkillPoints(draft.skills);
+  const totalAcp = (draft.inventory.body != null
+    ? applyAcpDelta(
+        draft.inventory.body.armorCheckPenalty ?? 0,
+        draft.inventory.body.material ? (MATERIALS[draft.inventory.body.material as MaterialKey]?.acpDelta ?? 0) : 0,
+      )
+    : 0)
+  + (draft.inventory.offHandShield != null
+    ? applyAcpDelta(
+        draft.inventory.offHandShield.armorCheckPenalty ?? 0,
+        draft.inventory.offHandShield.material ? (MATERIALS[draft.inventory.offHandShield.material as MaterialKey]?.acpDelta ?? 0) : 0,
+      )
+    : 0);
   const selectedClass = draft.classes[0];
   const calculatedCreateHitPoints = selectedClass
     ? Math.max(1, selectedClass.hitDieType + abilityModifier(abilityTotals.constitution))
@@ -1521,13 +1533,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
         </p>
       )}
 
-      {!loadingCharacter && isEdit && initialDraftFingerprint === null && error && (
-        <p className="text-sm px-3 py-2 rounded bg-[var(--color-danger-subtle)] text-[color:var(--color-danger-fg)] border border-[var(--color-danger-muted)]">
-          {error}
-        </p>
-      )}
-
-      {!loadingCharacter && !(isEdit && initialDraftFingerprint === null && error) && (
+      {!loadingCharacter && (
       <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-4">
         <div>
 
@@ -1696,6 +1702,7 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
             totalSkillPoints={availableSkillPoints}
             spentPoints={spentPoints}
             totalLevel={totalLevel}
+            totalAcp={totalAcp}
           />
         </Accordion>
 

@@ -46,6 +46,7 @@ export interface Skill {
   keyAbility: string | null;
   trainedOnly: boolean;
   armorCheckPenalty: boolean;
+  doubleAcp?: boolean;
   ranks: number;
   classSkill: boolean;
   /** Explicit user override for classSkill. null = defer to class-derived value. */

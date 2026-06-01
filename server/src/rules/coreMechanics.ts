@@ -153,6 +153,7 @@ export type SkillDef = {
   readonly keyAbility:         AbilityKey | null;
   readonly trainedOnly:        boolean;
   readonly armorCheckPenalty:  boolean;
+  readonly doubleAcp?:         boolean;
 };
 
 export const SKILL_LIST: ReadonlyArray<SkillDef> = Object.freeze([
@@ -197,7 +198,7 @@ export const SKILL_LIST: ReadonlyArray<SkillDef> = Object.freeze([
   { name: 'Spellcraft',                            keyAbility: 'intelligence',trainedOnly: true,  armorCheckPenalty: false },
   { name: 'Spot',                                  keyAbility: 'wisdom',      trainedOnly: false, armorCheckPenalty: false },
   { name: 'Survival',                              keyAbility: 'wisdom',      trainedOnly: false, armorCheckPenalty: false },
-  { name: 'Swim',                                  keyAbility: 'strength',    trainedOnly: false, armorCheckPenalty: true  },
+  { name: 'Swim',                                  keyAbility: 'strength',    trainedOnly: false, armorCheckPenalty: true,  doubleAcp: true },
   { name: 'Tumble',                                keyAbility: 'dexterity',   trainedOnly: true,  armorCheckPenalty: true  },
   { name: 'Use Magic Device',                      keyAbility: 'charisma',    trainedOnly: true,  armorCheckPenalty: false },
   { name: 'Use Rope',                              keyAbility: 'dexterity',   trainedOnly: false, armorCheckPenalty: false },

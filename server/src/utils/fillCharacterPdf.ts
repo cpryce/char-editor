@@ -1,10 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { PDFDocument, PDFTextField, PDFName, PDFBool, PDFDict, PDFRef, PDFString, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFTextField, PDFCheckBox, PDFName, PDFBool, PDFDict, PDFRef, PDFString, StandardFonts } from 'pdf-lib';
 import type { ICharacter } from '../models/Character';
 import type { ICustomClassFeature } from '../models/CustomClass';
 import { BUILTIN_CLASS_FEATURES } from '../data/builtinClassFeatures';
-import { SIZE_CATEGORIES, applyMaxDexCap, computeAcTotals, RACES } from '../rules/coreMechanics';
+import { SIZE_CATEGORIES, applyMaxDexCap, computeAcTotals, RACES, SKILL_LIST } from '../rules/coreMechanics';
 
 // ── Material helpers (inline — materials.ts lives in client only) ─────────────
 const MAT_EFFECTS: Record<string, { acpDelta: number; asfDelta: number; weightMultiplier: number; maxDexDelta: number }> = {
@@ -158,6 +158,23 @@ function safeSetDropdownOrText(
   }
 
   safeSet(form, name, value ?? '');
+}
+
+/** Silently skip a field if it doesn't exist or isn't a checkbox field. */
+function safeSetCheckbox(
+  form: ReturnType<PDFDocument['getForm']>,
+  name: string,
+  checked: boolean,
+) {
+  try {
+    const field = form.getField(name);
+    if (field instanceof PDFCheckBox) {
+      if (checked) field.check();
+      else field.uncheck();
+    }
+  } catch {
+    // Field not found or wrong type — skip gracefully.
+  }
 }
 
 /** Silently skip a field if it doesn't exist or isn't a text field. */
@@ -623,6 +640,88 @@ export async function fillCharacterPdf(
     }
   }
 
+  // ── Skills ────────────────────────────────────────────────────────────────
+
+  // Abbreviated labels for PDF key ability column.
+  const ABILITY_ABBREV: Record<string, string> = {
+    strength: 'Str', dexterity: 'Dex', constitution: 'Con',
+    intelligence: 'Int', wisdom: 'Wis', charisma: 'Cha',
+  };
+
+  // Skill point budget — mirrors client's totalSkillPointsAvailable.
+  const BUILTIN_SKILL_POINTS: Partial<Record<string, number>> = {
+    Barbarian: 4, Bard: 6, Cleric: 2, Druid: 4, Fighter: 2,
+    Monk: 4, Paladin: 2, Ranger: 6, Rogue: 8, Sorcerer: 2, Wizard: 2,
+  };
+  const racialSkillBonus = character.race === 'Human' ? 1 : 0;
+  const skillBudget = (character.classes as Array<{ name: string; level: number }>)
+    .flatMap((ce) => Array.from({ length: Math.max(0, ce.level) }, (_, i) => ({ className: ce.name, levelIndex: i })))
+    .reduce((total, { className, levelIndex }, charLevelIndex) => {
+      const base = BUILTIN_SKILL_POINTS[className] ?? 2;
+      const perLevel = Math.max(1, base + intMod + racialSkillBonus);
+      return total + (charLevelIndex === 0 ? perLevel * 4 : perLevel);
+    }, 0);
+
+  // Skill points spent: class-skill ranks cost 1, cross-class cost 2.
+  const skillPointsSpent = (character.skills as Array<{ ranks: number; classSkill: boolean }>)
+    .reduce((sum, sk) => sum + (sk.classSkill ? sk.ranks : sk.ranks * 2), 0);
+
+  safeSet(form, 'skills.budget',   skillBudget  || '');
+  safeSet(form, 'skills.assigned', skillPointsSpent || '');
+
+  {
+    const skills = character.skills as Array<{
+      name: string;
+      keyAbility: string | null;
+      trainedOnly: boolean;
+      armorCheckPenalty: boolean;
+      ranks: number;
+      classSkill: boolean;
+      miscBonus: number;
+    }>;
+
+    for (let i = 0; i < Math.min(skills.length, 44); i++) {
+      const sk = skills[i]!;
+
+      // Name with suffix markers: " *" for ACP, " T" for trained-only.
+      let displayName = sk.name;
+      if (sk.armorCheckPenalty) displayName += ' *';
+      if (sk.trainedOnly)       displayName += ' T';
+      safeSet(form, `skills.name.${i}`, displayName);
+
+      // Key ability abbreviation.
+      const abilityAbbrev = sk.keyAbility ? (ABILITY_ABBREV[sk.keyAbility] ?? sk.keyAbility) : '\u2014';
+      safeSet(form, `skills.keyAbility.${i}`, abilityAbbrev);
+
+      // Class skill checkbox.
+      safeSetCheckbox(form, `skills.classSkill.${i}`, sk.classSkill);
+
+      // Ability modifier for this skill's key ability.
+      // Match character editor behavior: temp score override, else normal score.
+      const abilityModValue = sk.keyAbility
+        ? (() => {
+            const ability = s[sk.keyAbility as keyof typeof s];
+            const effectiveScore = ability.temp ?? totalAbilityScore(ability);
+            return abilityMod(effectiveScore);
+          })()
+        : null;
+      safeSet(form, `skills.bonus.${i}`, abilityModValue !== null ? signed(abilityModValue) : '');
+
+      // Ranks: export 0 as blank, but calc scripts treat blank as 0.
+      const ranksValue = sk.ranks || 0;
+      safeSet(form, `skills.ranks.${i}`, ranksValue === 0 ? '' : ranksValue);
+
+      // Misc bonus — blank when 0.
+      safeSet(form, `skills.miscBonus.${i}`, sk.miscBonus || '');
+
+      // Total score: trained-only skills show "--" when no rank points are assigned.
+      const acpMultiplier = SKILL_LIST[i]?.doubleAcp ? 2 : 1;
+      const acpContrib = sk.armorCheckPenalty ? totalAcp * acpMultiplier : 0;
+      const scoreTotal = ranksValue + (abilityModValue ?? 0) + sk.miscBonus + acpContrib;
+      safeSet(form, `skills.score.${i}`, (sk.trainedOnly && ranksValue === 0) ? '--' : signed(scoreTotal));
+    }
+  }
+
   // ── Acrobat JavaScript calculations (Adobe Acrobat/Reader only) ──────────
   // Attaches a Calculate (AA.C) JS action to each derived field and sets the
   // AcroForm CO (Calculation Order) so Acrobat evaluates dependencies in order.
@@ -739,6 +838,50 @@ export async function fillCharacterPdf(
     const p = `combat.saves.${save}`;
     addCalc(`${p}.total`,
       `${N0}${SN}event.value=s(n("${p}.base")+n("${p}.mod")+n("${p}.magic")+n("${p}.misc"));`);
+  }
+
+  // 7. Skill bonuses (depend on ability mods calculated above)
+  //    Each row uses tempMod when present, otherwise mod.
+  {
+    const ABILITY_MOD_FIELDS: Record<string, { tempMod: string; mod: string }> = {
+      strength:     { tempMod: 'abilityScores.strength.tempMod',     mod: 'abilityScores.strength.mod' },
+      dexterity:    { tempMod: 'abilityScores.dexterity.tempMod',    mod: 'abilityScores.dexterity.mod' },
+      constitution: { tempMod: 'abilityScores.constitution.tempMod', mod: 'abilityScores.constitution.mod' },
+      intelligence: { tempMod: 'abilityScores.intelligence.tempMod', mod: 'abilityScores.intelligence.mod' },
+      wisdom:       { tempMod: 'abilityScores.wisdom.tempMod',       mod: 'abilityScores.wisdom.mod' },
+      charisma:     { tempMod: 'abilityScores.charisma.tempMod',     mod: 'abilityScores.charisma.mod' },
+    };
+    const filledSkills = character.skills as Array<{ keyAbility: string | null }>;
+    for (let i = 0; i < 46; i++) {
+      const keyAbility = filledSkills[i]?.keyAbility ?? null;
+      if (keyAbility && ABILITY_MOD_FIELDS[keyAbility]) {
+        const modFields = ABILITY_MOD_FIELDS[keyAbility]!;
+        addCalc(`skills.bonus.${i}`,
+          `var tm=this.getField("${modFields.tempMod}"),m=this.getField("${modFields.mod}");event.value=(tm&&tm.value!=="")?tm.value:((m&&m.value)?m.value:"+0");`);
+      }
+      // Rows without a key ability (Speak Language, blank user rows): no calc — leave as-is.
+    }
+  }
+
+  // 8. Skill scores (depend on skills.bonus.N, ranks, miscBonus, and ACP when applicable)
+  {
+    const filledSkills = character.skills as unknown as Array<{ armorCheckPenalty: boolean; trainedOnly?: boolean }>;
+    for (let i = 0; i < 46; i++) {
+      const hasAcp = filledSkills[i]?.armorCheckPenalty ?? false;
+      const isTrainedOnly = filledSkills[i]?.trainedOnly ?? false;
+      const acpTerm = hasAcp
+        ? (SKILL_LIST[i]?.doubleAcp ? `+2*n("ACP")` : `+n("ACP")`)
+        : '';
+      addCalc(`skills.score.${i}`,
+        `${N0}${SN}var r=n("skills.ranks.${i}");event.value=${isTrainedOnly ? 'r===0?"--":' : ''}s(r+n("skills.bonus.${i}")+n("skills.miscBonus.${i}")${acpTerm});`);
+    }
+  }
+
+  // 9. Skill points assigned (sum of rank costs; class-skill = 1 pt/rank, cross-class = 2 pts/rank)
+  {
+    const classSkillChecks = Array.from({ length: 46 }, (_, i) => `(c("skills.classSkill.${i}")?n("skills.ranks.${i}"):n("skills.ranks.${i}")*2)`).join('+');
+    addCalc('skills.assigned',
+      `${N0}var c=function(f){var x=this.getField(f);return(x&&x.value==="Yes")?1:0;};event.value=${classSkillChecks};`);
   }
 
   // Write CO (Calculation Order) onto AcroForm

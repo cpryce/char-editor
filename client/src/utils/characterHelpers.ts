@@ -511,7 +511,7 @@ export const POINT_BUY_CONFIGS: Readonly<Record<PointBuySystem, PointBuyConfig>>
 };
 
 // Mirrors server SKILL_LIST — keyAbility null = Speak Language
-const SKILL_DEFS: { name: string; keyAbility: string | null; trainedOnly: boolean; armorCheckPenalty: boolean }[] = [
+const SKILL_DEFS: { name: string; keyAbility: string | null; trainedOnly: boolean; armorCheckPenalty: boolean; doubleAcp?: boolean }[] = [
   { name: 'Appraise',                              keyAbility: 'intelligence', trainedOnly: false, armorCheckPenalty: false },
   { name: 'Balance',                               keyAbility: 'dexterity',   trainedOnly: false, armorCheckPenalty: true  },
   { name: 'Bluff',                                 keyAbility: 'charisma',    trainedOnly: false, armorCheckPenalty: false },
@@ -553,7 +553,7 @@ const SKILL_DEFS: { name: string; keyAbility: string | null; trainedOnly: boolea
   { name: 'Spellcraft',                            keyAbility: 'intelligence',trainedOnly: true,  armorCheckPenalty: false },
   { name: 'Spot',                                  keyAbility: 'wisdom',      trainedOnly: false, armorCheckPenalty: false },
   { name: 'Survival',                              keyAbility: 'wisdom',      trainedOnly: false, armorCheckPenalty: false },
-  { name: 'Swim',                                  keyAbility: 'strength',    trainedOnly: false, armorCheckPenalty: true  },
+  { name: 'Swim',                                  keyAbility: 'strength',    trainedOnly: false, armorCheckPenalty: true,  doubleAcp: true },
   { name: 'Tumble',                                keyAbility: 'dexterity',   trainedOnly: true,  armorCheckPenalty: true  },
   { name: 'Use Magic Device',                      keyAbility: 'charisma',    trainedOnly: true,  armorCheckPenalty: false },
   { name: 'Use Rope',                              keyAbility: 'dexterity',   trainedOnly: false, armorCheckPenalty: false },
@@ -639,11 +639,14 @@ export function totalScore(s: AbilityScore) {
 export function computeSkillBonus(
   skill: Skill,
   scores: CharacterDraft['abilityScores'],
+  totalAcp = 0,
 ): number {
-  if (!skill.keyAbility) return Math.floor(skill.ranks + skill.miscBonus);
+  const acpMultiplier = skill.doubleAcp ? 2 : 1;
+  const acp = skill.armorCheckPenalty ? totalAcp * acpMultiplier : 0;
+  if (!skill.keyAbility) return Math.floor(skill.ranks + skill.miscBonus + acp);
   const s = scores[skill.keyAbility as keyof CharacterDraft['abilityScores']];
   const effectiveScore = s.temp ?? totalScore(s);
-  return Math.floor(skill.ranks + abilityModifier(effectiveScore) + skill.miscBonus);
+  return Math.floor(skill.ranks + abilityModifier(effectiveScore) + skill.miscBonus + acp);
 }
 
 export function totalCharacterLevel(classes: CharacterDraft['classes']) {
@@ -834,6 +837,7 @@ export function newCharacterDraft(): CharacterDraft {
       keyAbility: def.keyAbility,
       trainedOnly: def.trainedOnly,
       armorCheckPenalty: def.armorCheckPenalty,
+      ...(def.doubleAcp ? { doubleAcp: true } : {}),
       ranks: 0,
       classSkill: false,
       miscBonus: 0,

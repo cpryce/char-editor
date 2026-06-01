@@ -9,7 +9,7 @@ import {
 import './SkillsSection.css';
 
 export function SkillsSection({
-  skills, abilityScores, onChange, totalSkillPoints, spentPoints, totalLevel,
+  skills, abilityScores, onChange, totalSkillPoints, spentPoints, totalLevel, totalAcp = 0,
 }: {
   skills: CharacterDraft['skills'];
   abilityScores: CharacterDraft['abilityScores'];
@@ -17,6 +17,7 @@ export function SkillsSection({
   totalSkillPoints: number;
   spentPoints: number;
   totalLevel: number;
+  totalAcp?: number;
 }) {
   const maxClassRanks = maxClassSkillRanks(totalLevel);
   const maxCrossRanks = maxCrossClassSkillRanks(totalLevel);
@@ -38,7 +39,7 @@ export function SkillsSection({
         ...sk,
         ranks: sk.classSkill ? Math.floor(finalRanks) : Math.floor(finalRanks * 2) / 2,
       };
-      return { ...updated, bonus: computeSkillBonus(updated, abilityScores) };
+      return { ...updated, bonus: computeSkillBonus(updated, abilityScores, totalAcp) };
     });
     onChange(updated);
   }
@@ -47,7 +48,7 @@ export function SkillsSection({
     const updated = skills.map((sk, idx) => {
       if (idx !== i) return sk;
       const next = { ...sk, miscBonus: Number.isFinite(miscBonus) ? Math.trunc(miscBonus) : 0 };
-      return { ...next, bonus: computeSkillBonus(next, abilityScores) };
+      return { ...next, bonus: computeSkillBonus(next, abilityScores, totalAcp) };
     });
     onChange(updated);
   }
@@ -56,7 +57,7 @@ export function SkillsSection({
     const updated = skills.map((sk, idx) => {
       if (idx !== i) return sk;
       const next = { ...sk, classSkill: newValue, classSkillOverride: newValue };
-      return { ...next, bonus: computeSkillBonus(next, abilityScores) };
+      return { ...next, bonus: computeSkillBonus(next, abilityScores, totalAcp) };
     });
     onChange(updated);
   }
@@ -64,7 +65,7 @@ export function SkillsSection({
   function resetRanks() {
     const updated = skills.map((sk) => {
       const next = { ...sk, ranks: 0 };
-      return { ...next, bonus: computeSkillBonus(next, abilityScores) };
+      return { ...next, bonus: computeSkillBonus(next, abilityScores, totalAcp) };
     });
     onChange(updated);
   }
@@ -128,7 +129,7 @@ export function SkillsSection({
         </thead>
         <tbody>
           {skills.map((sk, i) => {
-            const bonus = computeSkillBonus(sk, abilityScores);
+            const bonus = computeSkillBonus(sk, abilityScores, totalAcp);
             const abilityBonus = sk.keyAbility
               ? (() => { const s = abilityScores[sk.keyAbility as keyof CharacterDraft['abilityScores']]; return abilityModifier(s.temp ?? totalScore(s)); })()
               : 0;
