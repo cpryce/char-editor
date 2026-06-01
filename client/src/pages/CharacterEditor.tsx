@@ -255,7 +255,7 @@ function parseMaxDexBonus(value: string | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function deriveAbilityTotals(scores: CharacterDraft['abilityScores']): Record<AbilityKey, number> {
+export function deriveAbilityTotals(scores: CharacterDraft['abilityScores']): Record<AbilityKey, number> {
   return {
     strength: totalScore(scores.strength),
     dexterity: totalScore(scores.dexterity),
@@ -266,7 +266,7 @@ function deriveAbilityTotals(scores: CharacterDraft['abilityScores']): Record<Ab
   };
 }
 
-function deriveCombatStats({
+export function deriveCombatStats({
   combat,
   inventory,
   feats,
@@ -1521,7 +1521,13 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
         </p>
       )}
 
-      {!loadingCharacter && (
+      {!loadingCharacter && isEdit && initialDraftFingerprint === null && error && (
+        <p className="text-sm px-3 py-2 rounded bg-[var(--color-danger-subtle)] text-[color:var(--color-danger-fg)] border border-[var(--color-danger-muted)]">
+          {error}
+        </p>
+      )}
+
+      {!loadingCharacter && !(isEdit && initialDraftFingerprint === null && error) && (
       <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-4">
         <div>
 
