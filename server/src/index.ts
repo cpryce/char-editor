@@ -738,6 +738,7 @@ async function getCampaignDetail(campaignId: string, ownerId: mongoose.Types.Obj
   const playerUsers = playerIds.length > 0
     ? await User.find({ _id: { $in: playerIds } }, { name: 1, email: 1, avatar: 1 }).lean()
     : [];
+  const userById = new Map(playerUsers.map((u) => [u._id.toString(), u]));
   return {
     ...campaign,
     owner: ownerUser
@@ -755,12 +756,15 @@ async function getCampaignDetail(campaignId: string, ownerId: mongoose.Types.Obj
         ? (dex.temp ?? ((dex.base ?? 10) + (dex.racial ?? 0) + (dex.enhancement ?? 0) + (dex.misc ?? 0) + (dex.tempMod ?? 0) + (dex.levelUp ?? 0)))
         : 10;
       const initiativeModifier = Math.floor((dexTotal - 10) / 2) + Number(raw.combat?.initiative?.miscBonus ?? 0);
+      const ownerId = c.owner?.toString() ?? null;
+      const ownerUser = ownerId ? userById.get(ownerId) : null;
       return {
         _id: c._id.toString(),
         name: c.name,
         race: c.race,
         classes: c.classes,
-        owner: c.owner?.toString() ?? null,
+        owner: ownerId,
+        ownerName: ownerUser ? ownerUser.name ?? ownerUser.email : null,
         delegatedTo: raw.delegatedTo?.toString() ?? null,
         pendingInviteEmail: raw.pendingInviteEmail ?? null,
         initiativeModifier,

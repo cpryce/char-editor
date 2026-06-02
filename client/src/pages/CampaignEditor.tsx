@@ -12,6 +12,7 @@ interface CharSummary {
   race?: string;
   classes?: Array<{ name: string; level: number }>;
   owner?: string | null;
+  ownerName?: string | null;
   delegatedTo?: string | null;
   pendingInviteEmail?: string | null;
   initiativeModifier?: number;
@@ -82,14 +83,21 @@ export function CampaignEditor({
   const encounterDropdownRef = useRef<HTMLDivElement>(null);
   const pointBuyDropdownRef = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(() => {    fetch(`/api/campaigns/${campaignId}`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((data: CampaignDetail) => {
-        setCampaign(data);
-        setName(data.name);
-        setDescription(data.description ?? '');
-        onPointBuySystemChange?.(data.pointBuySystem as PointBuySystem ?? null);
-      });
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}`, { credentials: 'include' });
+      if (!res.ok) {
+        throw new Error(`Failed to load campaign (${res.status})`);
+      }
+
+      const data = await res.json() as CampaignDetail;
+      setCampaign(data);
+      setName(data.name);
+      setDescription(data.description ?? '');
+      onPointBuySystemChange?.(data.pointBuySystem as PointBuySystem ?? null);
+    } catch (error) {
+      console.error('Failed to load campaign editor data:', error);
+    }
   }, [campaignId, onPointBuySystemChange]);
 
   useEffect(() => { load(); }, [load]);
@@ -486,6 +494,7 @@ export function CampaignEditor({
               <thead>
                 <tr className="bg-[var(--color-canvas-subtle)]">
                   <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">Name</th>
+                  <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)] hidden sm:table-cell">Owner</th>
                   <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)] hidden sm:table-cell">Race</th>
                   <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)]">Class</th>
                   <th className="px-4 py-2 text-left font-medium text-[color:var(--color-fg-muted)] border-b border-[var(--color-border-default)] hidden min-[480px]:table-cell">Level</th>
@@ -514,6 +523,7 @@ export function CampaignEditor({
                         )}
                       </span>
                     </td>
+                    <td className="px-4 py-2 text-[color:var(--color-fg-default)] hidden sm:table-cell">{c.ownerName ?? c.owner ?? '—'}</td>
                     <td className="px-4 py-2 text-[color:var(--color-fg-default)] hidden sm:table-cell">{c.race ?? '—'}</td>
                     <td className="px-4 py-2 text-[color:var(--color-fg-default)]">{classLabel(c.classes)}</td>
                     <td className="px-4 py-2 text-[color:var(--color-fg-default)] hidden min-[480px]:table-cell">{totalLevel(c.classes)}</td>
