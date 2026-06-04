@@ -354,9 +354,9 @@ function deriveCombatStats({
     sizeMod: acSizeMod, dodge: acDodge, natural: acNatural, deflection: acDeflection, misc: acMisc + featAcMod,
   });
   const initiativeTotal = dexMod + initMisc;
-  const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc);
-  const reflexTotal = reflexBase + dexMod + safeCombatNumber(combat.saves.reflex.magic) + safeCombatNumber(combat.saves.reflex.misc);
-  const willTotal = willBase + wisMod + safeCombatNumber(combat.saves.will.magic) + safeCombatNumber(combat.saves.will.misc);
+  const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc) + featFortMod;
+  const reflexTotal = reflexBase + dexMod + safeCombatNumber(combat.saves.reflex.magic) + safeCombatNumber(combat.saves.reflex.misc) + featRefMod;
+  const willTotal = willBase + wisMod + safeCombatNumber(combat.saves.will.magic) + safeCombatNumber(combat.saves.will.misc) + featWillMod;
   const meleeAttack = bab + strMod + sizeMod + featMeleeAttackMod;
   const rangedAttack = bab + dexMod + sizeMod + featRangedAttackMod;
   const speedFeet = Math.max(0, speedBase + speedArmorAdjust);
