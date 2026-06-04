@@ -284,7 +284,7 @@ export async function fillCharacterPdf(
 
   // Ability scores — strength
   safeSet(form, 'abilityScores.strength.total',       str);
-  safeSet(form, 'abilityScores.strength.mod',         signed(strEffMod));
+  safeSet(form, 'abilityScores.strength.mod',         signed(strMod));
   safeSet(form, 'abilityScores.strength.base',        s.strength.base);
   safeSet(form, 'abilityScores.strength.racial',      s.strength.racial      || '');
   safeSet(form, 'abilityScores.strength.misc',        s.strength.misc        || '');
@@ -295,7 +295,7 @@ export async function fillCharacterPdf(
 
   // Ability scores — dexterity
   safeSet(form, 'abilityScores.dexterity.total',       dex);
-  safeSet(form, 'abilityScores.dexterity.mod',         signed(dexEffMod));
+  safeSet(form, 'abilityScores.dexterity.mod',         signed(dexMod));
   safeSet(form, 'abilityScores.dexterity.base',        s.dexterity.base);
   safeSet(form, 'abilityScores.dexterity.racial',      s.dexterity.racial      || '');
   safeSet(form, 'abilityScores.dexterity.misc',        s.dexterity.misc        || '');
@@ -306,7 +306,7 @@ export async function fillCharacterPdf(
 
   // Ability scores — constitution
   safeSet(form, 'abilityScores.constitution.total',       con);
-  safeSet(form, 'abilityScores.constitution.mod',         signed(conEffMod));
+  safeSet(form, 'abilityScores.constitution.mod',         signed(conMod));
   safeSet(form, 'abilityScores.constitution.base',        s.constitution.base);
   safeSet(form, 'abilityScores.constitution.racial',      s.constitution.racial      || '');
   safeSet(form, 'abilityScores.constitution.misc',        s.constitution.misc        || '');
@@ -315,13 +315,13 @@ export async function fillCharacterPdf(
   safeSet(form, 'abilityScores.constitution.temp',    s.constitution.temp    != null ? s.constitution.temp    : '');
   safeSet(form, 'abilityScores.constitution.tempMod',  effectiveTempMod(s.constitution) != null ? signed(effectiveTempMod(s.constitution)!) : '');
 
-  for (const [key, total, effMod, score] of [
-    ['intelligence', int_, intEffMod, s.intelligence],
-    ['wisdom',       wis,  wisEffMod, s.wisdom],
-    ['charisma',     cha,  chaEffMod, s.charisma],
+  for (const [key, total, permMod, score] of [
+    ['intelligence', int_, intMod, s.intelligence],
+    ['wisdom',       wis,  wisMod, s.wisdom],
+    ['charisma',     cha,  chaMod, s.charisma],
   ] as const) {
     safeSet(form, `abilityScores.${key}.total`,       total);
-    safeSet(form, `abilityScores.${key}.mod`,         signed(effMod));
+    safeSet(form, `abilityScores.${key}.mod`,         signed(permMod));
     safeSet(form, `abilityScores.${key}.base`,        score.base);
     safeSet(form, `abilityScores.${key}.racial`,      score.racial      || '');
     safeSet(form, `abilityScores.${key}.misc`,        score.misc        || '');
@@ -386,7 +386,24 @@ export async function fillCharacterPdf(
   safeSet(form, 'combat.initiative.mod',       signed(dexEffMod));
   safeSet(form, 'combat.initiative.miscBonus', initMiscBonus || '');
   safeSet(form, 'combat.initiative.total',     signed(initTotal));
-  safeSet(form, 'combat.baseAttackBonus',      character.combat.baseAttackBonus || '');
+  safeSet(form, 'combat.baseAttackBonus',      character.combat.baseAttackBonus ?? 0);
+
+  // CMB and CMD
+  // The special size modifier for CMB/CMD is the inverse of the AC size modifier
+  // (Small: AC=+1 but CMB/CMD=-1; Large: AC=-1 but CMB/CMD=+1; etc.).
+  const cmbSizeMod = -acSizeMod;
+  const bab = character.combat.baseAttackBonus;
+  safeSet(form, 'cmb.ability', signed(strEffMod));
+  safeSet(form, 'cmb.size',    cmbSizeMod || '');
+  safeSet(form, 'cmb.total',   bab + strEffMod + cmbSizeMod);
+  safeSet(form, 'cmd.BaB',     bab ?? 0);
+  safeSet(form, 'cmd.str',     signed(strEffMod));
+  safeSet(form, 'cmd.dex',     signed(dexEffMod));    // full DEX — CMD is not max-dex capped
+  safeSet(form, 'cmd.size',    cmbSizeMod || '');
+  safeSet(form, 'cmd.dodge',      ac.dodge      || '');
+  safeSet(form, 'cmd.deflection', ac.deflection || '');
+  safeSet(form, 'cmd.mic',        ac.misc       || '');
+  safeSet(form, 'cmd.total',   10 + bab + strEffMod + dexEffMod + cmbSizeMod + ac.dodge + ac.deflection + ac.misc);
 
   // ── Main-hand weapon ──────────────────────────────────────────────────────
   const mh = character.inventory?.mainHand ?? null;
@@ -764,6 +781,14 @@ export async function fillCharacterPdf(
     } catch { /* field not yet in template — skip */ }
   };
 
+  /** Add a field to the Calculation Order without changing its existing script. */
+  const addToCalcOrder = (fieldName: string): void => {
+    try {
+      const fRef = (form.getField(fieldName) as any).acroField.ref as PDFRef;
+      calcOrder.push(fRef);
+    } catch { /* field not in template — skip */ }
+  };
+
   // ── Race change handler ──────────────────────────────────────────────────
   // When user selects a different race in Acrobat, update: size label,
   // size bonus to AC, and base land speed.
@@ -801,18 +826,19 @@ export async function fillCharacterPdf(
       `${NN}${SN}var temp=n("${p}.temp");event.value=temp!==null?s(Math.floor((temp-10)/2)):"";`);
   }
 
-  // 3. Ability mods: tempMod if set, else floor((total − 10) / 2), signed
+  // 3. Ability mods: always floor((total − 10) / 2) from the permanent total.
+  //    Combat/skill fields that need temp-score awareness do their own tempMod || mod lookup.
   for (const key of ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma']) {
     const p = `abilityScores.${key}`;
     addCalc(`${p}.mod`,
-      `${NN}${SN}var tm=n("${p}.tempMod"),tot=n("${p}.total");event.value=tm!==null?s(tm):s(Math.floor(((tot!==null?tot:10)-10)/2));`);
+      `${N0}${SN}var tot=n("${p}.total");event.value=s(Math.floor((tot-10)/2));`);
   }
 
-  // 3. AC dexterity mod — mirrors dexterity.mod (temp score already handled there)
+  // 3. AC dexterity mod — DEX tempMod takes precedence over DEX mod
   addCalc('combat.armorClass.dexterityMod',
-    'var x=this.getField("abilityScores.dexterity.mod");event.value=x&&x.value?x.value:"+0";');
+    'var tm=this.getField("abilityScores.dexterity.tempMod"),m=this.getField("abilityScores.dexterity.mod");event.value=(tm&&tm.value!=="")?tm.value:((m&&m.value)?m.value:"+0");');
 
-  // 4. Save mods: tempMod override if set, otherwise derive from ability total
+  // 4. Save mods: tempMod takes precedence over mod
   const saveAbilityMap = [
     { save: 'fortitude', ability: 'constitution' },
     { save: 'reflex',    ability: 'dexterity'    },
@@ -822,7 +848,7 @@ export async function fillCharacterPdf(
   for (const { save, ability } of saveAbilityMap) {
     const p = `abilityScores.${ability}`;
     addCalc(`combat.saves.${save}.mod`,
-      `${NN}${SN}var tm=n("${p}.tempMod"),tot=n("${p}.total");event.value=tm!==null?s(tm):s(Math.floor(((tot!==null?tot:10)-10)/2));`);
+      `var tm=this.getField("${p}.tempMod"),m=this.getField("${p}.mod");event.value=(tm&&tm.value!=="")?tm.value:((m&&m.value)?m.value:"+0");`);
   }
 
   // 5. AC totals (depend on dexterityMod calculated above)
@@ -839,6 +865,49 @@ export async function fillCharacterPdf(
     addCalc(`${p}.total`,
       `${N0}${SN}event.value=s(n("${p}.base")+n("${p}.mod")+n("${p}.magic")+n("${p}.misc"));`);
   }
+
+  // 6.5. CMB ability component and CMD sub-fields (depend on ability mods calculated above).
+  //      These fields have scripts in blank.pdf but are not added to the generated CO by any
+  //      other addCalc call — restore them here so Acrobat fires the recalculation cascade.
+  //      cmb.ability and cmd.dex/cmd.str get tempMod-aware replacements; the rest retain their
+  //      template scripts (pass-throughs from BAB, AC, and size fields).
+  addCalc('cmb.ability',
+    'var tm=this.getField("abilityScores.strength.tempMod"),m=this.getField("abilityScores.strength.mod");event.value=(tm&&tm.value!=="")?tm.value:((m&&m.value)?m.value:"+0");');
+  addCalc('cmd.dex',
+    'var tm=this.getField("abilityScores.dexterity.tempMod"),m=this.getField("abilityScores.dexterity.mod");event.value=(tm&&tm.value!=="")?tm.value:((m&&m.value)?m.value:"+0");');
+  addCalc('cmd.str',
+    'var tm=this.getField("abilityScores.strength.tempMod"),m=this.getField("abilityScores.strength.mod");event.value=(tm&&tm.value!=="")?tm.value:((m&&m.value)?m.value:"+0");');
+  // BAB: computed from each class name + level slot (0–3).
+  // Progressions: full (Barbarian/Fighter/Paladin/Ranger), 3/4 (Bard/Cleric/Druid/Monk/Rogue), 1/2 (Sorcerer/Wizard).
+  const babScript = [
+    'var full=["Barbarian","Fighter","Paladin","Ranger"];',
+    'var tq=["Bard","Cleric","Druid","Monk","Rogue"];',
+    'var bab=0;',
+    'for(var i=0;i<4;i++){',
+    'var nf=this.getField("classes."+i+".name");',
+    'var lf=this.getField("classes."+i+".level");',
+    'if(!nf||!lf)continue;',
+    'var nm=(nf.value||"").trim(),lv=Math.floor(+lf.value||0);',
+    'if(!nm||lv<=0)continue;',
+    'if(full.indexOf(nm)>=0)bab+=lv;',
+    'else if(tq.indexOf(nm)>=0)bab+=Math.floor(lv*3/4);',
+    'else bab+=Math.floor(lv/2);',
+    '}event.value=String(bab);',
+  ].join('');
+  addCalc('combat.baseAttackBonus', babScript);
+  addToCalcOrder('cmd.BaB');
+  // CMB/CMD special size modifier = negative of AC size modifier.
+  const cmbSizeJs = 'var x=this.getField("combat.armorClass.size");event.value=x?-Number(x.value||0):0;';
+  addCalc('cmb.size', cmbSizeJs);
+  addCalc('cmd.size', cmbSizeJs);
+  // CMB = BAB + STR modifier + special size modifier
+  addCalc('cmb.total', `${N0}event.value=n("combat.baseAttackBonus")+n("cmb.ability")+n("cmb.size");`);
+  // Remaining CMD components before the total.
+  addToCalcOrder('cmd.dodge');
+  addToCalcOrder('cmd.deflection');
+  addToCalcOrder('cmd.mic');
+  // CMD = 10 + BAB + STR modifier + DEX modifier + special size modifier + dodge + deflection + misc
+  addCalc('cmd.total', `${N0}event.value=10+n("cmd.BaB")+n("cmd.str")+n("cmd.dex")+n("cmd.size")+n("cmd.dodge")+n("cmd.deflection")+n("cmd.mic");`);
 
   // 7. Skill bonuses (depend on ability mods calculated above)
   //    Each row uses tempMod when present, otherwise mod.
