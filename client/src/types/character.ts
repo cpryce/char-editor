@@ -51,6 +51,8 @@ export interface Skill {
   classSkill: boolean;
   /** Explicit user override for classSkill. null = defer to class-derived value. */
   classSkillOverride?: boolean | null;
+  /** Computed racial skill bonus; not user-editable. */
+  racialBonus?: number;
   miscBonus: number;
   bonus: number;
 }

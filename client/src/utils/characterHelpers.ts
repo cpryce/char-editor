@@ -643,10 +643,11 @@ export function computeSkillBonus(
 ): number {
   const acpMultiplier = skill.doubleAcp ? 2 : 1;
   const acp = skill.armorCheckPenalty ? totalAcp * acpMultiplier : 0;
-  if (!skill.keyAbility) return Math.floor(skill.ranks + skill.miscBonus + acp);
+  const miscTotal = skill.miscBonus + (skill.racialBonus ?? 0);
+  if (!skill.keyAbility) return Math.floor(skill.ranks + miscTotal + acp);
   const s = scores[skill.keyAbility as keyof CharacterDraft['abilityScores']];
   const effectiveScore = s.temp ?? totalScore(s);
-  return Math.floor(skill.ranks + abilityModifier(effectiveScore) + skill.miscBonus + acp);
+  return Math.floor(skill.ranks + abilityModifier(effectiveScore) + miscTotal + acp);
 }
 
 export function totalCharacterLevel(classes: CharacterDraft['classes']) {
@@ -730,7 +731,7 @@ export function applyClassAndRacialSkillRules(
     return {
       ...skill,
       classSkill,
-      miscBonus: racialBonuses[skill.name] ?? 0,
+      racialBonus: racialBonuses[skill.name] ?? 0,
     };
   });
 }
@@ -840,6 +841,7 @@ export function newCharacterDraft(): CharacterDraft {
       ...(def.doubleAcp ? { doubleAcp: true } : {}),
       ranks: 0,
       classSkill: false,
+      racialBonus: 0,
       miscBonus: 0,
       bonus: 0,
     })),

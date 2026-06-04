@@ -284,7 +284,7 @@ export function CombatSection({
       )}
 
       <p className="text-xs combat-muted-text">
-        Save inputs are ordered: base, magic, misc, temp. AC follows SRD: 10 + armor + shield + Dex + size + dodge + natural + deflection + misc.
+        Save inputs are ordered: base, ability modifier, magic, misc. AC follows SRD: 10 + armor + shield + Dex + size + dodge + natural + deflection + misc.
       </p>
     </div>
   );

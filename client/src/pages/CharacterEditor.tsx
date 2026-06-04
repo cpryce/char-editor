@@ -300,9 +300,9 @@ function deriveCombatStats({
   const acNatural = safeCombatNumber(combat.armorClass.natural);
   const acDeflection = safeCombatNumber(combat.armorClass.deflection);
   const initMisc = safeCombatNumber(combat.initiative.miscBonus);
-  const speedBase = parseInt(baseSpeed) || 30;
-  const armoredSpeedFt = inventory.body?.speed ? parseInt(inventory.body.speed) : NaN;
-  const speedArmorAdjust = inventory.body?.speed && !isNaN(armoredSpeedFt) ? armoredSpeedFt - speedBase : 0;
+  const derivedSpeedBase = parseInt(baseSpeed) || 30;
+  const speedBase = Number.isFinite(combat.speed.base) ? combat.speed.base : derivedSpeedBase;
+  const speedArmorAdjust = Number.isFinite(combat.speed.armorAdjust) ? combat.speed.armorAdjust : 0;
   const speedFly = safeCombatNumber(combat.speed.fly);
   const speedSwim = safeCombatNumber(combat.speed.swim);
   const bab = baseAttackBonusFromClasses(classes, customClassMap);
@@ -354,9 +354,9 @@ function deriveCombatStats({
     sizeMod: acSizeMod, dodge: acDodge, natural: acNatural, deflection: acDeflection, misc: acMisc + featAcMod,
   });
   const initiativeTotal = dexMod + initMisc;
-  const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc) + featFortMod;
-  const reflexTotal = reflexBase + dexMod + safeCombatNumber(combat.saves.reflex.magic) + safeCombatNumber(combat.saves.reflex.misc) + featRefMod;
-  const willTotal = willBase + wisMod + safeCombatNumber(combat.saves.will.magic) + safeCombatNumber(combat.saves.will.misc) + featWillMod;
+  const fortitudeTotal = fortitudeBase + conMod + safeCombatNumber(combat.saves.fortitude.magic) + safeCombatNumber(combat.saves.fortitude.misc);
+  const reflexTotal = reflexBase + dexMod + safeCombatNumber(combat.saves.reflex.magic) + safeCombatNumber(combat.saves.reflex.misc);
+  const willTotal = willBase + wisMod + safeCombatNumber(combat.saves.will.magic) + safeCombatNumber(combat.saves.will.misc);
   const meleeAttack = bab + strMod + sizeMod + featMeleeAttackMod;
   const rangedAttack = bab + dexMod + sizeMod + featRangedAttackMod;
   const speedFeet = Math.max(0, speedBase + speedArmorAdjust);
@@ -1120,6 +1120,10 @@ export function CharacterEditor({ characterId, initialClass, initialName, initia
         baseSpeed: String(BASE_SPEED_BY_RACE[race] ?? BASE_SPEED_BY_SIZE[nextSize] ?? 30),
         combat: {
           ...d.combat,
+          speed: {
+            ...d.combat.speed,
+            base: BASE_SPEED_BY_RACE[race] ?? BASE_SPEED_BY_SIZE[nextSize] ?? 30,
+          },
           armorClass: {
             ...d.combat.armorClass,
             size: defaultAcSizeModifier(nextSize),
