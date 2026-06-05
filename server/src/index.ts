@@ -15,7 +15,7 @@ import { Character } from './models/Character';
 import { CustomFeat } from './models/CustomFeat';
 import { CustomClass } from './models/CustomClass';
 import { EncounterSession } from './models/EncounterSession';
-import { Campaign } from './models/Campaign';
+import { Campaign, type ICampaign, type CampaignAccessLevel } from './models/Campaign';
 import { SpellProgression } from './models/SpellProgression';
 import { SRD_SPELL_PROGRESSIONS } from './data/spellProgressionSeed';
 
@@ -714,85 +714,169 @@ app.delete('/api/encounters/:id', async (req, res) => {
 
 // ── Campaign routes ─────────────────────────────────────────────
 
-/** Returns a campaign with populated character + encounter summaries. */
-async function getCampaignDetail(campaignId: string, ownerId: mongoose.Types.ObjectId) {
-  const campaign = await Campaign.findOne({ _id: campaignId, owner: ownerId }).lean();
+/**
+ * Returns the caller's access level for a campaign, or null if they have none.
+ * 'owner' > 'delegate' > 'view'
+ */
+async function getCampaignAccess(
+  campaignId: string,
+  userId: mongoose.Types.ObjectId,
+): Promise<{ campaign: ICampaign; access: 'owner' | CampaignAccessLevel } | null> {
+  const campaign = await Campaign.findById(campaignId);
   if (!campaign) return null;
+  if (campaign.owner.toString() === userId.toString()) return { campaign, access: 'owner' };
+  const invite = campaign.invites.find(
+    (inv) => inv.userId?.toString() === userId.toString(),
+  );
+  if (invite) return { campaign, access: invite.access };
+  return null;
+}
+
+/** Maps a character document to the summary shape returned in campaign detail. */
+function mapCharSummary(c: {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  race?: string;
+  classes?: Array<{ name: string; level: number; hitDieType: number; hpRolled: number[] }>;
+  owner?: mongoose.Types.ObjectId | null;
+  delegatedTo?: mongoose.Types.ObjectId | null;
+  pendingInviteEmail?: string | null;
+  abilityScores?: { dexterity?: { base?: number; racial?: number; enhancement?: number; misc?: number; tempMod?: number; levelUp?: number; temp?: number | null } };
+  combat?: { initiative?: { miscBonus?: number } };
+}, userById: Map<string, { _id: mongoose.Types.ObjectId; name?: string; email: string; avatar?: string }>) {
+  const dex = c.abilityScores?.dexterity;
+  const dexTotal = dex
+    ? (dex.temp ?? ((dex.base ?? 10) + (dex.racial ?? 0) + (dex.enhancement ?? 0) + (dex.misc ?? 0) + (dex.tempMod ?? 0) + (dex.levelUp ?? 0)))
+    : 10;
+  const initiativeModifier = Math.floor((dexTotal - 10) / 2) + Number(c.combat?.initiative?.miscBonus ?? 0);
+  const ownerId = c.owner?.toString() ?? null;
+  const delegatedToId = c.delegatedTo?.toString() ?? null;
+  const ownerUser = ownerId ? userById.get(ownerId) : null;
+  const delegateUser = delegatedToId ? userById.get(delegatedToId) : null;
+  return {
+    _id: c._id.toString(),
+    name: c.name,
+    race: c.race,
+    classes: c.classes,
+    owner: ownerId,
+    ownerName: ownerUser ? ownerUser.name ?? ownerUser.email : null,
+    delegatedTo: delegatedToId,
+    delegateName: delegateUser ? delegateUser.name ?? delegateUser.email : null,
+    pendingInviteEmail: c.pendingInviteEmail ?? null,
+    initiativeModifier,
+  };
+}
+
+/**
+ * Returns a campaign detail object visible to the given user (owner or accepted invite member).
+ * Owners additionally receive the full invites list.
+ */
+async function getCampaignDetail(
+  campaignId: string,
+  userId: mongoose.Types.ObjectId,
+) {
+  const result = await getCampaignAccess(campaignId, userId);
+  if (!result) return null;
+  const { campaign, access } = result;
+  const campObj = campaign;
+
   const [characters, encounters, ownerUser] = await Promise.all([
     Character.find(
-      { _id: { $in: campaign.characterIds } },
+      { _id: { $in: campObj.characterIds } },
       { name: 1, race: 1, classes: 1, owner: 1, delegatedTo: 1, pendingInviteEmail: 1, 'abilityScores.dexterity': 1, 'combat.initiative': 1 },
     ).lean(),
     EncounterSession.find(
-      { _id: { $in: campaign.encounterIds } },
+      { _id: { $in: campObj.encounterIds } },
       { name: 1 },
     ).lean(),
-    User.findById(ownerId, { name: 1, email: 1, avatar: 1 }).lean(),
+    User.findById(campObj.owner, { name: 1, email: 1, avatar: 1 }).lean(),
   ]);
-  const playerIds = [...new Set(
-    characters.map((c) => {
-      const raw = c as unknown as { delegatedTo?: { toString(): string } };
-      return (raw.delegatedTo?.toString() ?? c.owner?.toString());
-    }).filter((id): id is string => Boolean(id)),
-  )];
-  const playerUsers = playerIds.length > 0
-    ? await User.find({ _id: { $in: playerIds } }, { name: 1, email: 1, avatar: 1 }).lean()
+
+  // Players sidebar: all accepted invite members
+  const acceptedInviteUserIds = campObj.invites
+    .filter((inv) => inv.userId != null)
+    .map((inv) => inv.userId!.toString());
+  const charPlayerIds = characters.map((c) => {
+    const raw = c as unknown as { delegatedTo?: { toString(): string } | null };
+    return raw.delegatedTo?.toString() ?? c.owner?.toString();
+  }).filter((id): id is string => Boolean(id));
+  const allPlayerIds = [...new Set([...charPlayerIds, ...acceptedInviteUserIds])];
+  const playerUsers = allPlayerIds.length > 0
+    ? await User.find({ _id: { $in: allPlayerIds } }, { name: 1, email: 1, avatar: 1 }).lean()
     : [];
+
   const userById = new Map(playerUsers.map((u) => [u._id.toString(), u]));
-  return {
-    ...campaign,
+
+  const base = {
+    ...campObj.toObject(),
+    accessLevel: access,
     owner: ownerUser
       ? { _id: ownerUser._id.toString(), name: ownerUser.name, email: ownerUser.email, avatar: ownerUser.avatar }
       : null,
-    characters: characters.map((c) => {
-      const raw = c as unknown as {
-        delegatedTo?: { toString(): string };
-        pendingInviteEmail?: string;
-        abilityScores?: { dexterity?: { base?: number; racial?: number; enhancement?: number; misc?: number; tempMod?: number; levelUp?: number; temp?: number } };
-        combat?: { initiative?: { miscBonus?: number } };
-      };
-      const dex = raw.abilityScores?.dexterity;
-      const dexTotal = dex
-        ? (dex.temp ?? ((dex.base ?? 10) + (dex.racial ?? 0) + (dex.enhancement ?? 0) + (dex.misc ?? 0) + (dex.tempMod ?? 0) + (dex.levelUp ?? 0)))
-        : 10;
-      const initiativeModifier = Math.floor((dexTotal - 10) / 2) + Number(raw.combat?.initiative?.miscBonus ?? 0);
-      const ownerId = c.owner?.toString() ?? null;
-      const delegatedToId = raw.delegatedTo?.toString() ?? null;
-      const ownerUser = ownerId ? userById.get(ownerId) : null;
-      const delegateUser = delegatedToId ? userById.get(delegatedToId) : null;
-      return {
-        _id: c._id.toString(),
-        name: c.name,
-        race: c.race,
-        classes: c.classes,
-        owner: ownerId,
-        ownerName: ownerUser ? ownerUser.name ?? ownerUser.email : null,
-        delegatedTo: delegatedToId,
-        delegateName: delegateUser ? delegateUser.name ?? delegateUser.email : null,
-        pendingInviteEmail: raw.pendingInviteEmail ?? null,
-        initiativeModifier,
-      };
-    }),
+    characters: characters.map((c) => mapCharSummary(c as Parameters<typeof mapCharSummary>[0], userById)),
     encounters: encounters.map((e) => ({ _id: e._id.toString(), id: e._id.toString(), name: e.name })),
     players: playerUsers.map((u) => ({ _id: u._id.toString(), name: u.name, email: u.email, avatar: u.avatar })),
   };
+
+  // Only expose invite management data to the campaign owner
+  if (access === 'owner') {
+    const acceptedUserMap = new Map(playerUsers.map((u) => [u._id.toString(), u]));
+    return {
+      ...base,
+      invites: campObj.invites.map((inv) => {
+        const user = inv.userId ? acceptedUserMap.get(inv.userId.toString()) : null;
+        return {
+          _id: inv._id.toString(),
+          email: inv.email,
+          access: inv.access,
+          isPending: inv.token != null,
+          token: inv.token ?? null,
+          user: user ? { _id: user._id.toString(), name: user.name, email: user.email, avatar: user.avatar } : null,
+        };
+      }),
+    };
+  }
+
+  return { ...base, invites: undefined };
 }
 
 app.get('/api/campaigns', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
-  const campaigns = await Campaign.find({ owner: u._id }, { name: 1, description: 1, characterIds: 1, encounterIds: 1, updatedAt: 1 }).sort({ updatedAt: -1 }).lean();
+
+  // Fetch campaigns owned by user OR campaigns with an accepted invite for this user
+  const campaigns = await Campaign.find(
+    { $or: [{ owner: u._id }, { 'invites.userId': u._id }] },
+    { name: 1, description: 1, characterIds: 1, encounterIds: 1, updatedAt: 1, owner: 1, invites: 1 },
+  ).sort({ updatedAt: -1 }).lean();
+
   const allCharIds = campaigns.flatMap((c) => c.characterIds);
   const charOwners = allCharIds.length > 0
     ? await Character.find({ _id: { $in: allCharIds } }, { owner: 1 }).lean()
     : [];
   const charOwnerMap = new Map(charOwners.map((c) => [c._id.toString(), c.owner?.toString() ?? null]));
-  res.json(campaigns.map((c) => ({
-    ...c,
-    playerCount: new Set(
-      c.characterIds.map((id) => charOwnerMap.get(id.toString())).filter(Boolean),
-    ).size,
-  })));
+
+  // Resolve DM user info for shared campaigns
+  const dmIds = [...new Set(campaigns.map((c) => c.owner.toString()))];
+  const dmUsers = dmIds.length > 0
+    ? await User.find({ _id: { $in: dmIds } }, { name: 1, email: 1 }).lean()
+    : [];
+  const dmMap = new Map(dmUsers.map((u) => [u._id.toString(), u]));
+
+  res.json(campaigns.map((c) => {
+    const isOwner = c.owner.toString() === u._id.toString();
+    const invite = isOwner ? null : (c.invites as Array<{ userId?: { toString(): string } | null; access: string }>).find((inv) => inv.userId?.toString() === u._id.toString());
+    const dm = dmMap.get(c.owner.toString());
+    return {
+      ...c,
+      invites: undefined, // never expose raw invites array in list
+      accessLevel: isOwner ? 'owner' : invite?.access ?? 'view',
+      dmName: isOwner ? null : (dm?.name || dm?.email || null),
+      playerCount: new Set(
+        c.characterIds.map((id) => charOwnerMap.get(id.toString())).filter(Boolean),
+      ).size,
+    };
+  }));
 });
 
 app.post('/api/campaigns', async (req, res) => {
@@ -888,6 +972,112 @@ app.delete('/api/campaigns/:id/encounters/:encId', async (req, res) => {
     { _id: req.params.id, owner: u._id },
     { $pull: { encounterIds: new mongoose.Types.ObjectId(req.params.encId) } },
   );
+  const detail = await getCampaignDetail(req.params.id, u._id);
+  if (!detail) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json(detail);
+});
+
+// ── Campaign invite routes ──────────────────────────────────────────────────
+
+// Public: resolve a campaign invite token (no auth required — handle 401 on accept)
+app.get('/api/campaign-invite/:token', async (req, res) => {
+  const campaign = await Campaign.findOne({ 'invites.token': req.params.token })
+    .populate<{ owner: { name?: string; email: string } }>('owner', 'name email')
+    .lean();
+  if (!campaign) { res.status(404).json({ error: 'Invite not found or already accepted' }); return; }
+  const invite = (campaign.invites as Array<{ token: string | null; access: string }>).find((inv) => inv.token === req.params.token);
+  if (!invite) { res.status(404).json({ error: 'Invite not found or already accepted' }); return; }
+  const owner = campaign.owner as unknown as { name?: string; email: string };
+  res.json({
+    campaignId: campaign._id,
+    campaignName: campaign.name,
+    dmName: owner.name || owner.email,
+    access: invite.access,
+  });
+});
+
+// Accept a campaign invite
+app.post('/api/campaign-invite/:token/accept', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const campaign = await Campaign.findOne({ 'invites.token': req.params.token });
+  if (!campaign) { res.status(404).json({ error: 'Invite not found or already accepted' }); return; }
+  if (campaign.owner.toString() === u._id.toString()) {
+    res.status(400).json({ error: 'You cannot accept an invite to your own campaign' }); return;
+  }
+  const invite = campaign.invites.find((inv) => inv.token === req.params.token);
+  if (!invite) { res.status(404).json({ error: 'Invite not found or already accepted' }); return; }
+  const alreadyMember = campaign.invites.some((inv) => inv.userId?.toString() === u._id.toString());
+  if (alreadyMember) { res.status(409).json({ error: 'You are already a member of this campaign' }); return; }
+  invite.token = null;
+  invite.userId = u._id;
+  await campaign.save();
+  res.json({ campaignId: campaign._id });
+});
+
+// DM: create a new campaign invite
+app.post('/api/campaigns/:id/invites', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const { email, access } = req.body as { email?: string; access?: string };
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400).json({ error: 'Invalid email address' }); return;
+  }
+  if (access !== 'view' && access !== 'delegate') {
+    res.status(400).json({ error: 'access must be "view" or "delegate"' }); return;
+  }
+  const campaign = await Campaign.findOne({ _id: req.params.id, owner: u._id });
+  if (!campaign) { res.status(404).json({ error: 'Not found' }); return; }
+  const existing = campaign.invites.find((inv) => inv.email === email && inv.token != null);
+  if (existing) { res.status(409).json({ error: 'A pending invite already exists for this email' }); return; }
+  const token = crypto.randomBytes(32).toString('hex');
+  campaign.invites.push({ _id: new mongoose.Types.ObjectId(), email, token, userId: null, access: access as CampaignAccessLevel });
+  await campaign.save();
+  res.json({ token });
+});
+
+// DM: change a member's access level
+app.patch('/api/campaigns/:id/invites/:inviteId', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const { access } = req.body as { access?: string };
+  if (access !== 'view' && access !== 'delegate') {
+    res.status(400).json({ error: 'access must be "view" or "delegate"' }); return;
+  }
+  const campaign = await Campaign.findOne({ _id: req.params.id, owner: u._id });
+  if (!campaign) { res.status(404).json({ error: 'Not found' }); return; }
+  const invite = campaign.invites.id(req.params.inviteId);
+  if (!invite) { res.status(404).json({ error: 'Invite not found' }); return; }
+  invite.access = access as CampaignAccessLevel;
+  await campaign.save();
+  const detail = await getCampaignDetail(req.params.id, u._id);
+  res.json(detail);
+});
+
+// DM: revoke an invite (pending or accepted)
+app.delete('/api/campaigns/:id/invites/:inviteId', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const campaign = await Campaign.findOne({ _id: req.params.id, owner: u._id });
+  if (!campaign) { res.status(404).json({ error: 'Not found' }); return; }
+  const before = campaign.invites.length;
+  const revokedInvite = campaign.invites.find((inv) => inv._id.toString() === req.params.inviteId);
+  campaign.invites = campaign.invites.filter((inv) => inv._id.toString() !== req.params.inviteId) as typeof campaign.invites;
+  if (campaign.invites.length === before) { res.status(404).json({ error: 'Invite not found' }); return; }
+
+  // Remove characters owned by the revoked user from the campaign
+  if (revokedInvite?.userId) {
+    const ownedChars = await Character.find(
+      { _id: { $in: campaign.characterIds }, owner: revokedInvite.userId },
+      '_id',
+    ).lean();
+    const ownedIds = new Set(ownedChars.map((c) => c._id.toString()));
+    campaign.characterIds = campaign.characterIds.filter(
+      (id) => !ownedIds.has(id.toString()),
+    ) as typeof campaign.characterIds;
+  }
+
+  await campaign.save();
   const detail = await getCampaignDetail(req.params.id, u._id);
   if (!detail) { res.status(404).json({ error: 'Not found' }); return; }
   res.json(detail);

@@ -12,6 +12,7 @@ const CampaignsPage = lazy(() => import('./pages/CampaignsPage').then((module) =
 const CampaignEditor = lazy(() => import('./pages/CampaignEditor').then((module) => ({ default: module.CampaignEditor })));
 const CustomClassesPage = lazy(() => import('./pages/CustomClassesPage').then((module) => ({ default: module.CustomClassesPage })));
 const InvitePage = lazy(() => import('./pages/InvitePage').then((module) => ({ default: module.InvitePage })));
+const CampaignInvitePage = lazy(() => import('./pages/CampaignInvitePage').then((module) => ({ default: module.CampaignInvitePage })));
 const DiceRollerPage = lazy(() => import('./pages/DiceRollerPage').then((module) => ({ default: module.DiceRollerPage })));
 const TurnUndeadPage = lazy(() => import('./pages/TurnUndeadPage').then((module) => ({ default: module.TurnUndeadPage })));
 const SpellProgressionPage = lazy(() => import('./pages/SpellProgressionPage'));
@@ -487,6 +488,9 @@ function App() {
   const [showingInvite, setShowingInvite] = useState(
     () => /^\/invite\/[a-f0-9]+$/.test(window.location.pathname),
   );
+  const [showingCampaignInvite, setShowingCampaignInvite] = useState(
+    () => /^\/campaign-invite\/[a-f0-9]+$/.test(window.location.pathname),
+  );
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [initiativeSessionId, setInitiativeSessionId] = useState<string | null>(null);
@@ -531,6 +535,26 @@ function App() {
           onAccepted={() => {
             window.history.replaceState(null, '', '/');
             setShowingInvite(false); // guaranteed state change → triggers re-render
+          }}
+        />
+      </Suspense>
+    );
+  }
+
+  // Handle /campaign-invite/:token before auth check — CampaignInvitePage handles its own 401 redirect
+  const campaignInviteMatch = showingCampaignInvite
+    ? window.location.pathname.match(/^\/campaign-invite\/([a-f0-9]+)$/)
+    : null;
+  if (campaignInviteMatch) {
+    const token = campaignInviteMatch[1];
+    return (
+      <Suspense fallback={null}>
+        <CampaignInvitePage
+          token={token}
+          onAccepted={() => {
+            window.history.replaceState(null, '', '/');
+            setShowingCampaignInvite(false);
+            setSection('campaigns');
           }}
         />
       </Suspense>
