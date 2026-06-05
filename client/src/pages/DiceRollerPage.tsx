@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import Dice3D from 'react-3d-dice';
+import Dice3D from '../lib/react-3d-dice/Dice3D';
 import type { WeaponLoadout } from '../types/character';
 import './DiceRollerPage.css';
 
