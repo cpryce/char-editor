@@ -1,6 +1,6 @@
 // Vendored from https://github.com/ChefJulio/react-3d-dice
 // Uses patched diceEngine.js (colorSpace fix for Edge/high-DPI)
-import { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import {
   FACE_LABELED,
@@ -10,10 +10,27 @@ import {
   settleQuat,
 } from './diceEngine';
 
+interface OverlayPos { left: string; top: string; }
+interface GridPos { x: number; y: number; }
+interface SettleData { from: THREE.Quaternion; to: THREE.Quaternion; }
+interface SceneState {
+  scene: THREE.Scene | null;
+  camera: THREE.OrthographicCamera | null;
+  renderer: THREE.WebGLRenderer | null;
+  meshes: THREE.Object3D[];
+  gridPos: GridPos[];
+  animId: number | null;
+  phase: string;
+  settleStart: number;
+  settleData: SettleData[];
+  frustumHalf: number;
+  updateOverlay?: () => void;
+}
+
 const Dice3D = ({
   sides,
   color = 0x3b82f6,
-  results = [],
+  results = [] as number[],
   isRolling = false,
   animationMode = 'full',
   rollTrigger = 0,
@@ -22,9 +39,21 @@ const Dice3D = ({
   className,
   style,
   emptyText = 'Press Roll to see 3D dice',
+}: {
+  sides: number;
+  color?: number | string;
+  results?: number[];
+  isRolling?: boolean;
+  animationMode?: string;
+  rollTrigger?: number;
+  d6Style?: string;
+  height?: number | string;
+  className?: string;
+  style?: React.CSSProperties;
+  emptyText?: string;
 }) => {
-  const mountRef = useRef(null);
-  const S = useRef({
+  const mountRef = useRef<HTMLDivElement>(null);
+  const S = useRef<SceneState>({
     scene: null, camera: null, renderer: null,
     meshes: [], gridPos: [], animId: null,
     phase: 'idle', settleStart: 0, settleData: [],
@@ -37,7 +66,7 @@ const Dice3D = ({
   modeRef.current = animationMode;
   numberedRef.current = FACE_LABELED.has(sides);
 
-  const [overlayPos, setOverlayPos] = useState([]);
+  const [overlayPos, setOverlayPos] = useState<OverlayPos[]>([]);
   const hexColor = parseColor(color);
   const isNumbered = FACE_LABELED.has(sides);
 
@@ -104,7 +133,7 @@ const Dice3D = ({
     });
     ro.observe(el);
 
-    const loop = (time) => {
+    const loop = (time: number) => {
       s.animId = requestAnimationFrame(loop);
       const t = time / 1000;
       const meshes = s.meshes;
@@ -156,8 +185,9 @@ const Dice3D = ({
       s.meshes.forEach(m => {
         scene.remove(m);
         m.traverse(ch => {
-          if (ch.geometry) ch.geometry.dispose();
-          if (ch.material) ch.material.dispose();
+          const mesh = ch as THREE.Mesh;
+          if (mesh.geometry) mesh.geometry.dispose();
+          if (mesh.material) { const mat = mesh.material as THREE.Material | THREE.Material[]; Array.isArray(mat) ? mat.forEach(m2 => m2.dispose()) : mat.dispose(); }
         });
       });
       renderer.dispose();
@@ -172,11 +202,13 @@ const Dice3D = ({
     const s = S.current;
     if (!s.scene) return;
 
+    const scene = s.scene!;
     s.meshes.forEach(m => {
-      s.scene.remove(m);
+      scene.remove(m);
       m.traverse(ch => {
-        if (ch.geometry) ch.geometry.dispose();
-        if (ch.material) ch.material.dispose();
+        const mesh = ch as THREE.Mesh;
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) { const mat = mesh.material as THREE.Material | THREE.Material[]; Array.isArray(mat) ? mat.forEach(m2 => m2.dispose()) : mat.dispose(); }
       });
     });
     s.meshes = [];
@@ -205,7 +237,7 @@ const Dice3D = ({
         Math.random() * Math.PI * 2,
         Math.random() * Math.PI * 2
       );
-      s.scene.add(mesh);
+      scene.add(mesh);
       s.meshes.push(mesh);
       s.gridPos.push({ x, y });
     }
@@ -219,11 +251,12 @@ const Dice3D = ({
     const needX = (spanX / 2 + margin) / asp;
     const fh = Math.max(needY, needX, 2.5);
     s.frustumHalf = fh;
-    s.camera.left = -fh * asp;
-    s.camera.right = fh * asp;
-    s.camera.top = fh;
-    s.camera.bottom = -fh;
-    s.camera.updateProjectionMatrix();
+    const camera = s.camera!;
+    camera.left = -fh * asp;
+    camera.right = fh * asp;
+    camera.top = fh;
+    camera.bottom = -fh;
+    camera.updateProjectionMatrix();
 
     if (s.updateOverlay) s.updateOverlay();
 
@@ -269,7 +302,7 @@ const Dice3D = ({
   const showOverlay = !isNumbered && !isRolling && results.length > 0;
   const fs = results.length > 10 ? '0.875rem' : results.length > 5 ? '1.1rem' : '1.5rem';
 
-  const containerStyle = {
+  const containerStyle: React.CSSProperties = {
     position: 'relative',
     overflow: 'hidden',
     borderRadius: '0.75rem',
