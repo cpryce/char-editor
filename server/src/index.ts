@@ -757,7 +757,9 @@ async function getCampaignDetail(campaignId: string, ownerId: mongoose.Types.Obj
         : 10;
       const initiativeModifier = Math.floor((dexTotal - 10) / 2) + Number(raw.combat?.initiative?.miscBonus ?? 0);
       const ownerId = c.owner?.toString() ?? null;
+      const delegatedToId = raw.delegatedTo?.toString() ?? null;
       const ownerUser = ownerId ? userById.get(ownerId) : null;
+      const delegateUser = delegatedToId ? userById.get(delegatedToId) : null;
       return {
         _id: c._id.toString(),
         name: c.name,
@@ -765,7 +767,8 @@ async function getCampaignDetail(campaignId: string, ownerId: mongoose.Types.Obj
         classes: c.classes,
         owner: ownerId,
         ownerName: ownerUser ? ownerUser.name ?? ownerUser.email : null,
-        delegatedTo: raw.delegatedTo?.toString() ?? null,
+        delegatedTo: delegatedToId,
+        delegateName: delegateUser ? delegateUser.name ?? delegateUser.email : null,
         pendingInviteEmail: raw.pendingInviteEmail ?? null,
         initiativeModifier,
       };
