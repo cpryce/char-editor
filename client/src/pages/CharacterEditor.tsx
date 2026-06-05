@@ -449,13 +449,15 @@ function stampComputedAttacksForSave(
     const primaryAttackBonus = isRangedWeapon
       ? rangedAttackBonus
       : (usesFinesse ? rangedAttackBonus : meleeAttackBonus);
+    const isTouchAttack = weapon.special?.includes('touch attack') ?? false;
+    const effectiveMaxAttacks = isTouchAttack ? 1 : maxAttacks;
 
     const computedAttack = buildIterativeAttackString(
       primaryAttackBonus,
       baseAttackBonus,
       Number(weapon.enhancementBonus ?? 0),
       Number(weapon.combatMod ?? 0),
-      maxAttacks,
+      effectiveMaxAttacks,
       twoWeaponPenalty,
       featBonus,
       hasRapidShot,

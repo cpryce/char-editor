@@ -93,10 +93,12 @@ function weaponAttackString(
   const featBonus =
     (appliedFeats.includes('Weapon Focus') ? 1 : 0) +
     (appliedFeats.includes('Greater Weapon Focus') ? 1 : 0);
+  const isTouchAttack = weapon.special?.includes('touch attack') ?? false;
+  const effectiveMaxAttacks = isTouchAttack ? 1 : maxAttacks;
   const full = buildIterativeAttackString(
     primaryBonus, bab,
     safe(weapon.enhancementBonus), safe(weapon.combatMod),
-    maxAttacks, twoWeaponPenalty, featBonus, hasRapidShot,
+    effectiveMaxAttacks, twoWeaponPenalty, featBonus, hasRapidShot,
   );
   if (!firstOnly) return full;
   const [first] = full.split('/');

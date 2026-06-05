@@ -74,8 +74,10 @@ export function WeaponSelector({
   const primaryAttackBonus = isRangedWeapon
     ? parsedRangedAtk
     : (usesFinesse ? parsedRangedAtk : parsedMeleeAtk);
+  const isTouchAttack = weapon?.special?.includes('touch attack') ?? false;
+  const effectiveMaxAttacks = isTouchAttack ? 1 : maxAttacks;
   const iterativeAttack = weapon
-    ? buildIterativeAttackString(primaryAttackBonus, parsedBab, Number(weapon.enhancementBonus ?? 0), combatMod, maxAttacks, twoWeaponPenalty, featBonus, hasRapidShot)
+    ? buildIterativeAttackString(primaryAttackBonus, parsedBab, Number(weapon.enhancementBonus ?? 0), combatMod, effectiveMaxAttacks, twoWeaponPenalty, featBonus, hasRapidShot)
     : '—';
 
   return (

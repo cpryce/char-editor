@@ -568,12 +568,14 @@ export function InventorySection({
       .filter((m) => m.target === 'weapon-attack' && m.weaponScope === weaponScope)
       .reduce((sum, m) => sum + m.value, 0);
     const featBonus = (applied.includes('Weapon Focus') ? 1 : 0) + (applied.includes('Greater Weapon Focus') ? 1 : 0) + customFeatAttackBonus;
+    const isTouchAttack = weapon.special?.includes('touch attack') ?? false;
+    const effectiveMaxAtks = isTouchAttack ? 1 : maxAtks;
     return buildIterativeAttackString(
       primaryBonus,
       ctx.bab,
       Number(weapon.enhancementBonus ?? 0),
       Number(weapon.combatMod ?? 0),
-      maxAtks,
+      effectiveMaxAtks,
       twfPenalty,
       featBonus,
       rapidShot,
