@@ -198,17 +198,18 @@ export function DiceRollerPage() {
     return { minRoll: parseInt(m[1]), multiplier: parseInt(m[2]) };
   }
 
-  function parseAttacks(computedAttack: string, critical?: { minRoll: number; multiplier: number }): { label: string; bonus: number; critical?: { minRoll: number; multiplier: number } }[] {
+  function parseAttacks(computedAttack: string, critical?: { minRoll: number; multiplier: number }, handLabel?: string): { label: string; bonus: number; critical?: { minRoll: number; multiplier: number } }[] {
     return computedAttack.split('/').map((s, i) => {
       const trimmed = s.trim();
       const bonus = parseInt(trimmed, 10);
-      return { label: `Attack ${i + 1} (${trimmed})`, bonus: isNaN(bonus) ? 0 : bonus, critical };
+      const label = handLabel ? `${handLabel} · Attack ${i + 1} (${trimmed})` : `Attack ${i + 1} (${trimmed})`;
+      return { label, bonus: isNaN(bonus) ? 0 : bonus, critical };
     });
   }
 
-  function startAttackFromText(attackText: string, critical?: { minRoll: number; multiplier: number }, mod?: number) {
+  function startAttackFromText(attackText: string, critical?: { minRoll: number; multiplier: number }, mod?: number, handLabel?: string) {
     if (!attackText.trim()) return;
-    const attacks = parseAttacks(attackText, critical).map((a) => ({ ...a, bonus: a.bonus + (mod ?? 0) }));
+    const attacks = parseAttacks(attackText, critical, handLabel).map((a) => ({ ...a, bonus: a.bonus + (mod ?? 0) }));
     if (attacks.length === 0) return;
     const first = attacks[0];
     const rolls = [rollDie(20)];
@@ -221,6 +222,44 @@ export function DiceRollerPage() {
     setRollTrigger((t) => t + 1);
     setTimeout(() => setIsRolling(false), 800);
     setHistory([{ id: nextId++, label: first.label, rolls, modifier: first.bonus, total, critMultiplier, timestamp: new Date() }]);
+  }
+
+  function rollAllAttacksAutomated() {
+    const mainCrit = weapons?.mainHand?.critical ? parseCritical(weapons.mainHand.critical) ?? undefined : undefined;
+    const offCrit = weapons?.offHandWeapon?.critical ? parseCritical(weapons.offHandWeapon.critical) ?? undefined : undefined;
+    const mainAttacks = mainHandAttackText.trim()
+      ? parseAttacks(mainHandAttackText, mainCrit, 'Main Hand').map((a) => ({ ...a, bonus: a.bonus + (mainHandMod ?? 0) }))
+      : [];
+    const offAttacks = offHandAttackText.trim()
+      ? parseAttacks(offHandAttackText, offCrit, 'Off Hand').map((a) => ({ ...a, bonus: a.bonus + (offHandMod ?? 0) }))
+      : [];
+
+    // Interleave: main[0], off[0], main[1], off[1], …
+    const allAttacks: typeof mainAttacks = [];
+    const maxLen = Math.max(mainAttacks.length, offAttacks.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (i < mainAttacks.length) allAttacks.push(mainAttacks[i]);
+      if (i < offAttacks.length) allAttacks.push(offAttacks[i]);
+    }
+    if (allAttacks.length === 0) return;
+
+    const now = new Date();
+    const newResults = allAttacks.map((attack) => {
+      const rolls = [rollDie(20)];
+      const total = rolls[0] + attack.bonus;
+      const critMultiplier = attack.critical && rolls[0] >= attack.critical.minRoll ? attack.critical.multiplier : undefined;
+      return { id: nextId++, label: attack.label, rolls, modifier: attack.bonus, total, critMultiplier, timestamp: now };
+    });
+
+    // Show animation using the first d20
+    setActiveRoll([{ sides: 20, results: [newResults[0].rolls[0]] }]);
+    setIsRolling(true);
+    setRollTrigger((t) => t + 1);
+    setTimeout(() => setIsRolling(false), 800);
+
+    setAttackSequence(null);
+    setCurrentAttackIdx(0);
+    setHistory(newResults.slice(-50));
   }
 
   function rollSave(label: string, bonus: number) {
@@ -279,6 +318,7 @@ export function DiceRollerPage() {
   }, []);
 
   const [railOpen, setRailOpen] = useState(false);
+  const [automateRolls, setAutomateRolls] = useState(false);
 
   return (
     <div className="dice-roller-page p-6">
@@ -317,10 +357,10 @@ export function DiceRollerPage() {
                     />
                     <button
                       type="button"
-                      disabled={isRolling || !mainHandAttackText.trim() || (attackSequence !== null && currentAttackIdx < attackSequence.length - 1)}
-                      onClick={() => startAttackFromText(mainHandAttackText, parseCritical(weapons!.mainHand!.critical ?? '') ?? undefined, mainHandMod ?? 0)}
-                      aria-label="Roll main hand attack sequence"
-                      title="Roll attack sequence"
+                      disabled={isRolling || !mainHandAttackText.trim() || (!automateRolls && attackSequence !== null && currentAttackIdx < attackSequence.length - 1)}
+                      onClick={() => automateRolls ? rollAllAttacksAutomated() : startAttackFromText(mainHandAttackText, parseCritical(weapons!.mainHand!.critical ?? '') ?? undefined, mainHandMod ?? 0, 'Main Hand')}
+                      aria-label={automateRolls ? 'Roll all attacks' : 'Roll main hand attack sequence'}
+                      title={automateRolls ? 'Roll all attacks' : 'Roll attack sequence'}
                       className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-0 disabled:opacity-40 cursor-pointer"
                       style={{ background: '#2d7a3a', color: '#fff' }}
                     >
@@ -356,10 +396,10 @@ export function DiceRollerPage() {
                     />
                     <button
                       type="button"
-                      disabled={isRolling || !offHandAttackText.trim() || (attackSequence !== null && currentAttackIdx < attackSequence.length - 1)}
-                      onClick={() => startAttackFromText(offHandAttackText, parseCritical(weapons!.offHandWeapon!.critical ?? '') ?? undefined, offHandMod ?? 0)}
-                      aria-label="Roll off hand attack sequence"
-                      title="Roll attack sequence"
+                      disabled={isRolling || !offHandAttackText.trim() || (!automateRolls && attackSequence !== null && currentAttackIdx < attackSequence.length - 1)}
+                      onClick={() => automateRolls ? rollAllAttacksAutomated() : startAttackFromText(offHandAttackText, parseCritical(weapons!.offHandWeapon!.critical ?? '') ?? undefined, offHandMod ?? 0, 'Off Hand')}
+                      aria-label={automateRolls ? 'Roll all attacks' : 'Roll off hand attack sequence'}
+                      title={automateRolls ? 'Roll all attacks' : 'Roll attack sequence'}
                       className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-0 disabled:opacity-40 cursor-pointer"
                       style={{ background: '#2d7a3a', color: '#fff' }}
                     >
@@ -475,7 +515,7 @@ export function DiceRollerPage() {
                 </div>
               )}
               {/* Next attack arrow */}
-              {attackSequence && currentAttackIdx < attackSequence.length - 1 && (
+              {!automateRolls && attackSequence && currentAttackIdx < attackSequence.length - 1 && (
                 <button
                   type="button"
                   onClick={advanceAttack}
@@ -716,6 +756,25 @@ export function DiceRollerPage() {
           )}
           {selectedChar && !weapons && (
             <p className="text-xs text-[color:var(--color-fg-muted)] mt-1">Loading weapons…</p>
+          )}
+          {selectedChar && (
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--color-border-default)]">
+              <label htmlFor="automate-rolls-toggle" className="text-sm text-[color:var(--color-fg-default)] cursor-pointer select-none">
+                Automate Rolls
+              </label>
+              <button
+                id="automate-rolls-toggle"
+                type="button"
+                role="switch"
+                aria-checked={automateRolls}
+                onClick={() => setAutomateRolls((v) => !v)}
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-fg)] ${automateRolls ? 'bg-[var(--color-btn-primary-bg)]' : 'bg-[var(--color-border-default)]'}`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${automateRolls ? 'translate-x-4' : 'translate-x-0.5'}`}
+                />
+              </button>
+            </div>
           )}
         </div>
         </div>{/* end dice-roller-rail-inner */}
