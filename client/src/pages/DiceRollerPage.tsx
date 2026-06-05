@@ -77,6 +77,39 @@ export function DiceRollerPage() {
   const [selectedChar, setSelectedChar] = useState<CharacterSummary | null>(null);
   const [weapons, setWeapons] = useState<CharacterWeapons | null>(null);
   const comboRef = useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  function handleDieTouchStart(dieType: DieType) {
+    longPressFiredRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      setDiceSelections((prev) => {
+        const current = prev[dieType] ?? 0;
+        if (current <= 1) {
+          const next = { ...prev };
+          delete next[dieType];
+          return next;
+        }
+        return { ...prev, [dieType]: current - 1 };
+      });
+    }, 500);
+  }
+
+  function handleDieTouchEnd() {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
+
+  function handleDieClick(dieType: DieType) {
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false;
+      return;
+    }
+    selectDie(dieType);
+  }
 
   useEffect(() => {
     fetch('/api/characters', { credentials: 'include' })
@@ -448,9 +481,13 @@ export function DiceRollerPage() {
                 key={d.type}
                 type="button"
                 disabled={isRolling}
-                onClick={() => selectDie(d.type)}
+                onClick={() => handleDieClick(d.type)}
                 onContextMenu={(e) => deselectDie(e, d.type)}
-                title="Left-click to add · Right-click to remove"
+                onTouchStart={() => handleDieTouchStart(d.type)}
+                onTouchEnd={handleDieTouchEnd}
+                onTouchCancel={handleDieTouchEnd}
+                onTouchMove={handleDieTouchEnd}
+                title="Tap to add · Long-press or right-click to remove"
                 className="relative h-8 min-w-[38px] px-1.5 sm:px-3 text-m font-medium rounded-md border border-[var(--color-border-default)] bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)] hover:bg-[var(--color-canvas-subtle)] disabled:opacity-50"
               >
                 {d.type}
