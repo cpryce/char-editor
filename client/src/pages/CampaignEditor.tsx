@@ -116,6 +116,7 @@ export function CampaignEditor({
   const [openInviteDropdownId, setOpenInviteDropdownId] = useState<string | null>(null);
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [statBlockModal, setStatBlockModal] = useState<{ data: StatBlockData; name: string } | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<CharSummary | null>(null);
   const delegateBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const selectAllRef = useRef<HTMLInputElement>(null);
   const charDropdownRef = useRef<HTMLDivElement>(null);
@@ -675,7 +676,7 @@ export function CampaignEditor({
                   <tr
                     key={c._id}
                     className="border-b border-[var(--color-border-muted)] last:border-b-0 cursor-pointer hover:bg-[var(--color-canvas-subtle)] bg-[var(--color-canvas-default)]"
-                    onClick={() => (roleAccess === 'owner' || c.owner === userId) ? onEditCharacter(c._id) : void fetchCharStatBlock(c._id)}
+                    onClick={() => (c.owner === userId || c.delegatedTo === userId) ? onEditCharacter(c._id) : void fetchCharStatBlock(c._id)}
                   >
                     <td className="px-4 py-2 font-medium text-[color:var(--color-fg-default)]">
                       <span className="inline-flex items-center gap-2">
@@ -743,7 +744,14 @@ export function CampaignEditor({
                           <button
                             type="button"
                             className="campaign-editor-remove-btn inline-flex items-center justify-center w-6 h-6"
-                            onClick={(e) => { e.stopPropagation(); removeCharacter(c._id); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (c.owner !== userId) {
+                                setRemoveTarget(c);
+                              } else {
+                                removeCharacter(c._id);
+                              }
+                            }}
                             aria-label={`Remove ${c.name}`}
                           >
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -1091,6 +1099,46 @@ export function CampaignEditor({
           />
         )}
       </div>
+      {removeTarget && (
+        <div
+          role="presentation"
+          className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center"
+          onClick={() => setRemoveTarget(null)}
+          onKeyDown={(e) => e.key === 'Escape' && setRemoveTarget(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="remove-char-campaign-title"
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[var(--color-canvas-default)] border border-[var(--color-border-default)] rounded-xl p-6 w-[360px] shadow-[0_8px_24px_rgba(0,0,0,0.2)]"
+          >
+            <h3 id="remove-char-campaign-title" className="mb-2 text-[15px] font-semibold text-[color:var(--color-fg-default)]">
+              Remove character from campaign?
+            </h3>
+            <p className="mb-5 text-[13px] text-[color:var(--color-fg-muted)]">
+              <strong className="text-[color:var(--color-fg-default)]">{removeTarget.name}</strong> is owned by {removeTarget.ownerName ?? 'another player'}. Removing it will unlink it from this campaign.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRemoveTarget(null)}
+                className="py-[6px] px-4 rounded-[6px] text-[13px] font-semibold border border-[var(--color-border-default)] cursor-pointer bg-[var(--color-canvas-default)] text-[color:var(--color-fg-default)]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { removeCharacter(removeTarget._id); setRemoveTarget(null); }}
+                className="py-[6px] px-4 rounded-[6px] text-[13px] font-semibold border-0 cursor-pointer bg-[var(--color-danger-emphasis)] text-white"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {statBlockModal && (
         <StatBlockModal
           data={statBlockModal.data}

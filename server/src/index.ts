@@ -856,25 +856,50 @@ app.get('/api/campaigns', async (req, res) => {
     : [];
   const charOwnerMap = new Map(charOwners.map((c) => [c._id.toString(), c.owner?.toString() ?? null]));
 
-  // Resolve DM user info for shared campaigns
+  // Resolve DM user info for all campaigns
   const dmIds = [...new Set(campaigns.map((c) => c.owner.toString()))];
   const dmUsers = dmIds.length > 0
-    ? await User.find({ _id: { $in: dmIds } }, { name: 1, email: 1 }).lean()
+    ? await User.find({ _id: { $in: dmIds } }, { name: 1, email: 1, avatar: 1 }).lean()
     : [];
   const dmMap = new Map(dmUsers.map((u) => [u._id.toString(), u]));
 
+  // Resolve player info for accepted invites (token == null, userId != null)
+  const allInviteUserIds = [...new Set(
+    campaigns.flatMap((c) =>
+      ((c.invites ?? []) as Array<{ token: string | null; userId: { toString(): string } | null }>)
+        .filter((inv) => inv.token == null && inv.userId != null)
+        .map((inv) => inv.userId!.toString()),
+    ),
+  )];
+  const inviteUsers = allInviteUserIds.length > 0
+    ? await User.find({ _id: { $in: allInviteUserIds } }, { name: 1, email: 1, avatar: 1 }).lean()
+    : [];
+  const inviteUserMap = new Map(inviteUsers.map((u) => [u._id.toString(), u]));
+
   res.json(campaigns.map((c) => {
     const isOwner = c.owner.toString() === u._id.toString();
-    const invite = isOwner ? null : (c.invites as Array<{ userId?: { toString(): string } | null; access: string }>).find((inv) => inv.userId?.toString() === u._id.toString());
+    const invite = isOwner ? null : ((c.invites ?? []) as Array<{ userId?: { toString(): string } | null; access: string }>).find((inv) => inv.userId?.toString() === u._id.toString());
     const dm = dmMap.get(c.owner.toString());
+    const players = ((c.invites ?? []) as Array<{ token: string | null; userId: { toString(): string } | null }>)
+      .filter((inv) => inv.token == null && inv.userId != null)
+      .map((inv) => {
+        const pu = inviteUserMap.get(inv.userId!.toString());
+        return pu ? { _id: pu._id.toString(), name: (pu as { name?: string }).name ?? null, avatar: (pu as { avatar?: string }).avatar ?? null } : null;
+      })
+      .filter((p): p is { _id: string; name: string | null; avatar: string | null } => p != null);
+    const inviteCount = (c.invites ?? []).length;
     return {
       ...c,
       invites: undefined, // never expose raw invites array in list
       accessLevel: isOwner ? 'owner' : invite?.access ?? 'view',
-      dmName: isOwner ? null : (dm?.name || dm?.email || null),
+      ownerName: dm?.name || (dm as { email?: string })?.email || null,
+      ownerAvatar: (dm as { avatar?: string })?.avatar ?? null,
+      dmName: isOwner ? null : (dm?.name || (dm as { email?: string })?.email || null),
       playerCount: new Set(
         c.characterIds.map((id) => charOwnerMap.get(id.toString())).filter(Boolean),
       ).size,
+      players,
+      inviteCount,
     };
   }));
 });
