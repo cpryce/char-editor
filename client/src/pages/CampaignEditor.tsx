@@ -230,7 +230,7 @@ export function CampaignEditor({
     try {
       const res = await fetch(`/api/campaigns/${campaignId}/characters/${charId}`, { credentials: 'include' });
       if (!res.ok) return;
-      const char = await res.json() as CharacterDraft & { characterCustomClasses?: CustomClassLookup[] };
+      const char = await res.json() as CharacterDraft & { characterCustomClasses?: Array<CustomClassLookup & { name: string }> };
       const customClassMap = new Map<string, CustomClassLookup>();
       for (const cc of (char.characterCustomClasses ?? [])) {
         customClassMap.set(cc.name, cc);
