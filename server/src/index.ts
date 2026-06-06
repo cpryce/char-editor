@@ -926,10 +926,14 @@ app.post('/api/campaigns/:id/characters', async (req, res) => {
   const u = req.user as { _id: mongoose.Types.ObjectId };
   const { characterId } = req.body as { characterId?: string };
   if (!characterId) { res.status(400).json({ error: 'characterId is required.' }); return; }
+  // Verify user has access to this campaign
+  const access = await getCampaignAccess(req.params.id, u._id);
+  if (!access) { res.status(404).json({ error: 'Campaign not found.' }); return; }
+  // Verify user owns (or is delegated) the character they're adding
   const char = await Character.findOne({ _id: characterId, $or: [{ owner: u._id }, { delegatedTo: u._id }] });
   if (!char) { res.status(404).json({ error: 'Character not found.' }); return; }
   await Campaign.updateOne(
-    { _id: req.params.id, owner: u._id },
+    { _id: req.params.id },
     { $addToSet: { characterIds: char._id } },
   );
   const detail = await getCampaignDetail(req.params.id, u._id);
@@ -940,13 +944,45 @@ app.post('/api/campaigns/:id/characters', async (req, res) => {
 app.delete('/api/campaigns/:id/characters/:charId', async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const u = req.user as { _id: mongoose.Types.ObjectId };
+  const result = await getCampaignAccess(req.params.id, u._id);
+  if (!result) { res.status(404).json({ error: 'Not found' }); return; }
+  const { campaign, access } = result;
+  const charObjId = new mongoose.Types.ObjectId(req.params.charId);
+  if (access !== 'owner') {
+    // Non-owner may only remove their own character
+    const char = await Character.findOne({ _id: charObjId, $or: [{ owner: u._id }, { delegatedTo: u._id }] });
+    if (!char) { res.status(403).json({ error: 'Forbidden' }); return; }
+  }
+  if (!campaign.characterIds.some((id) => id.equals(charObjId))) {
+    res.status(404).json({ error: 'Character not in campaign' }); return;
+  }
   await Campaign.updateOne(
-    { _id: req.params.id, owner: u._id },
-    { $pull: { characterIds: new mongoose.Types.ObjectId(req.params.charId) } },
+    { _id: req.params.id },
+    { $pull: { characterIds: charObjId } },
   );
   const detail = await getCampaignDetail(req.params.id, u._id);
   if (!detail) { res.status(404).json({ error: 'Not found' }); return; }
   res.json(detail);
+});
+
+app.get('/api/campaigns/:id/characters/:charId', async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  const u = req.user as { _id: mongoose.Types.ObjectId };
+  const access = await getCampaignAccess(req.params.id, u._id);
+  if (!access) { res.status(404).json({ error: 'Not found' }); return; }
+  const { campaign } = access;
+  const charObjId = new mongoose.Types.ObjectId(req.params.charId);
+  if (!campaign.characterIds.some((id) => id.equals(charObjId))) {
+    res.status(404).json({ error: 'Character not in campaign' }); return;
+  }
+  const character = await Character.findById(charObjId);
+  if (!character) { res.status(404).json({ error: 'Not found' }); return; }
+  const classNames = ((character.classes ?? []) as Array<{ name: string }>).map((c) => c.name).filter(Boolean);
+  const ownerId = character.owner instanceof mongoose.Types.ObjectId ? character.owner : new mongoose.Types.ObjectId(String(character.owner));
+  const characterCustomClasses = classNames.length > 0
+    ? await CustomClass.find({ name: { $in: classNames }, owner: ownerId })
+    : [];
+  res.json({ ...character.toObject(), characterCustomClasses });
 });
 
 app.post('/api/campaigns/:id/encounters', async (req, res) => {

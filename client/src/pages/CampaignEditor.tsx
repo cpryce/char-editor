@@ -2,7 +2,12 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import './CampaignEditor.css';
 import { NewCharacterForm } from '../components/NewCharacterForm';
 import { DelegatePopover } from '../components/DelegatePopover';
-import { type PointBuySystem } from '../utils/characterHelpers';
+import { type PointBuySystem, type CustomClassLookup, abilityModifier, totalScore, baseAttackBonusFromClasses, baseSaveBonusFromClasses, computeAcTotals, defaultAcSizeModifier, applyMaxDexCap, BASE_SPEED_BY_SIZE } from '../utils/characterHelpers';
+import { StatBlockModal } from '../components/StatBlockModal';
+import { generateStatBlock } from '../utils/statBlock';
+import type { StatBlockData } from '../utils/statBlock';
+import type { CharacterDraft } from '../types/character';
+import type { CombatDerivedStats } from './character-editor/CombatSection';
 
 const DEFAULT_ABILITY_SCORE = { base: 10, racial: 0, enhancement: 0, misc: 0, temp: null, tempMod: null, levelUp: 0 };
 
@@ -110,6 +115,7 @@ export function CampaignEditor({
   const [patchingInviteId, setPatchingInviteId] = useState<string | null>(null);
   const [openInviteDropdownId, setOpenInviteDropdownId] = useState<string | null>(null);
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
+  const [statBlockModal, setStatBlockModal] = useState<{ data: StatBlockData; name: string } | null>(null);
   const delegateBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const selectAllRef = useRef<HTMLInputElement>(null);
   const charDropdownRef = useRef<HTMLDivElement>(null);
@@ -216,6 +222,65 @@ export function CampaignEditor({
       if (res.ok) setCampaign(await res.json());
     } finally {
       setRevokingInviteId(null);
+    }
+  }
+
+  async function fetchCharStatBlock(charId: string) {
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/characters/${charId}`, { credentials: 'include' });
+      if (!res.ok) return;
+      const char = await res.json() as CharacterDraft & { characterCustomClasses?: CustomClassLookup[] };
+      const customClassMap = new Map<string, CustomClassLookup>();
+      for (const cc of (char.characterCustomClasses ?? [])) {
+        customClassMap.set(cc.name, cc);
+      }
+      const safe = (v: unknown) => typeof v === 'number' && Number.isFinite(v) ? v : 0;
+      const strTotal = totalScore(char.abilityScores.strength);
+      const dexTotal = totalScore(char.abilityScores.dexterity);
+      const conTotal = totalScore(char.abilityScores.constitution);
+      const wisTotal = totalScore(char.abilityScores.wisdom);
+      const strMod = abilityModifier(strTotal);
+      const dexMod = abilityModifier(dexTotal);
+      const conMod = abilityModifier(conTotal);
+      const wisMod = abilityModifier(wisTotal);
+      const sizeMod = defaultAcSizeModifier(char.size);
+      const acDexMod = applyMaxDexCap(dexMod, null);
+      const acArmor = safe(char.combat?.armorClass?.armor);
+      const acShield = safe(char.combat?.armorClass?.shield);
+      const acNatural = safe(char.combat?.armorClass?.natural);
+      const acDeflection = safe(char.combat?.armorClass?.deflection);
+      const acMisc = safe(char.combat?.armorClass?.misc);
+      const acDodge = safe(char.combat?.armorClass?.dodge);
+      const acTotals = computeAcTotals({ armor: acArmor, shield: acShield, acDexMod, sizeMod, dodge: acDodge, natural: acNatural, deflection: acDeflection, misc: acMisc });
+      const bab = baseAttackBonusFromClasses(char.classes ?? [], customClassMap);
+      const fortBase = baseSaveBonusFromClasses(char.classes ?? [], 'fortitude', customClassMap);
+      const refBase = baseSaveBonusFromClasses(char.classes ?? [], 'reflex', customClassMap);
+      const willBase = baseSaveBonusFromClasses(char.classes ?? [], 'will', customClassMap);
+      const initMisc = safe(char.combat?.initiative?.miscBonus);
+      const speedBase = parseInt(char.baseSpeed ?? '') || (BASE_SPEED_BY_SIZE[char.size] ?? 30);
+      const speedArmorAdjust = safe(char.combat?.speed?.armorAdjust);
+      const combatStats: CombatDerivedStats = {
+        dexMod, conMod, wisMod, strMod, sizeMod,
+        acSizeMod: sizeMod, acArmor, acShield, acDexMod, acDodge,
+        acNatural, acDeflection, acMisc, initMisc,
+        speedBase, speedArmorAdjust,
+        speedFly: safe(char.combat?.speed?.fly),
+        speedSwim: safe(char.combat?.speed?.swim),
+        bab, fortitudeBase: fortBase, reflexBase: refBase, willBase,
+        totalAC: acTotals.total, touchAC: acTotals.touch, flatFootedAC: acTotals.flatFooted,
+        initiativeTotal: dexMod + initMisc,
+        fortitudeTotal: fortBase + conMod + safe(char.combat?.saves?.fortitude?.magic) + safe(char.combat?.saves?.fortitude?.misc),
+        reflexTotal: refBase + dexMod + safe(char.combat?.saves?.reflex?.magic) + safe(char.combat?.saves?.reflex?.misc),
+        willTotal: willBase + wisMod + safe(char.combat?.saves?.will?.magic) + safe(char.combat?.saves?.will?.misc),
+        meleeAttack: bab + strMod + sizeMod,
+        rangedAttack: bab + dexMod + sizeMod,
+        speedFeet: Math.max(0, speedBase + speedArmorAdjust),
+        featMeleeDamageMod: 0,
+        featRangedDamageMod: 0,
+      };
+      setStatBlockModal({ data: generateStatBlock(char, combatStats), name: char.name || 'Character' });
+    } catch {
+      // silently ignore fetch errors
     }
   }
 
@@ -610,7 +675,7 @@ export function CampaignEditor({
                   <tr
                     key={c._id}
                     className="border-b border-[var(--color-border-muted)] last:border-b-0 cursor-pointer hover:bg-[var(--color-canvas-subtle)] bg-[var(--color-canvas-default)]"
-                    onClick={() => onEditCharacter(c._id)}
+                    onClick={() => (roleAccess === 'owner' || c.owner === userId) ? onEditCharacter(c._id) : void fetchCharStatBlock(c._id)}
                   >
                     <td className="px-4 py-2 font-medium text-[color:var(--color-fg-default)]">
                       <span className="inline-flex items-center gap-2">
@@ -674,17 +739,19 @@ export function CampaignEditor({
                             )}
                           </>
                         )}
-                        <button
-                          type="button"
-                          className="campaign-editor-remove-btn inline-flex items-center justify-center w-6 h-6"
-                          onClick={(e) => { e.stopPropagation(); removeCharacter(c._id); }}
-                          aria-label={`Remove ${c.name}`}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                            <path d="M4 2H1V4H15V2H12V0H4V2Z"/>
-                            <path fillRule="evenodd" clipRule="evenodd" d="M3 6H13V16H3V6ZM7 9H9V13H7V9Z"/>
-                          </svg>
-                        </button>
+                        {(roleAccess === 'owner' || c.owner === userId) && (
+                          <button
+                            type="button"
+                            className="campaign-editor-remove-btn inline-flex items-center justify-center w-6 h-6"
+                            onClick={(e) => { e.stopPropagation(); removeCharacter(c._id); }}
+                            aria-label={`Remove ${c.name}`}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                              <path d="M4 2H1V4H15V2H12V0H4V2Z"/>
+                              <path fillRule="evenodd" clipRule="evenodd" d="M3 6H13V16H3V6ZM7 9H9V13H7V9Z"/>
+                            </svg>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -747,6 +814,10 @@ export function CampaignEditor({
           <section className="campaign-rail-section">
             <h3 className="subsection-header">Rules</h3>
             <p className="campaign-rail-field-label">Point Buy System</p>
+            {roleAccess !== 'owner' ? (
+              <p className="campaign-rail-field-value">{campaign.pointBuySystem ? POINT_BUY_LABELS[campaign.pointBuySystem as PointBuySystem] : '— Use global setting —'}</p>
+            ) : (
+            <>
             <div className="point-buy-dropdown-wrap" ref={pointBuyDropdownRef}>
               <button
                 type="button"
@@ -790,6 +861,8 @@ export function CampaignEditor({
               )}
             </div>
             <p className="campaign-rail-help-text">Overrides the global setting for characters created in this campaign.</p>
+            </>
+            )}
           </section>
 
           {/* Players */}
@@ -802,7 +875,7 @@ export function CampaignEditor({
                 {/* Active players (delegated + accepted invite members, excluding the DM) */}
                 {(() => {
                   const invitedUserIds = new Set((campaign.invites ?? []).map((inv) => inv.user?._id).filter(Boolean));
-                  const activePlayers = campaign.players.filter((p) => p._id !== campaign.owner?._id);
+                  const activePlayers = campaign.players.filter((p) => p._id !== campaign.owner?._id && !invitedUserIds.has(p._id));
                   if (activePlayers.length === 0) return null;
                   return (
                     <div className="campaign-rail-players mb-3">
@@ -1018,6 +1091,13 @@ export function CampaignEditor({
           />
         )}
       </div>
+      {statBlockModal && (
+        <StatBlockModal
+          data={statBlockModal.data}
+          name={statBlockModal.name}
+          onClose={() => setStatBlockModal(null)}
+        />
+      )}
     </div>
   );
 }
