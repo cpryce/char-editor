@@ -66,18 +66,40 @@ function matMaxDex(maxDexBonus: string | null | undefined, mat?: string): number
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
- * Replace characters outside the WinAnsi (cp1252) range with safe ASCII
- * equivalents so pdf-lib's Standard Helvetica font can encode them.
+ * Decode common HTML entities that may have been copy-pasted into stored data.
+ * Must run before winAnsiSafe so entity-decoded characters are also normalized.
+ */
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#160;/g, ' ')          // numeric non-breaking space
+    .replace(/&#(\d+);/g, (_, n: string) => {
+      const cp = parseInt(n, 10);
+      return cp <= 0xFF ? String.fromCharCode(cp) : '?';
+    });
+}
+
+/**
+ * Replace characters outside the printable ASCII range (0x20–0x7E) with safe
+ * equivalents so pdf-lib encodes every string as a simple byte literal rather
+ * than UTF-16BE.  UTF-16BE strings can render incorrectly in Acrobat's browser
+ * viewer (spaces and other low-code-point chars appear as the wrong glyph).
  */
 function winAnsiSafe(text: string): string {
-  return text
-    .replace(/\u2212/g, '-')   // MINUS SIGN → hyphen-minus
+  return decodeHtmlEntities(text)
+    .replace(/\u00A0/g, ' ')          // non-breaking space → regular space
+    .replace(/\u2212/g, '-')          // MINUS SIGN → hyphen-minus
     .replace(/[\u2018\u2019]/g, "'")  // curly single quotes → apostrophe
     .replace(/[\u201C\u201D]/g, '"')  // curly double quotes → straight quote
-    .replace(/\u2013/g, '-')   // en dash → hyphen
-    .replace(/\u2014/g, '-')   // em dash → hyphen
-    .replace(/\u2026/g, '...')  // ellipsis → three dots
-    .replace(/[^\x00-\xFF]/g, '?');  // anything else outside Latin-1 → ?
+    .replace(/\u2013/g, '-')          // en dash → hyphen
+    .replace(/\u2014/g, '-')          // em dash → hyphen
+    .replace(/\u2026/g, '...')        // ellipsis → three dots
+    .replace(/[^\x20-\x7E]/g, '?');  // anything outside printable ASCII → ?
 }
 
 function signed(n: number): string {
@@ -341,8 +363,10 @@ export async function fillCharacterPdf(
     .reduce<number | null>((lowest, c) => (lowest === null ? c : Math.min(lowest, c)), null);
   const acDexEffMod = applyMaxDexCap(dexEffMod, maxDexCap);
 
-  safeSet(form, 'combat.armorClass.armor',       ac.armor);
-  safeSet(form, 'combat.armorClass.shield',      ac.shield);
+  // armor and shield AC are derived from equipment fields so user edits to
+  // body.armorBonus / offHandShield.shieldBonus propagate automatically.
+  // We still pre-fill the equipment source fields above; these calc scripts
+  // read from them at render time in Acrobat.
   safeSet(form, 'combat.armorClass.dexterityMod', signed(acDexEffMod));
   safeSet(form, 'combat.armorClass.size',        acSizeMod || '');
   safeSet(form, 'combat.armorClass.dodge',       ac.dodge       || '');
@@ -834,6 +858,33 @@ export async function fillCharacterPdf(
       `${N0}${SN}var tot=n("${p}.total");event.value=s(Math.floor((tot-10)/2));`);
   }
 
+  // 2b. AC armor and shield — mirror the character editor's syncArmorClass logic:
+  //   armor  = Math.max(body.armorBonus, bestWornSlot('armor'))
+  //   shield = Math.max(offHandShield.shieldBonus, bestWornSlot('shield'))
+  // Armor and shield bonuses do not stack; only the highest value applies.
+  {
+    const wornSlotKeys = ['head','face','neck','shoulders','bodySlot','chest','wrists','hands','ringLeft','ringRight','waist','feet'];
+    const bestSlotJs = (type: string) =>
+      `(function(){var b=0,k=${JSON.stringify(wornSlotKeys)};`
+      + `for(var i=0;i<k.length;i++){`
+      + `var tf=this.getField("wornSlots."+k[i]+".acType");`
+      + `var bf=this.getField("wornSlots."+k[i]+".acBonus");`
+      + `if(tf&&bf&&(tf.value||"").toLowerCase()==="${type}"){var v=Number(bf.value)||0;if(v>b)b=v;}`
+      + `}return b;})()`;
+
+    addCalc('combat.armorClass.armor',
+      `${N0}var eq=n("body.armorBonus"),ws=${bestSlotJs('armor')};event.value=Math.max(eq,ws);`);
+    addCalc('combat.armorClass.shield',
+      `${N0}var eq=n("offHandShield.shieldBonus"),ws=${bestSlotJs('shield')};event.value=Math.max(eq,ws);`);
+  }
+
+  // When user edits any source equipment field directly, trigger a full recalc.
+  addOnChange('body.armorBonus',           'this.calculateNow();');
+  addOnChange('offHandShield.shieldBonus', 'this.calculateNow();');
+  for (const key of ['head','face','neck','shoulders','bodySlot','chest','wrists','hands','ringLeft','ringRight','waist','feet']) {
+    addOnChange(`wornSlots.${key}.acBonus`, 'this.calculateNow();');
+  }
+
   // 3. AC dexterity mod — DEX tempMod takes precedence over DEX mod
   addCalc('combat.armorClass.dexterityMod',
     'var tm=this.getField("abilityScores.dexterity.tempMod"),m=this.getField("abilityScores.dexterity.mod");event.value=(tm&&tm.value!=="")?tm.value:((m&&m.value)?m.value:"+0");');
@@ -858,6 +909,7 @@ export async function fillCharacterPdf(
     `${N0}event.value=10+n("combat.armorClass.dexterityMod")+n("combat.armorClass.size")+n("combat.armorClass.dodge")+n("combat.armorClass.deflection")+n("combat.armorClass.misc");`);
   addCalc('combat.armorClass.flatFooted',
     `${N0}event.value=10+n("combat.armorClass.armor")+n("combat.armorClass.shield")+n("combat.armorClass.size")+n("combat.armorClass.natural")+n("combat.armorClass.deflection")+n("combat.armorClass.misc");`);
+
 
   // 6. Save totals (depend on save mods calculated above)
   for (const { save } of saveAbilityMap) {
@@ -959,11 +1011,20 @@ export async function fillCharacterPdf(
       .set(PDFName.of('CO'), pdfDoc.context.obj(calcOrder as any));
   }
 
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  // Regenerate appearance streams for all text fields so Chrome's built-in
+  // PDF viewer can render filled values without relying on NeedAppearances.
+  // skills.score.N fields use HelveticaBold (closest standard substitute for
+  // the Myriad Pro Bold set in the template) to visually distinguish them.
   try {
-    form.updateFieldAppearances(font);
+    for (const field of form.getFields()) {
+      if (!(field instanceof PDFTextField)) continue;
+      const isScore = /^skills\.score\.\d+$/.test(field.getName());
+      try { field.updateAppearances(isScore ? boldFont : font); } catch { /* skip rich-text fields */ }
+    }
   } catch {
-    // pdf-lib cannot generate appearance streams for rich text fields — skip.
-    // NeedAppearances:true below tells conforming readers to regenerate on open.
+    // fallback: skip all appearance regeneration
   }
 
   // Tell conforming readers to regenerate field appearances on open.
