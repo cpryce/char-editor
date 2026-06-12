@@ -1057,11 +1057,12 @@ export async function fillCharacterPdf(
     // fallback: skip all appearance regeneration
   }
 
-  // Tell conforming readers to regenerate field appearances on open.
-  // This ensures dropdown selected values are visible without relying on
-  // pdf-lib's appearance stream generation for combo boxes.
+  // Do not force viewers (especially Acrobat on Windows) to regenerate field
+  // appearances. Some legacy flattened/XFA-derived templates carry font
+  // encodings where space renders as '&' when viewers rebuild appearances.
+  // We generate AP streams above and let viewers use them directly.
   pdfDoc.catalog.lookup(PDFName.of('AcroForm'), PDFDict)
-    .set(PDFName.of('NeedAppearances'), PDFBool.True);
+    .delete(PDFName.of('NeedAppearances'));
 
   // Set document language (catalog + XMP dc:language) so Adobe AI and
   // accessibility tools recognise this as an English document.
