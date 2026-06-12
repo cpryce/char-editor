@@ -70,7 +70,7 @@ function matMaxDex(maxDexBonus: string | null | undefined, mat?: string): number
  * Must run before winAnsiSafe so entity-decoded characters are also normalized.
  */
 function decodeHtmlEntities(text: string): string {
-  return text
+  const decode = (s: string): string => s
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -82,6 +82,8 @@ function decodeHtmlEntities(text: string): string {
       const cp = parseInt(n, 10);
       return cp <= 0xFF ? String.fromCharCode(cp) : '?';
     });
+  // Two passes handle double-encoded entities (e.g. &amp;nbsp; → &nbsp; → ' ')
+  return decode(decode(text));
 }
 
 /**
@@ -1020,8 +1022,13 @@ export async function fillCharacterPdf(
   try {
     for (const field of form.getFields()) {
       if (!(field instanceof PDFTextField)) continue;
+      // Delete stale RV (rich-text value) entries left in the template.
+      // Windows PDF viewers prefer RV over V for rich-text fields; an old
+      // RV containing &nbsp; XHTML entities renders as bare "&" on Windows
+      // while the correct plain-text V entry is ignored.
+      (field as any).acroField.dict.delete(PDFName.of('RV'));
       const isScore = /^skills\.score\.\d+$/.test(field.getName());
-      try { field.updateAppearances(isScore ? boldFont : font); } catch { /* skip rich-text fields */ }
+      try { field.updateAppearances(isScore ? boldFont : font); } catch { /* skip — not a supported field type */ }
     }
   } catch {
     // fallback: skip all appearance regeneration
