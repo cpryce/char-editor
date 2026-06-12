@@ -242,6 +242,19 @@ export async function fillCharacterPdf(
   const form = pdfDoc.getForm();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
+  // ── Strip all /RV (rich-text value) entries from the entire document ──────
+  // XFA-flattened PDFs embed /RV entries at every level of the field hierarchy
+  // (leaf fields AND parent nodes).  The per-field loop below only reaches leaf
+  // dicts; parent-level /RV entries survive and Acrobat on Windows prefers /RV
+  // over the plain-text /V we write, rendering &nbsp; entities as bare "&".
+  // Walking every indirect object once here is the only reliable way to remove
+  // all of them before any field values are written.
+  for (const [, obj] of (pdfDoc.context as any).indirectObjects as Map<unknown, unknown>) {
+    if (obj instanceof PDFDict) {
+      obj.delete(PDFName.of('RV'));
+    }
+  }
+
   // ── Derived stats ─────────────────────────────────────────────────────────
 
   const { abilityScores: s } = character;
@@ -1034,10 +1047,8 @@ export async function fillCharacterPdf(
   try {
     for (const field of form.getFields()) {
       if (!(field instanceof PDFTextField)) continue;
-      // Delete stale RV (rich-text value) entries left in the template.
-      // Windows PDF viewers prefer RV over V for rich-text fields; an old
-      // RV containing &nbsp; XHTML entities renders as bare "&" on Windows
-      // while the correct plain-text V entry is ignored.
+      // Belt-and-suspenders: also remove /RV from any leaf field dict that
+      // setText() may have re-introduced (pdf-lib sets /RV on RichText fields).
       (field as any).acroField.dict.delete(PDFName.of('RV'));
       const isScore = /^skills\.score\.\d+$/.test(field.getName());
       try { field.updateAppearances(isScore ? boldFont : font); } catch { /* skip — not a supported field type */ }
