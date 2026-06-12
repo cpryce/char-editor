@@ -30,11 +30,20 @@ interface RollResult {
   id: number;
   label: string;
   rolls: number[];
+  breakdowns?: string[];
   modifier: number;
   total: number;
   timestamp: Date;
   critMultiplier?: number;
-  confirmRoll?: { rolls: number[]; total: number };
+  confirmRoll?: { id: number; rolls: number[]; total: number };
+}
+
+function isAttackRoll(result: RollResult): boolean {
+  return result.label.includes('Attack');
+}
+
+function isDamageRoll(result: RollResult): boolean {
+  return result.label.startsWith('Damage Total (');
 }
 
 let nextId = 1;
@@ -50,6 +59,7 @@ function computeAbilityMod(score: { base: number; racial: number; enhancement: n
 
 export function DiceRollerPage() {
   const [history, setHistory] = useState<RollResult[]>([]);
+  const [selectedRollIds, setSelectedRollIds] = useState<Set<number>>(new Set());
   const [activeRoll, setActiveRoll] = useState<{ sides: number; results: number[] }[] | null>(null);
   const [isRolling, setIsRolling] = useState(false);
   const [rollTrigger, setRollTrigger] = useState(0);
@@ -63,6 +73,148 @@ export function DiceRollerPage() {
   const [offHandAttackText, setOffHandAttackText] = useState('');
   const [mainHandMod, setMainHandMod] = useState<number | null>(null);
   const [offHandMod, setOffHandMod] = useState<number | null>(null);
+
+  useEffect(() => {
+    const hasAttackRolls = history.some(isAttackRoll);
+    const hasDamageRolls = history.some(isDamageRoll);
+    if (hasAttackRolls || !hasDamageRolls) return;
+
+    setHistory((prev) => prev.filter((result) => !isDamageRoll(result)));
+    setSelectedRollIds((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const result of history) {
+        if (isDamageRoll(result) && next.has(result.id)) {
+          next.delete(result.id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [history]);
+
+  function parseDamageExpression(rawExpression: string): { total: number; groups: { sides: number; results: number[] }[]; breakdown: string } | null {
+    const primaryExpression = rawExpression.split('/')[0]?.trim() ?? '';
+    if (!primaryExpression) return null;
+    const normalized = primaryExpression.replace(/\s+/g, '');
+    const terms = normalized.match(/[+-]?[^+-]+/g);
+    if (!terms || terms.length === 0) return null;
+
+    const groups: { sides: number; results: number[] }[] = [];
+    let total = 0;
+    let breakdown = '';
+
+    function appendSigned(value: number) {
+      const sign = value < 0 ? '-' : '+';
+      const absValue = Math.abs(value);
+      if (!breakdown) {
+        breakdown = `${value}`;
+      } else {
+        breakdown += `${sign}${absValue}`;
+      }
+    }
+
+    for (const term of terms) {
+      const sign = term.startsWith('-') ? -1 : 1;
+      const body = term.replace(/^[+-]/, '');
+      const diceMatch = body.match(/^(\d*)d(\d+)$/i);
+      if (diceMatch) {
+        const count = Math.max(1, parseInt(diceMatch[1] || '1', 10));
+        const sides = parseInt(diceMatch[2], 10);
+        if (!Number.isFinite(sides) || sides <= 0) return null;
+        const results = Array.from({ length: count }, () => rollDie(sides));
+        groups.push({ sides, results });
+        for (const value of results) appendSigned(sign * value);
+        total += sign * results.reduce((sum, value) => sum + value, 0);
+        continue;
+      }
+
+      const flat = parseInt(body, 10);
+      if (!Number.isFinite(flat)) return null;
+      appendSigned(sign * flat);
+      total += sign * flat;
+    }
+
+    return { total, groups, breakdown };
+  }
+
+  function getDamageExpressionForLabel(label: string): string | null {
+    const mainDamage = weapons?.mainHand?.damage?.trim() ?? '';
+    const offDamage = weapons?.offHandWeapon?.damage?.trim() ?? '';
+
+    if (!label.includes('Attack')) return null;
+
+    if (label.includes('Off Hand')) return offDamage || null;
+    if (label.includes('Main Hand')) return mainDamage || null;
+
+    if (mainDamage && !offDamage) return mainDamage;
+    if (offDamage && !mainDamage) return offDamage;
+    return null;
+  }
+
+  function toggleRollSelection(rollId: number) {
+    setSelectedRollIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rollId)) next.delete(rollId);
+      else next.add(rollId);
+      return next;
+    });
+  }
+
+  function rollSelectedHitDamages() {
+    if (selectedRollIds.size === 0) return;
+    const selected = history.flatMap((r) => {
+      const picks: { id: number; label: string; repeats: number }[] = [];
+      const parentSelected = selectedRollIds.has(r.id);
+      if (parentSelected) picks.push({ id: r.id, label: r.label, repeats: 1 });
+      if (r.confirmRoll && selectedRollIds.has(r.confirmRoll.id)) {
+        const critMultiplier = Math.max(r.critMultiplier ?? 2, 2);
+        const repeats = parentSelected ? critMultiplier - 1 : critMultiplier;
+        picks.push({ id: r.confirmRoll.id, label: r.label, repeats: Math.max(repeats, 1) });
+      }
+      return picks;
+    });
+    if (selected.length === 0) return;
+
+    const expandedSelected = selected.flatMap((roll) => Array.from({ length: roll.repeats }, () => ({ id: roll.id, label: roll.label })));
+
+    const damageOutcomes = expandedSelected
+      .map((roll) => {
+        const expression = getDamageExpressionForLabel(roll.label);
+        if (!expression) return null;
+        const parsed = parseDamageExpression(expression);
+        if (!parsed) return null;
+        return parsed;
+      })
+      .filter((outcome): outcome is { total: number; groups: { sides: number; results: number[] }[]; breakdown: string } => Boolean(outcome));
+
+    if (damageOutcomes.length === 0) return;
+
+    const totalDamage = damageOutcomes.reduce((sum, outcome) => sum + outcome.total, 0);
+    const perHitTotals = damageOutcomes.map((outcome) => outcome.total);
+    const perHitBreakdowns = damageOutcomes.map((outcome) => outcome.breakdown);
+    const label = `Damage Total (${damageOutcomes.length} ${damageOutcomes.length === 1 ? 'hit' : 'hits'})`;
+    const allDamageGroups = damageOutcomes.flatMap((outcome) => outcome.groups);
+    const groupedAnimation = allDamageGroups.reduce<Record<number, number[]>>((acc, group) => {
+      if (!acc[group.sides]) acc[group.sides] = [];
+      acc[group.sides].push(...group.results);
+      return acc;
+    }, {});
+    const groupedDamageAnimation = Object.entries(groupedAnimation)
+      .map(([sides, results]) => ({ sides: parseInt(sides, 10), results }))
+      .sort((a, b) => a.sides - b.sides);
+
+    setActiveRoll(groupedDamageAnimation.length > 0 ? groupedDamageAnimation : null);
+    setIsRolling(true);
+    setRollTrigger((t) => t + 1);
+    setTimeout(() => setIsRolling(false), 800);
+
+    setHistory((prev) => [
+      ...prev,
+      { id: nextId++, label, rolls: perHitTotals, breakdowns: perHitBreakdowns, modifier: 0, total: totalDamage, timestamp: new Date() },
+    ].slice(-50));
+    setSelectedRollIds(new Set());
+  }
 
   useEffect(() => {
     function onResize() { setPanelHeight(window.innerWidth <= 639 ? 250 : 350); }
@@ -137,6 +289,7 @@ export function DiceRollerPage() {
     setAttackSequence(null);
     setCurrentAttackIdx(0);
     setHistory([]);
+    setSelectedRollIds(new Set());
     setDiceSelections({});
     setSelectedModifier(null);
     fetch(`/api/characters/${char._id}`, { credentials: 'include' })
@@ -175,6 +328,7 @@ export function DiceRollerPage() {
     setOffHandMod(null);
     setAttackSequence(null);
     setCurrentAttackIdx(0);
+    setSelectedRollIds(new Set());
   }
 
   const filteredChars = charInput.trim().length > 0
@@ -223,6 +377,7 @@ export function DiceRollerPage() {
       ...prev,
       { id: nextId++, label, rolls: allRolls, modifier: mod, total, timestamp: new Date() },
     ].slice(-50));
+    setSelectedRollIds(new Set());
   }, [diceSelections, selectedModifier]);
 
   function parseCritical(critical: string): { minRoll: number; multiplier: number } | null {
@@ -255,6 +410,7 @@ export function DiceRollerPage() {
     setRollTrigger((t) => t + 1);
     setTimeout(() => setIsRolling(false), 800);
     setHistory([{ id: nextId++, label: first.label, rolls, modifier: first.bonus, total, critMultiplier, timestamp: new Date() }]);
+    setSelectedRollIds(new Set());
   }
 
   function rollAllAttacksAutomated() {
@@ -293,6 +449,7 @@ export function DiceRollerPage() {
     setAttackSequence(null);
     setCurrentAttackIdx(0);
     setHistory(newResults.slice(-50));
+    setSelectedRollIds(new Set());
   }
 
   function rollSave(label: string, bonus: number) {
@@ -307,6 +464,7 @@ export function DiceRollerPage() {
       ...prev,
       { id: nextId++, label: `${label} save (${sign})`, rolls, modifier: bonus, total, timestamp: new Date() },
     ].slice(-50));
+    setSelectedRollIds(new Set());
   }
 
   function advanceAttack() {
@@ -323,6 +481,7 @@ export function DiceRollerPage() {
     setRollTrigger((t) => t + 1);
     setTimeout(() => setIsRolling(false), 800);
     setHistory((prev) => [...prev, { id: nextId++, label: attack.label, rolls, modifier: attack.bonus, total, critMultiplier, timestamp: new Date() }]);
+    setSelectedRollIds(new Set());
   }
 
   function confirmCritical(rollId: number) {
@@ -335,15 +494,17 @@ export function DiceRollerPage() {
       const idx = prev.findIndex((r) => r.id === rollId);
       if (idx === -1) return prev;
       const original = prev[idx];
+      if (original.confirmRoll) return prev;
       const confirmTotal = confirmD20 + original.modifier;
       const next = [...prev];
-      next[idx] = { ...original, confirmRoll: { rolls: [confirmD20], total: confirmTotal } };
+      next[idx] = { ...original, confirmRoll: { id: nextId++, rolls: [confirmD20], total: confirmTotal } };
       return next;
     });
   }
 
   const clearHistory = useCallback(() => {
     setHistory([]);
+    setSelectedRollIds(new Set());
     setActiveRoll(null);
     setAttackSequence(null);
     setCurrentAttackIdx(0);
@@ -352,6 +513,11 @@ export function DiceRollerPage() {
 
   const [railOpen, setRailOpen] = useState(false);
   const [automateRolls, setAutomateRolls] = useState(false);
+  const canRollSelectedDamage = selectedRollIds.size > 0 && history.some((r) => {
+    if (selectedRollIds.has(r.id) && Boolean(getDamageExpressionForLabel(r.label))) return true;
+    if (r.confirmRoll && selectedRollIds.has(r.confirmRoll.id) && Boolean(getDamageExpressionForLabel(r.label))) return true;
+    return false;
+  });
 
   return (
     <div className="dice-roller-page p-6">
@@ -500,10 +666,10 @@ export function DiceRollerPage() {
             ))}
             <button
               type="button"
-              disabled={isRolling || !Object.values(diceSelections).some((n) => (n ?? 0) > 0)}
-              onClick={() => { rollSelected(); }}
-              aria-label="Roll selected dice"
-              title="Roll selected dice"
+              disabled={isRolling || (!canRollSelectedDamage && !Object.values(diceSelections).some((n) => (n ?? 0) > 0))}
+              onClick={() => { if (canRollSelectedDamage) rollSelectedHitDamages(); else rollSelected(); }}
+              aria-label={canRollSelectedDamage ? 'Roll selected hit damages' : 'Roll selected dice'}
+              title={canRollSelectedDamage ? 'Roll selected hit damages' : 'Roll selected dice'}
               className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-btn-primary-bg)] text-[var(--color-btn-primary-text)] hover:bg-[var(--color-btn-primary-hover-bg)] border border-[var(--color-btn-primary-border)] disabled:opacity-40"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
@@ -597,10 +763,28 @@ export function DiceRollerPage() {
                   {[...history].reverse().map((result, index) => (
                     <li
                       key={result.id}
-                      className={`flex flex-col gap-0.5 px-4 py-1.5 ${index === 0 ? 'bg-[var(--color-canvas-subtle)]' : ''}`}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={selectedRollIds.has(result.id)}
+                      onClick={() => toggleRollSelection(result.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggleRollSelection(result.id);
+                        }
+                      }}
+                      className={`dice-roller-history-item flex flex-col gap-0.5 px-4 py-1.5 ${selectedRollIds.has(result.id) ? 'dice-roller-history-item--selected' : ''} ${index === 0 ? 'bg-[var(--color-canvas-subtle)]' : ''}`}
                     >
                       <div className="flex items-baseline gap-3">
-                        <span className="text-xl font-bold tabular-nums text-[color:var(--color-fg-default)] w-10 shrink-0 text-right">
+                        <span className="dice-roller-selection-indicator" aria-hidden="true">
+                          {selectedRollIds.has(result.id) ? (
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                              <path d="M7 12.5l3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          ) : null}
+                        </span>
+                        <span className={`text-xl font-bold tabular-nums w-10 shrink-0 text-right ${isDamageRoll(result) ? 'dice-roller-damage-roll-text' : 'text-[color:var(--color-fg-default)]'}`}>
                           {result.total}
                         </span>
                         {result.critMultiplier && (
@@ -624,11 +808,11 @@ export function DiceRollerPage() {
                           </span>
                         )}
                         <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-medium text-[color:var(--color-fg-default)]">
+                          <span className={`text-sm font-medium ${isDamageRoll(result) ? 'dice-roller-damage-roll-text' : 'text-[color:var(--color-fg-default)]'}`}>
                             {result.label}
                           </span>
-                          <span className="text-xs text-[color:var(--color-fg-muted)] truncate">
-                            [{result.rolls.join(', ')}]
+                          <span className={`text-xs truncate ${isDamageRoll(result) ? 'dice-roller-damage-roll-text' : 'text-[color:var(--color-fg-muted)]'}`}>
+                            [{(result.breakdowns ?? result.rolls.map((r) => `${r}`)).join(', ')}]
                             {result.modifier !== 0 && (
                               <> {result.modifier > 0 ? '+' : ''}{result.modifier} mod</>
                             )}
@@ -638,7 +822,7 @@ export function DiceRollerPage() {
                           {result.critMultiplier && !result.confirmRoll && (
                             <button
                               type="button"
-                              onClick={() => confirmCritical(result.id)}
+                              onClick={(e) => { e.stopPropagation(); confirmCritical(result.id); }}
                               aria-label="Roll to confirm critical"
                               title="Roll to confirm critical"
                               className="w-6 h-6 rounded-full flex items-center justify-center border"
@@ -649,13 +833,35 @@ export function DiceRollerPage() {
                               </svg>
                             </button>
                           )}
-                          <span className="text-xs text-[color:var(--color-fg-muted)]">
-                            {result.timestamp.toLocaleTimeString()}
-                          </span>
                         </div>
                       </div>
                       {result.confirmRoll && (
-                        <div className="flex items-baseline gap-3 pl-2 border-l-2" style={{ borderColor: 'var(--color-fg-accent)' }}>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-pressed={selectedRollIds.has(result.confirmRoll.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleRollSelection(result.confirmRoll!.id);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleRollSelection(result.confirmRoll!.id);
+                            }
+                          }}
+                          className={`dice-roller-history-item mt-1 flex items-baseline gap-3 pl-2 border-l-2 ${selectedRollIds.has(result.confirmRoll.id) ? 'dice-roller-history-item--selected' : ''}`}
+                          style={{ borderColor: 'var(--color-fg-accent)' }}
+                        >
+                          <span className="dice-roller-selection-indicator" aria-hidden="true">
+                            {selectedRollIds.has(result.confirmRoll.id) ? (
+                              <svg viewBox="0 0 24 24" width="14" height="14" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                                <path d="M7 12.5l3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            ) : null}
+                          </span>
                           <span className="text-lg font-bold tabular-nums w-10 shrink-0 text-right" style={{ color: 'var(--color-fg-accent)' }}>
                             {result.confirmRoll.total}
                           </span>
