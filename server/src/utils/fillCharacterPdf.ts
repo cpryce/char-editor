@@ -70,6 +70,14 @@ function matMaxDex(maxDexBonus: string | null | undefined, mat?: string): number
  * Must run before winAnsiSafe so entity-decoded characters are also normalized.
  */
 function decodeHtmlEntities(text: string): string {
+  // URL percent-decode printable ASCII sequences first (e.g. %20 → space).
+  // Only decodes sequences that resolve to printable ASCII (0x20–0x7E) to
+  // avoid mangling binary or control characters.
+  const urlDecoded = text.replace(/%([0-9a-fA-F]{2})/g, (match, hex: string) => {
+    const cp = parseInt(hex, 16);
+    return cp >= 0x20 && cp <= 0x7E ? String.fromCharCode(cp) : match;
+  });
+
   const decode = (s: string): string => s
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
@@ -78,12 +86,16 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
     .replace(/&#160;/g, ' ')          // numeric non-breaking space
+    .replace(/&#x([0-9a-fA-F]+);/gi, (_, hex: string) => {  // hex numeric refs (e.g. &#x20;)
+      const cp = parseInt(hex, 16);
+      return cp <= 0xFF ? String.fromCharCode(cp) : '?';
+    })
     .replace(/&#(\d+);/g, (_, n: string) => {
       const cp = parseInt(n, 10);
       return cp <= 0xFF ? String.fromCharCode(cp) : '?';
     });
   // Two passes handle double-encoded entities (e.g. &amp;nbsp; → &nbsp; → ' ')
-  return decode(decode(text));
+  return decode(decode(urlDecoded));
 }
 
 /**
