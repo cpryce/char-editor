@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { PDFDocument, PDFTextField, PDFCheckBox, PDFName, PDFBool, PDFDict, PDFRef, PDFString, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFTextField, PDFCheckBox, PDFName, PDFBool, PDFDict, PDFRef, PDFString, PDFHexString, StandardFonts, type PDFFont } from 'pdf-lib';
 import type { ICharacter } from '../models/Character';
 import type { ICustomClassFeature } from '../models/CustomClass';
 import { BUILTIN_CLASS_FEATURES } from '../data/builtinClassFeatures';
@@ -81,6 +81,7 @@ function decodeHtmlEntities(text: string): string {
   const decode = (s: string): string => s
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
+    .replace(/&times;/gi, 'x')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
@@ -88,10 +89,12 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&#160;/g, ' ')          // numeric non-breaking space
     .replace(/&#x([0-9a-fA-F]+);/gi, (_, hex: string) => {  // hex numeric refs (e.g. &#x20;)
       const cp = parseInt(hex, 16);
+      if (cp === 0xD7) return 'x'; // multiplication sign → ASCII x (e.g. crit x2)
       return cp <= 0xFF ? String.fromCharCode(cp) : '?';
     })
     .replace(/&#(\d+);/g, (_, n: string) => {
       const cp = parseInt(n, 10);
+      if (cp === 215) return 'x'; // multiplication sign → ASCII x (e.g. crit x2)
       return cp <= 0xFF ? String.fromCharCode(cp) : '?';
     });
   // Two passes handle double-encoded entities (e.g. &amp;nbsp; → &nbsp; → ' ')
@@ -107,6 +110,7 @@ function decodeHtmlEntities(text: string): string {
 function winAnsiSafe(text: string): string {
   return decodeHtmlEntities(text)
     .replace(/\u00A0/g, ' ')          // non-breaking space → regular space
+    .replace(/\u00D7/g, 'x')          // multiplication sign → ASCII x (e.g. crit x2)
     .replace(/\u2212/g, '-')          // MINUS SIGN → hyphen-minus
     .replace(/[\u2018\u2019]/g, "'")  // curly single quotes → apostrophe
     .replace(/[\u201C\u201D]/g, '"')  // curly double quotes → straight quote
@@ -122,6 +126,78 @@ function signed(n: number): string {
 
 function abilityMod(score: number): number {
   return Math.floor((score - 10) / 2);
+}
+
+type CarryingCapacity = {
+  light: number;
+  medium: number;
+  heavy: number;
+  // Max load values for the common derived entries on the sheet.
+  lift: number;  // lift over head
+  carry: number; // lift off ground / carry
+  drag: number;  // push or drag
+};
+
+// d20 SRD table for Medium bipedal creatures, Strength 1-29.
+const CARRYING_CAPACITY_TABLE: Record<number, [number, number, number]> = {
+  1: [3, 6, 10],
+  2: [6, 13, 20],
+  3: [10, 20, 30],
+  4: [13, 26, 40],
+  5: [16, 33, 50],
+  6: [20, 40, 60],
+  7: [23, 46, 70],
+  8: [26, 53, 80],
+  9: [30, 60, 90],
+  10: [33, 66, 100],
+  11: [38, 76, 115],
+  12: [43, 86, 130],
+  13: [50, 100, 150],
+  14: [58, 116, 175],
+  15: [66, 133, 200],
+  16: [76, 153, 230],
+  17: [86, 173, 260],
+  18: [100, 200, 300],
+  19: [116, 233, 350],
+  20: [133, 266, 400],
+  21: [153, 306, 460],
+  22: [173, 346, 520],
+  23: [200, 400, 600],
+  24: [233, 466, 700],
+  25: [266, 533, 800],
+  26: [306, 613, 920],
+  27: [346, 693, 1040],
+  28: [400, 800, 1200],
+  29: [466, 933, 1400],
+};
+
+function carryingCapacity(strScore: number): CarryingCapacity {
+  const score = Math.floor(strScore);
+  if (!Number.isFinite(score) || score < 1) {
+    return { light: 0, medium: 0, heavy: 0, lift: 0, carry: 0, drag: 0 };
+  }
+
+  // Per SRD: every +10 Strength multiplies carrying capacity by 4.
+  let reduced = score;
+  let multiplier = 1;
+  while (reduced > 29) {
+    reduced -= 10;
+    multiplier *= 4;
+  }
+
+  const [light, medium, heavy] = CARRYING_CAPACITY_TABLE[reduced] ?? CARRYING_CAPACITY_TABLE[29]!;
+  const finalLight = light * multiplier;
+  const finalMedium = medium * multiplier;
+  const finalHeavy = heavy * multiplier;
+
+  return {
+    light: finalLight,
+    medium: finalMedium,
+    heavy: finalHeavy,
+    lift: finalHeavy,
+    carry: finalHeavy * 2,
+    drag: finalHeavy * 5,
+  };
 }
 
 function alignmentInitials(alignment: string | null | undefined): string {
@@ -240,7 +316,6 @@ export async function fillCharacterPdf(
   const pdfBytes = fs.readFileSync(templatePath);
   const pdfDoc = await PDFDocument.load(pdfBytes);
   const form = pdfDoc.getForm();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
   // ── Strip all /RV (rich-text value) entries from the entire document ──────
   // XFA-flattened PDFs embed /RV entries at every level of the field hierarchy
@@ -281,6 +356,8 @@ export async function fillCharacterPdf(
   const intEffMod = effectiveTempMod(s.intelligence)  ?? intMod;
   const wisEffMod = effectiveTempMod(s.wisdom)         ?? wisMod;
   const chaEffMod = effectiveTempMod(s.charisma)      ?? chaMod;
+  const effectiveStrForLoad = s.strength.temp ?? str;
+  const loadCapacity = carryingCapacity(effectiveStrForLoad);
 
   const defaultSizeMod = SIZE_CATEGORIES[character.size as keyof typeof SIZE_CATEGORIES]?.acAttackMod ?? 0;
 
@@ -330,6 +407,14 @@ export async function fillCharacterPdf(
 
   // Hit points
   safeSet(form, 'hitPoints.max', character.hitPoints.max);
+
+  // Carrying capacity / encumbrance
+  safeSet(form, 'load.light',  loadCapacity.light);
+  safeSet(form, 'load.medium', loadCapacity.medium);
+  safeSet(form, 'load.heavy',  loadCapacity.heavy);
+  safeSet(form, 'load.lift',   loadCapacity.lift);
+  safeSet(form, 'load.carry',  loadCapacity.carry);
+  safeSet(form, 'load.drag',   loadCapacity.drag);
 
   // Ability scores — strength
   safeSet(form, 'abilityScores.strength.total',       str);
@@ -885,6 +970,40 @@ export async function fillCharacterPdf(
       `${N0}${SN}var tot=n("${p}.total");event.value=s(Math.floor((tot-10)/2));`);
   }
 
+  // 3.5 Carrying capacity (d20 SRD). Uses temporary Strength score when present,
+  // otherwise falls back to permanent Strength total.
+  {
+    const carryCapJs = [
+      'var n=function(f){var x=this.getField(f);return(x&&""!==x.value&&!isNaN(+x.value))?+x.value:null;};',
+      'var c=function(s){',
+      '  s=Math.floor(s||0);',
+      '  if(s<1)return [0,0,0];',
+      '  var m=1;',
+      '  while(s>29){s-=10;m*=4;}',
+      '  var t={',
+      '    1:[3,6,10],2:[6,13,20],3:[10,20,30],4:[13,26,40],5:[16,33,50],',
+      '    6:[20,40,60],7:[23,46,70],8:[26,53,80],9:[30,60,90],10:[33,66,100],',
+      '    11:[38,76,115],12:[43,86,130],13:[50,100,150],14:[58,116,175],15:[66,133,200],',
+      '    16:[76,153,230],17:[86,173,260],18:[100,200,300],19:[116,233,350],20:[133,266,400],',
+      '    21:[153,306,460],22:[173,346,520],23:[200,400,600],24:[233,466,700],25:[266,533,800],',
+      '    26:[306,613,920],27:[346,693,1040],28:[400,800,1200],29:[466,933,1400]',
+      '  };',
+      '  var v=t[s]||t[29];',
+      '  return [v[0]*m,v[1]*m,v[2]*m];',
+      '};',
+      'var st=n("abilityScores.strength.temp");',
+      'if(st===null)st=n("abilityScores.strength.total")||0;',
+      'var cap=c(st);',
+    ].join('');
+
+    addCalc('load.light',  `${carryCapJs}event.value=cap[0];`);
+    addCalc('load.medium', `${carryCapJs}event.value=cap[1];`);
+    addCalc('load.heavy',  `${carryCapJs}event.value=cap[2];`);
+    addCalc('load.lift',   `${carryCapJs}event.value=cap[2];`);
+    addCalc('load.carry',  `${carryCapJs}event.value=cap[2]*2;`);
+    addCalc('load.drag',   `${carryCapJs}event.value=cap[2]*5;`);
+  }
+
   // 2b. AC armor and shield — mirror the character editor's syncArmorClass logic:
   //   armor  = Math.max(body.armorBonus, bestWornSlot('armor'))
   //   shield = Math.max(offHandShield.shieldBonus, bestWornSlot('shield'))
@@ -1039,11 +1158,65 @@ export async function fillCharacterPdf(
   }
 
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontCache = new Map<string, PDFFont>([
+    ['Helvetica', regularFont],
+    ['Helvetica-Bold', boldFont],
+  ]);
 
-  // Regenerate appearance streams for all text fields so Chrome's built-in
-  // PDF viewer can render filled values without relying on NeedAppearances.
-  // skills.score.N fields use HelveticaBold (closest standard substitute for
-  // the Myriad Pro Bold set in the template) to visually distinguish them.
+  const fontByDaToken: Record<string, StandardFonts> = {
+    Helv: StandardFonts.Helvetica,
+    HeBo: StandardFonts.HelveticaBold,
+    HeOb: StandardFonts.HelveticaOblique,
+    HeBI: StandardFonts.HelveticaBoldOblique,
+    Cour: StandardFonts.Courier,
+    CoBo: StandardFonts.CourierBold,
+    CoOb: StandardFonts.CourierOblique,
+    CoBI: StandardFonts.CourierBoldOblique,
+    TiRo: StandardFonts.TimesRoman,
+    TiBo: StandardFonts.TimesRomanBold,
+    TiIt: StandardFonts.TimesRomanItalic,
+    TiBI: StandardFonts.TimesRomanBoldItalic,
+  };
+
+  const mapDaTokenToStandardFont = (token: string | null): StandardFonts => {
+    if (!token) return StandardFonts.Helvetica;
+    if (fontByDaToken[token]) return fontByDaToken[token];
+    const t = token.toLowerCase();
+    if (t.includes('bold') && t.includes('italic')) return StandardFonts.HelveticaBoldOblique;
+    if (t.includes('bold') && t.includes('oblique')) return StandardFonts.HelveticaBoldOblique;
+    if (t.includes('bold')) return StandardFonts.HelveticaBold;
+    if (t.includes('italic') || t.includes('oblique')) return StandardFonts.HelveticaOblique;
+    return StandardFonts.Helvetica;
+  };
+
+  const getDaToken = (field: PDFTextField): string | null => {
+    const acroDict = (field as any).acroField.dict as PDFDict;
+    const daObj = (acroDict as any).lookupMaybe(PDFName.of('DA'), PDFString)
+      ?? (acroDict as any).lookupMaybe(PDFName.of('DA'), PDFHexString);
+    if (daObj && (daObj instanceof PDFString || daObj instanceof PDFHexString)) {
+      const da = daObj.decodeText();
+      const m = da.match(/\/([A-Za-z0-9_.-]+)\s+[-+]?\d*\.?\d+\s+Tf/);
+      return m?.[1] ?? null;
+    }
+    return null;
+  };
+
+  const getFontForFieldAppearance = async (field: PDFTextField): Promise<PDFFont> => {
+    const token = getDaToken(field);
+    const standard = mapDaTokenToStandardFont(token);
+    const cacheKey = String(standard);
+    const cached = fontCache.get(cacheKey);
+    if (cached) return cached;
+    const embedded = await pdfDoc.embedFont(standard);
+    fontCache.set(cacheKey, embedded);
+    return embedded;
+  };
+
+  // Regenerate AP streams so static viewers render filled values.
+  // For most fields, use the field's own default appearance (DA) so we do not
+  // force a replacement font/size. Only skills.score.N is explicitly rendered
+  // with HelveticaBold.
   try {
     for (const field of form.getFields()) {
       if (!(field instanceof PDFTextField)) continue;
@@ -1051,7 +1224,14 @@ export async function fillCharacterPdf(
       // setText() may have re-introduced (pdf-lib sets /RV on RichText fields).
       (field as any).acroField.dict.delete(PDFName.of('RV'));
       const isScore = /^skills\.score\.\d+$/.test(field.getName());
-      try { field.updateAppearances(isScore ? boldFont : font); } catch { /* skip — not a supported field type */ }
+      if (isScore) {
+        try { field.updateAppearances(boldFont); } catch { /* skip — not a supported field type */ }
+      } else {
+        try {
+          const appearanceFont = await getFontForFieldAppearance(field);
+          field.updateAppearances(appearanceFont);
+        } catch { /* skip — not a supported field type */ }
+      }
     }
   } catch {
     // fallback: skip all appearance regeneration
