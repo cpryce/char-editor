@@ -7,7 +7,7 @@ describe('formatSpellsPerDay', () => {
   });
 
   it('adds domain slot for spell levels above zero', () => {
-    expect(formatSpellsPerDay(6, 1, true)).toBe('6 +1');
+    expect(formatSpellsPerDay(6, 1, true)).toBe('6+1');
   });
 
   it('returns unavailable marker for unavailable spell levels', () => {

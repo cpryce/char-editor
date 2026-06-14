@@ -224,7 +224,11 @@ app.get('/api/characters/:id/export-pdf', async (req, res) => {
       ? await CustomClass.find({ name: { $in: classNames } }).lean()
       : [];
     const customClassFeatures = customClasses.map((cc) => ({ className: cc.name, features: cc.features }));
-    const pdfBytes = await fillCharacterPdf(character, customClassFeatures);
+    const progressionOwner = (character as any).owner ?? u._id;
+    const spellProgressions = classNames.length > 0
+      ? await SpellProgression.find({ owner: progressionOwner, className: { $in: classNames } }).lean()
+      : [];
+    const pdfBytes = await fillCharacterPdf(character, customClassFeatures, spellProgressions);
     const safeName = (character.name ?? 'character').replace(/[^a-z0-9_\- ]/gi, '_');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}_character_sheet.pdf"`);

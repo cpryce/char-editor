@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { PDFDocument, PDFTextField, PDFCheckBox, PDFName, PDFBool, PDFDict, PDFRef, PDFString, PDFHexString, StandardFonts, type PDFFont } from 'pdf-lib';
+import { PDFDocument, PDFTextField, PDFCheckBox, PDFName, PDFBool, PDFDict, PDFRef, PDFString, PDFHexString } from 'pdf-lib';
 import type { ICharacter } from '../models/Character';
 import type { ICustomClassFeature } from '../models/CustomClass';
 import { BUILTIN_CLASS_FEATURES } from '../data/builtinClassFeatures';
@@ -306,11 +306,20 @@ function safeSet(
   }
 }
 
+// ── Spell-progression data needed by the PDF fill ───────────────────────────────
+export interface SpellProgressionForPdf {
+  className: string;
+  hasLimitedSpellsKnown?: boolean;
+  levels: number[][];          // [charLevel-1][spellLevel]  (-1 = not available)
+  spellsKnown?: number[][];   // same shape; present for spontaneous casters
+}
+
 // ── Main export function ──────────────────────────────────────────────────────
 
 export async function fillCharacterPdf(
   character: ICharacter,
   customClassFeatures: { className: string; features: ICustomClassFeature[] }[] = [],
+  spellProgressions: SpellProgressionForPdf[] = [],
 ): Promise<Uint8Array> {
   const templatePath = path.join(__dirname, '../assets/blank.pdf');
   const pdfBytes = fs.readFileSync(templatePath);
@@ -760,15 +769,103 @@ export async function fillCharacterPdf(
 
   // ── Spellcasting ─────────────────────────────────────────────────────────
   {
-    const sc = character.spellcasting;
-    // Resolve CL and EL: fall back to the highest spellcasting class level when
-    // the stored value is 0 (meaning "use default").
-    const highestSpellcastingLevel = (character.classes as Array<{ name: string; level: number }> | undefined)
-      ?.reduce((max, c) => Math.max(max, c.level ?? 0), 0) ?? 0;
-    const cl = (sc?.casterLevel && sc.casterLevel > 0) ? sc.casterLevel : highestSpellcastingLevel;
-    const el = (sc?.effectiveCasterLevel && sc.effectiveCasterLevel > 0) ? sc.effectiveCasterLevel : highestSpellcastingLevel;
-    safeSet(form, 'spellcasting.casterLevel',         cl || '');
-    safeSet(form, 'spellcasting.effectiveCasterLevel', el || '');
+    // Cast to the full runtime shape (schema has more fields than ICharacter interface).
+    const sc = character.spellcasting as {
+      casterAbility?: string;
+      casterLevel?: number;
+      effectiveCasterLevel?: number;
+      spellPenetration?: boolean;
+      greaterSpellPenetration?: boolean;
+      domainSlots?: boolean;
+    } | undefined;
+
+    // Resolve CL and EL: fall back to the highest class level when stored value is 0.
+    const charClasses = character.classes as Array<{ name: string; level: number }>;
+    const highestClassLevel = charClasses?.reduce((max, c) => Math.max(max, c.level ?? 0), 0) ?? 0;
+    const cl = (sc?.casterLevel && sc.casterLevel > 0) ? sc.casterLevel : highestClassLevel;
+    const el = (sc?.effectiveCasterLevel && sc.effectiveCasterLevel > 0) ? sc.effectiveCasterLevel : highestClassLevel;
+    safeSet(form, 'casterLevel',          cl || '');
+    safeSet(form, 'effectiveCasterLevel', el || '');
+
+    // Spell penetration check bonus (d20 + this to overcome SR).
+    const spPenBonus = el + (sc?.spellPenetration ? 2 : 0) + (sc?.greaterSpellPenetration ? 2 : 0);
+    safeSet(form, 'spellPenetration', spPenBonus || '');
+
+    // Combined arcane spell failure (body armor + shield) — already computed above.
+    const totalAsf = bdAsf + osAsf;
+    safeSet(form, 'spellFailure', totalAsf !== 0 ? `${totalAsf}%` : '');
+
+    // ── Spell table ───────────────────────────────────────────────────────
+    // Mirrors the ClassLevelSection.tsx resolution and calculation logic exactly.
+    if (sc?.casterAbility) {
+      // Find the active progression: the one for the highest-level spellcasting class.
+      let activeProgression: SpellProgressionForPdf | null = null;
+      let primaryClassLevel = 0;
+      for (const c of charClasses) {
+        if (!c.name) continue;
+        const lvl = c.level ?? 0;
+        if (lvl <= primaryClassLevel) continue;
+        const prog = spellProgressions.find(
+          (p) => p.className.toLowerCase() === c.name.toLowerCase(),
+        ) ?? null;
+        if (!prog) continue;
+        activeProgression = prog;
+        primaryClassLevel = lvl;
+      }
+
+      // EL drives spells per day and spells known; use primaryClassLevel as fallback.
+      const resolvedEL = (sc.effectiveCasterLevel && sc.effectiveCasterLevel > 0) ? sc.effectiveCasterLevel : primaryClassLevel;
+      const progressionRow: number[] | null =
+        activeProgression && resolvedEL > 0
+          ? (activeProgression.levels[Math.min(resolvedEL, 20) - 1] ?? null)
+          : null;
+      const spellsKnownRow: number[] | null =
+        activeProgression?.hasLimitedSpellsKnown && activeProgression.spellsKnown && resolvedEL > 0
+          ? (activeProgression.spellsKnown[Math.min(resolvedEL, 20) - 1] ?? null)
+          : null;
+
+      // Casting ability modifier — mirrors spellAbilityMod() in ClassLevelSection.
+      const castingAbility = (s as Record<string, typeof s.strength>)[sc.casterAbility.toLowerCase()] ?? null;
+      const castingMod = castingAbility
+        ? abilityMod(castingAbility.temp ?? totalAbilityScore(castingAbility))
+        : 0;
+
+      // bonusSpells(level) — mirrors bonusSpells() in ClassLevelSection.
+      const bonusForLevel = (lvl: number): number | null => {
+        if (lvl === 0) return null;
+        if (castingMod < lvl) return 0;
+        return Math.floor((castingMod - lvl) / 4) + 1;
+      };
+
+      // formatSpd — mirrors formatSpellsPerDay() in spellSlots.ts.
+      const formatSpd = (base: number, lvl: number): string => {
+        if (base === -1) return '—';
+        if (sc?.domainSlots && lvl > 0) return `${base}+1`;
+        return String(base);
+      };
+
+      for (let lvl = 0; lvl <= 9; lvl++) {
+        safeSet(form, `spellDC.level.${lvl}`,      10 + lvl + castingMod);
+        safeSet(form, `spellsPerDay.level.${lvl}`,
+          progressionRow ? formatSpd(progressionRow[lvl] ?? -1, lvl) : '');
+        safeSet(form, `spellsKnown.level.${lvl}`,
+          spellsKnownRow
+            ? (spellsKnownRow[lvl] === -1 ? '—' : String(spellsKnownRow[lvl] ?? ''))
+            : '');
+        if (lvl > 0) {
+          const bonus = bonusForLevel(lvl);
+          safeSet(form, `bonusSpells.level.${lvl}`, bonus !== null ? String(bonus) : '');
+        }
+      }
+    } else {
+      // No caster ability set — clear all spell table fields.
+      for (let lvl = 0; lvl <= 9; lvl++) {
+        safeSet(form, `spellDC.level.${lvl}`,      '');
+        safeSet(form, `spellsPerDay.level.${lvl}`, '');
+        safeSet(form, `spellsKnown.level.${lvl}`,  '');
+        if (lvl > 0) safeSet(form, `bonusSpells.level.${lvl}`, '');
+      }
+    }
   }
 
   // ── Turn / Rebuke Undead ─────────────────────────────────────────────────
@@ -1157,92 +1254,21 @@ export async function fillCharacterPdf(
       .set(PDFName.of('CO'), pdfDoc.context.obj(calcOrder as any));
   }
 
-  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontCache = new Map<string, PDFFont>([
-    ['Helvetica', regularFont],
-    ['Helvetica-Bold', boldFont],
-  ]);
-
-  const fontByDaToken: Record<string, StandardFonts> = {
-    Helv: StandardFonts.Helvetica,
-    HeBo: StandardFonts.HelveticaBold,
-    HeOb: StandardFonts.HelveticaOblique,
-    HeBI: StandardFonts.HelveticaBoldOblique,
-    Cour: StandardFonts.Courier,
-    CoBo: StandardFonts.CourierBold,
-    CoOb: StandardFonts.CourierOblique,
-    CoBI: StandardFonts.CourierBoldOblique,
-    TiRo: StandardFonts.TimesRoman,
-    TiBo: StandardFonts.TimesRomanBold,
-    TiIt: StandardFonts.TimesRomanItalic,
-    TiBI: StandardFonts.TimesRomanBoldItalic,
-  };
-
-  const mapDaTokenToStandardFont = (token: string | null): StandardFonts => {
-    if (!token) return StandardFonts.Helvetica;
-    if (fontByDaToken[token]) return fontByDaToken[token];
-    const t = token.toLowerCase();
-    if (t.includes('bold') && t.includes('italic')) return StandardFonts.HelveticaBoldOblique;
-    if (t.includes('bold') && t.includes('oblique')) return StandardFonts.HelveticaBoldOblique;
-    if (t.includes('bold')) return StandardFonts.HelveticaBold;
-    if (t.includes('italic') || t.includes('oblique')) return StandardFonts.HelveticaOblique;
-    return StandardFonts.Helvetica;
-  };
-
-  const getDaToken = (field: PDFTextField): string | null => {
-    const acroDict = (field as any).acroField.dict as PDFDict;
-    const daObj = (acroDict as any).lookupMaybe(PDFName.of('DA'), PDFString)
-      ?? (acroDict as any).lookupMaybe(PDFName.of('DA'), PDFHexString);
-    if (daObj && (daObj instanceof PDFString || daObj instanceof PDFHexString)) {
-      const da = daObj.decodeText();
-      const m = da.match(/\/([A-Za-z0-9_.-]+)\s+[-+]?\d*\.?\d+\s+Tf/);
-      return m?.[1] ?? null;
-    }
-    return null;
-  };
-
-  const getFontForFieldAppearance = async (field: PDFTextField): Promise<PDFFont> => {
-    const token = getDaToken(field);
-    const standard = mapDaTokenToStandardFont(token);
-    const cacheKey = String(standard);
-    const cached = fontCache.get(cacheKey);
-    if (cached) return cached;
-    const embedded = await pdfDoc.embedFont(standard);
-    fontCache.set(cacheKey, embedded);
-    return embedded;
-  };
-
-  // Regenerate AP streams so static viewers render filled values.
-  // For most fields, use the field's own default appearance (DA) so we do not
-  // force a replacement font/size. Only skills.score.N is explicitly rendered
-  // with HelveticaBold.
-  try {
-    for (const field of form.getFields()) {
-      if (!(field instanceof PDFTextField)) continue;
-      // Belt-and-suspenders: also remove /RV from any leaf field dict that
-      // setText() may have re-introduced (pdf-lib sets /RV on RichText fields).
-      (field as any).acroField.dict.delete(PDFName.of('RV'));
-      const isScore = /^skills\.score\.\d+$/.test(field.getName());
-      if (isScore) {
-        try { field.updateAppearances(boldFont); } catch { /* skip — not a supported field type */ }
-      } else {
-        try {
-          const appearanceFont = await getFontForFieldAppearance(field);
-          field.updateAppearances(appearanceFont);
-        } catch { /* skip — not a supported field type */ }
-      }
-    }
-  } catch {
-    // fallback: skip all appearance regeneration
+  // Strip /RV (RichText Value) from every leaf text field. Acrobat treats /RV
+  // as the authoritative display value and, in some XFA-derived font encodings,
+  // renders space as '&'. Removing /RV forces all viewers to use the plain /V.
+  for (const field of form.getFields()) {
+    if (!(field instanceof PDFTextField)) continue;
+    (field as any).acroField.dict.delete(PDFName.of('RV'));
   }
 
-  // Do not force viewers (especially Acrobat on Windows) to regenerate field
-  // appearances. Some legacy flattened/XFA-derived templates carry font
-  // encodings where space renders as '&' when viewers rebuild appearances.
-  // We generate AP streams above and let viewers use them directly.
+  // Set NeedAppearances so each viewer regenerates field appearances from the
+  // field's own /DA (font name, size, colour) and widget dicts (border, background).
+  // This preserves the template's original visual style exactly and avoids the
+  // font-substitution / border-loss caused by calling updateAppearances() with
+  // an embedded OpenType font that differs from the template's Type1 /Helv.
   pdfDoc.catalog.lookup(PDFName.of('AcroForm'), PDFDict)
-    .delete(PDFName.of('NeedAppearances'));
+    .set(PDFName.of('NeedAppearances'), PDFBool.True);
 
   // Set document language (catalog + XMP dc:language) so Adobe AI and
   // accessibility tools recognise this as an English document.

@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import mongoose from 'mongoose';
 import { Character } from './models/Character';
+import { SpellProgression } from './models/SpellProgression';
 import { fillCharacterPdf } from './utils/fillCharacterPdf';
 
 const CHARACTER_ID = '69ebd3a79a2252e8d7bb20f9';
@@ -31,7 +32,11 @@ async function run() {
   }
 
   console.log(`Filling PDF for: ${character.name}`);
-  const pdfBytes = await fillCharacterPdf(character);
+  const classNames = (character.classes as Array<{ name: string }>).map((c) => c.name);
+  const spellProgressions = classNames.length > 0
+    ? await SpellProgression.find({ owner: (character as any).owner, className: { $in: classNames } }).lean()
+    : [];
+  const pdfBytes = await fillCharacterPdf(character, [], spellProgressions);
 
   const outPath = path.join(__dirname, 'assets/test-fill.pdf');
   fs.writeFileSync(outPath, pdfBytes);

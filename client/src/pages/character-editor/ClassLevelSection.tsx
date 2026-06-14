@@ -342,17 +342,16 @@ export function ClassLevelSection({
     { activeProgression: null, primaryClassLevel: 0 },
   );
 
-  // CL defaults to highest spellcasting class level; EL also defaults the same.
-  // CL drives the spells-per-day table; EL drives spell resistance checks.
+  // EL drives spells per day and spells known; CL is displayed but not used for the table.
   const resolvedCL = spellcasting.casterLevel > 0 ? spellcasting.casterLevel : primaryClassLevel;
   const resolvedEL = spellcasting.effectiveCasterLevel > 0 ? spellcasting.effectiveCasterLevel : primaryClassLevel;
-  const progressionRow: number[] | null = activeProgression && resolvedCL > 0
-    ? (activeProgression.levels[Math.min(resolvedCL, 20) - 1] ?? null)
+  const progressionRow: number[] | null = activeProgression && resolvedEL > 0
+    ? (activeProgression.levels[Math.min(resolvedEL, 20) - 1] ?? null)
     : null;
 
   const showSpellsKnown = !!(activeProgression?.hasLimitedSpellsKnown && activeProgression.spellsKnown);
-  const spellsKnownRow: number[] | null = showSpellsKnown && resolvedCL > 0
-    ? (activeProgression!.spellsKnown![Math.min(resolvedCL, 20) - 1] ?? null)
+  const spellsKnownRow: number[] | null = showSpellsKnown && resolvedEL > 0
+    ? (activeProgression!.spellsKnown![Math.min(resolvedEL, 20) - 1] ?? null)
     : null;
 
   // ── Turn Undead defaults ──────────────────────────────────────────────────
