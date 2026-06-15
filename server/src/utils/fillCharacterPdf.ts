@@ -1255,30 +1255,27 @@ export async function fillCharacterPdf(
   }
 
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-  // Regenerate AP streams for all text fields so static viewers (Chrome, Firefox)
-  // render filled values without relying on NeedAppearances. skills.score.N fields
-  // use HelveticaBold to visually distinguish them.
-  try {
-    for (const field of form.getFields()) {
-      if (!(field instanceof PDFTextField)) continue;
-      // Strip /RV so Acrobat on Windows uses /V (plain text) not /RV (XFA rich-text
-      // where space encodes as '&').
-      (field as any).acroField.dict.delete(PDFName.of('RV'));
-      const isScore = /^skills\.score\.\d+$/.test(field.getName());
-      try { field.updateAppearances(isScore ? boldFont : regularFont); } catch { /* skip — unsupported field type */ }
+  // Strip /RV from all text fields so Acrobat on Windows uses /V (plain text)
+  // rather than /RV (XFA rich-text where space encodes as '&').
+  // For skills.score.N only, generate an explicit AP stream with HelveticaBold.
+  // All other fields keep no pre-generated AP stream; NeedAppearances=True
+  // (set below) tells each viewer to render them from the field's own /DA and
+  // widget dicts, preserving the template's original border, fill, and font.
+  for (const field of form.getFields()) {
+    if (!(field instanceof PDFTextField)) continue;
+    (field as any).acroField.dict.delete(PDFName.of('RV'));
+    if (/^skills\.score\.\d+$/.test(field.getName())) {
+      try { field.updateAppearances(boldFont); } catch { /* skip — unsupported field type */ }
     }
-  } catch {
-    // fallback: skip all appearance regeneration
   }
 
-  // Do NOT set NeedAppearances=True. Some legacy flattened/XFA-derived templates
-  // carry font encodings where space renders as '&' when viewers rebuild
-  // appearances using NeedAppearances. We generate AP streams above and let
-  // viewers use them directly.
+  // NeedAppearances=True: each viewer regenerates AP streams from the field's
+  // own /DA (font name, size, colour) and widget dicts (border, background).
+  // This preserves the template's visual style without any overrides from
+  // pdf-lib's embedded OpenType fonts.
   pdfDoc.catalog.lookup(PDFName.of('AcroForm'), PDFDict)
-    .delete(PDFName.of('NeedAppearances'));
+    .set(PDFName.of('NeedAppearances'), PDFBool.True);
 
   // Set document language (catalog + XMP dc:language) so Adobe AI and
   // accessibility tools recognise this as an English document.
