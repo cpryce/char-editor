@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { PDFDocument, PDFTextField, PDFCheckBox, PDFName, PDFBool, PDFDict, PDFRef, PDFString, PDFHexString } from 'pdf-lib';
+import { PDFDocument, PDFTextField, PDFCheckBox, PDFName, PDFBool, PDFDict, PDFRef, PDFString, PDFHexString, StandardFonts } from 'pdf-lib';
 import type { ICharacter } from '../models/Character';
 import type { ICustomClassFeature } from '../models/CustomClass';
 import { BUILTIN_CLASS_FEATURES } from '../data/builtinClassFeatures';
@@ -1254,21 +1254,31 @@ export async function fillCharacterPdf(
       .set(PDFName.of('CO'), pdfDoc.context.obj(calcOrder as any));
   }
 
-  // Strip /RV (RichText Value) from every leaf text field. Acrobat treats /RV
-  // as the authoritative display value and, in some XFA-derived font encodings,
-  // renders space as '&'. Removing /RV forces all viewers to use the plain /V.
-  for (const field of form.getFields()) {
-    if (!(field instanceof PDFTextField)) continue;
-    (field as any).acroField.dict.delete(PDFName.of('RV'));
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  // Regenerate AP streams for all text fields so static viewers (Chrome, Firefox)
+  // render filled values without relying on NeedAppearances. skills.score.N fields
+  // use HelveticaBold to visually distinguish them.
+  try {
+    for (const field of form.getFields()) {
+      if (!(field instanceof PDFTextField)) continue;
+      // Strip /RV so Acrobat on Windows uses /V (plain text) not /RV (XFA rich-text
+      // where space encodes as '&').
+      (field as any).acroField.dict.delete(PDFName.of('RV'));
+      const isScore = /^skills\.score\.\d+$/.test(field.getName());
+      try { field.updateAppearances(isScore ? boldFont : regularFont); } catch { /* skip — unsupported field type */ }
+    }
+  } catch {
+    // fallback: skip all appearance regeneration
   }
 
-  // Set NeedAppearances so each viewer regenerates field appearances from the
-  // field's own /DA (font name, size, colour) and widget dicts (border, background).
-  // This preserves the template's original visual style exactly and avoids the
-  // font-substitution / border-loss caused by calling updateAppearances() with
-  // an embedded OpenType font that differs from the template's Type1 /Helv.
+  // Do NOT set NeedAppearances=True. Some legacy flattened/XFA-derived templates
+  // carry font encodings where space renders as '&' when viewers rebuild
+  // appearances using NeedAppearances. We generate AP streams above and let
+  // viewers use them directly.
   pdfDoc.catalog.lookup(PDFName.of('AcroForm'), PDFDict)
-    .set(PDFName.of('NeedAppearances'), PDFBool.True);
+    .delete(PDFName.of('NeedAppearances'));
 
   // Set document language (catalog + XMP dc:language) so Adobe AI and
   // accessibility tools recognise this as an English document.

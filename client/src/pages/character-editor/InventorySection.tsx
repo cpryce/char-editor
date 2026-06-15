@@ -671,6 +671,7 @@ export function InventorySection({
       const mat = typeof value === 'string' && value ? MATERIALS[value as MaterialKey] : undefined;
       const effectiveCategory = applyArmorCategoryShift(base.category, mat?.categoryShift ?? 0);
       next.speed = getArmorSpeedForSize(effectiveCategory, size, race);
+      next.armorAdjust = (effectiveCategory === 'Light Armor' || effectiveCategory === 'Shield') ? 0 : -10;
     }
     updateInventory({ body: next });
   }
