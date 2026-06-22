@@ -892,12 +892,6 @@ export async function fillCharacterPdf(
 
   // ── Skills ────────────────────────────────────────────────────────────────
 
-  // Abbreviated labels for PDF key ability column.
-  const ABILITY_ABBREV: Record<string, string> = {
-    strength: 'Str', dexterity: 'Dex', constitution: 'Con',
-    intelligence: 'Int', wisdom: 'Wis', charisma: 'Cha',
-  };
-
   // Skill point budget — mirrors client's totalSkillPointsAvailable.
   const BUILTIN_SKILL_POINTS: Partial<Record<string, number>> = {
     Barbarian: 4, Bard: 6, Cleric: 2, Druid: 4, Fighter: 2,
@@ -930,18 +924,8 @@ export async function fillCharacterPdf(
       miscBonus: number;
     }>;
 
-    for (let i = 0; i < Math.min(skills.length, 44); i++) {
+    for (let i = 0; i < Math.min(skills.length, 45); i++) {
       const sk = skills[i]!;
-
-      // Name with suffix markers: " *" for ACP, " T" for trained-only.
-      let displayName = sk.name;
-      if (sk.armorCheckPenalty) displayName += ' *';
-      if (sk.trainedOnly)       displayName += ' T';
-      safeSet(form, `skills.name.${i}`, displayName);
-
-      // Key ability abbreviation.
-      const abilityAbbrev = sk.keyAbility ? (ABILITY_ABBREV[sk.keyAbility] ?? sk.keyAbility) : '\u2014';
-      safeSet(form, `skills.keyAbility.${i}`, abilityAbbrev);
 
       // Class skill checkbox.
       safeSetCheckbox(form, `skills.classSkill.${i}`, sk.classSkill);
