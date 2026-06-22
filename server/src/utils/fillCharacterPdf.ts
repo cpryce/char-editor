@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { PDFDocument, PDFTextField, PDFCheckBox, PDFName, PDFBool, PDFDict, PDFRef, PDFString, PDFHexString, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFTextField, PDFCheckBox, PDFName, PDFDict, PDFRef, PDFString, PDFHexString, StandardFonts } from 'pdf-lib';
 import type { ICharacter } from '../models/Character';
 import type { ICustomClassFeature } from '../models/CustomClass';
 import { BUILTIN_CLASS_FEATURES } from '../data/builtinClassFeatures';
@@ -78,15 +78,24 @@ function decodeHtmlEntities(text: string): string {
     return cp >= 0x20 && cp <= 0x7E ? String.fromCharCode(cp) : match;
   });
 
+  // Decode escaped hex bytes sometimes produced by copy/paste pipelines.
+  // Examples: "\\x20" or "/x20" -> space.
+  const slashHexDecoded = urlDecoded.replace(/(?:\\|\/)x([0-9a-fA-F]{2})/g, (match, hex: string) => {
+    const cp = parseInt(hex, 16);
+    return cp >= 0x20 && cp <= 0x7E ? String.fromCharCode(cp) : match;
+  });
+
   const decode = (s: string): string => s
-    .replace(/&nbsp;/g, ' ')
+    .replace(/&nbsp;?/gi, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&times;/gi, 'x')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
-    .replace(/&#160;/g, ' ')          // numeric non-breaking space
+    .replace(/&#160;?/g, ' ')         // numeric non-breaking space
+    .replace(/&#32;?/g, ' ')          // numeric regular space
+    .replace(/&#x20;?/gi, ' ')        // hex regular space
     .replace(/&#x([0-9a-fA-F]+);/gi, (_, hex: string) => {  // hex numeric refs (e.g. &#x20;)
       const cp = parseInt(hex, 16);
       if (cp === 0xD7) return 'x'; // multiplication sign → ASCII x (e.g. crit x2)
@@ -98,7 +107,7 @@ function decodeHtmlEntities(text: string): string {
       return cp <= 0xFF ? String.fromCharCode(cp) : '?';
     });
   // Two passes handle double-encoded entities (e.g. &amp;nbsp; → &nbsp; → ' ')
-  return decode(decode(urlDecoded));
+  return decode(decode(slashHexDecoded));
 }
 
 /**
@@ -1239,27 +1248,23 @@ export async function fillCharacterPdf(
   }
 
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-  // Strip /RV from all text fields so Acrobat on Windows uses /V (plain text)
-  // rather than /RV (XFA rich-text where space encodes as '&').
-  // For skills.score.N only, generate an explicit AP stream with HelveticaBold.
-  // All other fields keep no pre-generated AP stream; NeedAppearances=True
-  // (set below) tells each viewer to render them from the field's own /DA and
-  // widget dicts, preserving the template's original border, fill, and font.
+  // Strip /RV from all text fields so Acrobat/Chromium viewers on Windows use
+  // /V (plain text) and don't reinterpret XFA rich-text entities.
+  // Then regenerate AP streams server-side to avoid viewer-specific rendering
+  // regressions where spaces appear as '&' after template re-optimisation.
   for (const field of form.getFields()) {
     if (!(field instanceof PDFTextField)) continue;
     (field as any).acroField.dict.delete(PDFName.of('RV'));
-    if (/^skills\.score\.\d+$/.test(field.getName())) {
-      try { field.updateAppearances(boldFont); } catch { /* skip — unsupported field type */ }
-    }
+    const isScoreField = /^skills\.score\.\d+$/.test(field.getName());
+    try { field.updateAppearances(isScoreField ? boldFont : regularFont); } catch { /* skip — unsupported field type */ }
   }
 
-  // NeedAppearances=True: each viewer regenerates AP streams from the field's
-  // own /DA (font name, size, colour) and widget dicts (border, background).
-  // This preserves the template's visual style without any overrides from
-  // pdf-lib's embedded OpenType fonts.
+  // Keep NeedAppearances unset so viewers use the AP streams we generated.
+  // This avoids browser re-render paths that can map space glyphs incorrectly.
   pdfDoc.catalog.lookup(PDFName.of('AcroForm'), PDFDict)
-    .set(PDFName.of('NeedAppearances'), PDFBool.True);
+    .delete(PDFName.of('NeedAppearances'));
 
   // Set document language (catalog + XMP dc:language) so Adobe AI and
   // accessibility tools recognise this as an English document.
